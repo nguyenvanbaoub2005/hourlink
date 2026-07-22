@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Node / Expo (Frontend)
+fe/node_modules/
+fe/.expo/
+fe/dist/
+fe/npm-debug.*
+fe/yarn-error.log
+fe/yarn-debug.log
+
+# Java / Spring Boot (Backend)
+BE/target/
+BE/build/
+BE/.mvn/wrapper/maven-wrapper.jar
+BE/log/
+BE/logs/
+*.class
+*.log
+
+# Env
+.env
+.env.local
