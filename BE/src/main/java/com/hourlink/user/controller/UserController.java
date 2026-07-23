@@ -30,5 +30,17 @@ public class UserController {
 
     UserService userService;
 
-    // TODO: thêm các endpoints
+    @Operation(summary = "Xem hồ sơ bản thân")
+    @GetMapping("/profile")
+    public ApiResponse<com.hourlink.user.dto.UserDto> getMyProfile() {
+        return ApiResponse.success(userService.getMyProfile());
+    }
+
+    @Operation(summary = "Cập nhật hồ sơ bản thân")
+    @PutMapping("/profile")
+    public ApiResponse<com.hourlink.user.dto.UserDto> updateMyProfile(
+            @jakarta.validation.Valid @RequestBody com.hourlink.user.dto.ProfileUpdateRequest request) {
+        // trigger recompilation
+        return ApiResponse.success(userService.updateMyProfile(request));
+    }
 }

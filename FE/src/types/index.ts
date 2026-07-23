@@ -69,6 +69,18 @@ export interface UserResponse {
   createdAt: string;
 }
 
+export interface ProfileUpdateRequest {
+  fullName: string;
+  bio?: string;
+  region?: string;
+  phone?: string;
+  email?: string;
+  occupation?: string;
+  languages?: string;
+  avatarUrl?: string;
+  dob?: string;
+}
+
 export interface OrganizationProfile {
   id: string;
   userId: string;
