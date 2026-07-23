@@ -25,6 +25,7 @@ public enum ErrorCode {
     NOT_FOUND(404,           "Không tìm thấy tài nguyên",               HttpStatus.NOT_FOUND),
     ACCESS_DENIED(403,       "Không có quyền truy cập",                 HttpStatus.FORBIDDEN),
     INVALID_REQUEST(400,     "Yêu cầu không hợp lệ",                    HttpStatus.BAD_REQUEST),
+    UPLOAD_FAILED(9001,      "Lỗi upload file",                         HttpStatus.INTERNAL_SERVER_ERROR),
 
     // ─── Auth / User (1xxx) ───────────────────────────────────────────
     UNAUTHENTICATED(1000,          "Chưa xác thực, vui lòng đăng nhập",       HttpStatus.UNAUTHORIZED),
