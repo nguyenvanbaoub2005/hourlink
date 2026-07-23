@@ -1,17 +1,86 @@
 package com.hourlink.helprequest.service;
 
+import com.hourlink.common.exception.AppException;
+import com.hourlink.common.exception.ErrorCode;
+import com.hourlink.common.util.SecurityUtil;
+import com.hourlink.helprequest.dto.request.HelpRequestRequest;
+import com.hourlink.helprequest.dto.response.HelpRequestResponse;
+import com.hourlink.helprequest.entity.HelpRequest;
+import com.hourlink.helprequest.enums.RequestStatus;
+import com.hourlink.helprequest.repository.HelpRequestRepository;
+import com.hourlink.skill.entity.SkillCategory;
+import com.hourlink.skill.repository.SkillCategoryRepository;
+import com.hourlink.user.entity.User;
+import com.hourlink.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * HelprequestService — TODO: implement business logic cho module helprequest.
- */
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class HelprequestService {
-    // TODO: inject repositories + implement methods
+public class HelpRequestService {
+    private final HelpRequestRepository helpRequestRepository;
+    private final SkillCategoryRepository categoryRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public HelpRequestResponse createHelpRequest(HelpRequestRequest request) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        SkillCategory category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        HelpRequest helpRequest = HelpRequest.builder()
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .currentLevel(request.getCurrentLevel())
+                .format(request.getFormat())
+                .desiredTime(request.getDesiredTime())
+                .duration(request.getDuration())
+                .region(request.getRegion())
+                .category(category)
+                .requester(user)
+                .status(RequestStatus.SEARCHING)
+                .timeCreditAmount(request.getDuration() != null ? request.getDuration() : 1)
+                .build();
+
+        HelpRequest saved = helpRequestRepository.save(helpRequest);
+        return mapToResponse(saved);
+    }
+
+    public List<HelpRequestResponse> getMyHelpRequests() {
+        String email = SecurityUtil.getCurrentUserEmail();
+        List<HelpRequest> requests = helpRequestRepository.findAllByRequester_Email(email);
+        return requests.stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
+    private HelpRequestResponse mapToResponse(HelpRequest request) {
+        return HelpRequestResponse.builder()
+                .id(request.getId())
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .currentLevel(request.getCurrentLevel())
+                .format(request.getFormat())
+                .desiredTime(request.getDesiredTime())
+                .duration(request.getDuration())
+                .region(request.getRegion())
+                .timeCreditAmount(request.getTimeCreditAmount())
+                .status(request.getStatus())
+                .categoryId(request.getCategory() != null ? request.getCategory().getId() : null)
+                .categoryName(request.getCategory() != null ? request.getCategory().getName() : null)
+                .requesterId(request.getRequester().getId())
+                .requesterFullName(request.getRequester().getFullName())
+                .createdAt(request.getCreatedAt())
+                .updatedAt(request.getUpdatedAt())
+                .build();
+    }
 }

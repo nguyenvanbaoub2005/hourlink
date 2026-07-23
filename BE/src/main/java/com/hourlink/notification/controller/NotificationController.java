@@ -1,6 +1,6 @@
 package com.hourlink.notification.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;

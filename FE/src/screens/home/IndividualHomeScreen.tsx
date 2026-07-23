@@ -1,63 +1,293 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Colors, Fonts, Spacing, Radius } from '@constants/Colors';
-import { Feather } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { Colors, Spacing, Radius } from '@constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import HelpRequestApi from '@api/helprequest';
+import UserApi from '@api/user';
 
+// ─── Types ─────────────────────────────────────────────────────────────────
+type HelpRequestItem = {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  duration: number;
+  categoryName?: string;
+  format?: string;
+  createdAt: string;
+};
+
+// ─── Time greeting ─────────────────────────────────────────────────────────
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12)  return 'Chào buổi sáng ☀️';
+  if (h >= 12 && h < 18) return 'Chào buổi chiều 🌤';
+  return 'Chào buổi tối 🌙';
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────
 export default function IndividualHomeScreen() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const router = useRouter();
+  const [myRequests, setMyRequests] = useState<HelpRequestItem[]>([]);
+  const [firstName, setFirstName] = useState<string>('Bạn');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [reqRes, profileRes] = await Promise.all([
+        HelpRequestApi.getMyRequests(),
+        UserApi.getMyProfile()
+      ]);
+      setMyRequests(reqRes.data.data ?? []);
+      
+      if (profileRes.data.data?.fullName) {
+        setFirstName(profileRes.data.data.fullName.split(' ').pop() ?? 'Bạn');
+      } else if (user?.fullName) {
+        setFirstName(user.fullName.split(' ').pop() ?? 'Bạn');
+      }
+    } catch {
+      setMyRequests([]);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
+  const activeRequests = myRequests.filter(r => r.status === 'SEARCHING' || r.status === 'ASSIGNED');
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Xin chào,</Text>
-          <Text style={styles.name}>{user?.fullName || 'Người dùng'}</Text>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+    >
+      {/* ── Top Bar ─────────────────────────────────────────────────────── */}
+      <View style={styles.topBar}>
+        <View style={styles.logo}>
+          <View style={styles.logoIcon}><Text style={styles.logoLetter}>H</Text></View>
+          <Text style={styles.brandName}>HourLink</Text>
         </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Feather name="log-out" size={18} color={Colors.danger} />
-          <Text style={styles.logoutText}>Đăng xuất</Text>
+        <View style={styles.topRight}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Ionicons name="chatbubble-outline" size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Wallet Card ──────────────────────────────────────────────────── */}
+      <LinearGradient
+        colors={['#0D9488', '#1D4ED8']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.card}
+      >
+        <Text style={styles.greeting}>{getGreeting()}</Text>
+        <Text style={styles.greetingName}>{firstName} ơi, có gì mới?</Text>
+
+        <View style={styles.balanceRow}>
+          <View>
+            <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
+            <Text style={styles.balanceValue}>
+              0 <Text style={styles.balanceUnit}>Time Credit</Text>
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.walletBtn}>
+            <Text style={styles.walletBtnText}>Ví tiền</Text>
+            <Ionicons name="chevron-forward" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.stats}>
+          {[
+            { label: 'Đã cho', icon: 'arrow-up-outline', val: '0h' },
+            { label: 'Đã nhận', icon: 'arrow-down-outline', val: '0h' },
+            { label: 'Đang giữ', icon: 'hourglass-outline', val: '0h' },
+          ].map(s => (
+            <View key={s.label} style={styles.statBox}>
+              <Text style={styles.statLabel}>{s.label}</Text>
+              <View style={styles.statVal}>
+                <Ionicons name={s.icon as any} size={14} color="#fff" />
+                <Text style={styles.statText}>{s.val}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </LinearGradient>
+
+      {/* ── Action Buttons ───────────────────────────────────────────────── */}
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'shareSkill' } } as any)}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: '#CCFBF1' }]}>
+            <Text style={{ fontSize: 26 }}>🤝</Text>
+          </View>
+          <Text style={styles.actionTitle}>Đăng kỹ năng</Text>
+          <Text style={styles.actionSub}>Chia sẻ với cộng đồng</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'needHelp' } } as any)}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
+            <Text style={{ fontSize: 26 }}>🙋</Text>
+          </View>
+          <Text style={styles.actionTitle}>Cần hỗ trợ</Text>
+          <Text style={styles.actionSub}>Đặt yêu cầu giúp đỡ</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.creditCard}>
-        <Text style={styles.creditLabel}>Số dư Time Credit</Text>
-        <Text style={styles.creditValue}>24.5 <Text style={styles.creditUnit}>giờ</Text></Text>
+      {/* ── Lịch hẹn ─────────────────────────────────────────────────────── */}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>Lịch hẹn sắp tới</Text>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/appointments' as any)}>
+          <Text style={styles.seeAll}>Xem tất cả</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gợi ý từ AI (Matching)</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Dạy kèm Tiếng Anh</Text>
-          <Text style={styles.cardDesc}>Có 3 người đang cần học Tiếng Anh cơ bản. Kỹ năng của bạn rất phù hợp!</Text>
-        </View>
+      <View style={styles.emptyBox}>
+        <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
+        <Text style={styles.emptyText}>Chưa có lịch hẹn nào</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hoạt động cộng đồng</Text>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Dọn rác bãi biển Cần Giờ</Text>
-          <Text style={styles.cardDesc}>Tổ chức: GreenEarth - Tặng 5 Time Credit</Text>
-        </View>
+      {/* ── Yêu cầu đang hoạt động ───────────────────────────────────────── */}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>Yêu cầu đang hoạt động</Text>
+        <TouchableOpacity>
+          <Text style={styles.seeAll}>Xem thêm</Text>
+        </TouchableOpacity>
       </View>
+
+      {activeRequests.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Ionicons name="help-circle-outline" size={32} color={Colors.textMuted} />
+          <Text style={styles.emptyText}>Chưa có yêu cầu nào</Text>
+          <TouchableOpacity
+            style={styles.createBtn}
+            onPress={() => router.push('/(tabs)/post' as any)}
+          >
+            <Text style={styles.createBtnText}>+ Đăng yêu cầu ngay</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        activeRequests.map(req => (
+          <View key={req.id} style={styles.requestCard}>
+            <View style={styles.requestTopRow}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={[
+                  styles.badge,
+                  req.status === 'SEARCHING' ? { backgroundColor: '#FEF3C7' } : { backgroundColor: '#D1FAE5' }
+                ]}>
+                  <Text style={[
+                    styles.badgeText,
+                    req.status === 'SEARCHING' ? { color: '#92400E' } : { color: '#065F46' }
+                  ]}>
+                    {req.status === 'SEARCHING' ? 'Đang tìm kiếm' : 'Đã ghép'}
+                  </Text>
+                </View>
+                {req.duration ? (
+                  <View style={[styles.badge, { backgroundColor: '#FFEDD5' }]}>
+                    <Text style={[styles.badgeText, { color: '#C2410C' }]}>⏱ {req.duration / 60} TC</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            <Text style={styles.requestTitle}>{req.title}</Text>
+            {req.description ? (
+              <Text style={styles.requestDesc} numberOfLines={2}>{req.description}</Text>
+            ) : null}
+
+            <View style={styles.cardDivider} />
+            
+            <View style={styles.requestBottomRow}>
+              <Text style={styles.requestBottomText}>
+                🕒 {req.duration ? req.duration / 60 : 1} giờ · {
+                  req.format === 'OFFLINE' ? 'Trực tiếp' : 
+                  req.format === 'BOTH' ? 'Cả hai' : 'Online'
+                } 📈 3 phản hồi
+              </Text>
+              <Text style={styles.aiSuggestText}>⚡ AI gợi ý</Text>
+            </View>
+          </View>
+        ))
+      )}
+
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
 
+// ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: Colors.bgLight, padding: Spacing.xl },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
-  greeting: { fontSize: 14, color: Colors.textSecondary },
-  name: { fontSize: 22, fontWeight: 'bold', color: Colors.textPrimary, fontFamily: Fonts.bold },
-  creditCard: { backgroundColor: Colors.primary, padding: Spacing.xl, borderRadius: Radius.lg, marginBottom: Spacing.xl },
-  creditLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: Spacing.sm },
-  creditValue: { color: '#FFF', fontSize: 32, fontWeight: 'bold' },
-  creditUnit: { fontSize: 18, fontWeight: 'normal' },
-  section: { marginBottom: Spacing.xl },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.md },
-  card: { backgroundColor: Colors.bgCard, padding: Spacing.lg, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.xs },
-  cardDesc: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, gap: 6 },
-  logoutText: { color: Colors.danger, fontSize: 14, fontWeight: 'bold' },
+  container:    { flexGrow: 1, backgroundColor: '#F8FAFC', paddingHorizontal: Spacing.md },
+
+  topBar:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.md },
+  logo:         { flexDirection: 'row', alignItems: 'center' },
+  logoIcon:     { backgroundColor: '#0F766E', width: 34, height: 34, borderRadius: 9, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  logoLetter:   { color: '#fff', fontWeight: 'bold', fontSize: 20 },
+  brandName:    { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
+  topRight:     { flexDirection: 'row' },
+  iconBtn:      { marginLeft: Spacing.md },
+
+  card:         { borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
+  greeting:     { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 4 },
+  greetingName: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: Spacing.lg },
+  balanceRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: Spacing.lg },
+  balanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 4 },
+  balanceValue: { color: '#fff', fontSize: 34, fontWeight: 'bold' },
+  balanceUnit:  { fontSize: 16, fontWeight: '500' },
+  walletBtn:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  walletBtnText:{ color: '#fff', fontWeight: '500', marginRight: 4 },
+
+  stats:        { flexDirection: 'row', justifyContent: 'space-between' },
+  statBox:      { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.md, padding: Spacing.sm, marginHorizontal: 4, alignItems: 'center' },
+  statLabel:    { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginBottom: 4 },
+  statVal:      { flexDirection: 'row', alignItems: 'center' },
+  statText:     { color: '#fff', fontWeight: 'bold', fontSize: 15, marginLeft: 3 },
+
+  actions:      { flexDirection: 'row', gap: 12, marginBottom: Spacing.xl },
+  actionCard:   { flex: 1, backgroundColor: '#fff', padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border },
+  actionIcon:   { width: 50, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.sm },
+  actionTitle:  { fontSize: 15, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 2 },
+  actionSub:    { fontSize: 12, color: Colors.textMuted },
+
+  sectionRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: Colors.textPrimary },
+  seeAll:       { color: Colors.secondary, fontWeight: '500', fontSize: 14 },
+
+  emptyBox:     { backgroundColor: '#fff', padding: Spacing.xl, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.lg, gap: 8 },
+  emptyText:    { color: Colors.textMuted, fontStyle: 'italic' },
+  createBtn:    { marginTop: 4, backgroundColor: Colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  createBtnText:{ color: '#fff', fontWeight: 'bold' },
+
+  requestCard:  { backgroundColor: '#fff', borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm },
+  requestTopRow:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  badge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  badgeText:    { fontSize: 12, fontWeight: '600' },
+  creditText:   { fontSize: 13, color: Colors.accent, fontWeight: 'bold' },
+  requestTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 4 },
+  requestDesc:  { fontSize: 14, color: Colors.textMuted, lineHeight: 22 },
+
+  cardDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
+  requestBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  requestBottomText: { fontSize: 13, color: Colors.textMuted },
+  aiSuggestText: { fontSize: 13, fontWeight: 'bold', color: '#059669' },
 });

@@ -7,12 +7,12 @@ import type { ApiResponse, PagedResponse } from '@types';
  * Base URL: /skills
  */
 const SkillApi = {
-  getSkills: () => api.get('/skills'),
-  getMySkills: () => api.get('/skills/me'),
-  createSkill: (data: any) => api.post('/skills', data),
-  updateSkill: (data: any) => api.put(`/skills/{id}`, data),
-  deleteSkill: (id: string) => api.delete(`/skills/${id}`),
-  getCategories: () => api.get('/skills/categories'),
+  getSkills: () => api.get('/skill'),
+  getMySkills: () => api.get('/skill/my-skills'),
+  createSkill: (data: any) => api.post('/skill', data),
+  updateSkill: (id: string, data: any) => api.put(`/skill/${id}`, data),
+  toggleVisibility: (id: string) => api.patch(`/skill/${id}/toggle-visibility`),
+  getCategories: () => api.get('/skill/categories'),
 };
 
 export default SkillApi;

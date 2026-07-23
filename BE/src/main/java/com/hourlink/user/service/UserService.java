@@ -54,7 +54,7 @@ public class UserService {
         if (request.getAvatarUrl() != null && !request.getAvatarUrl().isBlank()) {
             if (request.getAvatarUrl().startsWith("data:image")) {
                 try {
-                    Map uploadResult = cloudinary.uploader().upload(request.getAvatarUrl(), ObjectUtils.emptyMap());
+                    Map<?, ?> uploadResult = cloudinary.uploader().upload(request.getAvatarUrl(), ObjectUtils.emptyMap());
                     user.setAvatarUrl(uploadResult.get("url").toString());
                 } catch (IOException e) {
                     log.error("Lỗi upload avatar: ", e);

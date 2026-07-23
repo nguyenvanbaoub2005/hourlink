@@ -1,24 +1,31 @@
 package com.hourlink.helprequest.controller;
 
+
 import com.hourlink.common.response.ApiResponse;
-import com.hourlink.helprequest.service.HelprequestService;
+import com.hourlink.helprequest.service.HelpRequestService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * HelprequestController — TODO: implement endpoints cho module helprequest.
- */
-@Tag(name = "Helprequest Management")
+@Tag(name = "Help Request Management")
 @RestController
-@RequestMapping("/help-requests")
+@RequestMapping("/help-request")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class HelprequestController {
+public class HelpRequestController {
 
-    HelprequestService helprequestService;
+    HelpRequestService helpRequestService;
 
-    // TODO: thêm các endpoints
+    @PostMapping
+    public ApiResponse<com.hourlink.helprequest.dto.response.HelpRequestResponse> createHelpRequest(
+            @RequestBody @jakarta.validation.Valid com.hourlink.helprequest.dto.request.HelpRequestRequest request) {
+        return ApiResponse.success(helpRequestService.createHelpRequest(request));
+    }
+
+    @GetMapping("/my-requests")
+    public ApiResponse<java.util.List<com.hourlink.helprequest.dto.response.HelpRequestResponse>> getMyHelpRequests() {
+        return ApiResponse.success(helpRequestService.getMyHelpRequests());
+    }
 }

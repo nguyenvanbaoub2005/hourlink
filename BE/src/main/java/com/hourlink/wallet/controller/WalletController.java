@@ -1,6 +1,6 @@
 package com.hourlink.wallet.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.wallet.service.WalletService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;

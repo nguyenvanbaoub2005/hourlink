@@ -1,6 +1,6 @@
 package com.hourlink.appointment.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.appointment.service.AppointmentService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;

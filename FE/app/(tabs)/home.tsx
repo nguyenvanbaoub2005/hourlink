@@ -12,24 +12,19 @@ export default function HomeScreen() {
   const { role } = useAuthStore();
 
   const renderHomeContent = () => {
-    switch (role) {
-      case 'ROLE_USER':
-        return <IndividualHomeScreen />;
-      case 'ROLE_ORGANIZATION':
-        return <OrganizationHomeScreen />;
-      case 'ROLE_ADMIN':
-        return <AdminHomeScreen />;
-      default:
-        return (
-          <View style={styles.center}>
-            <Text style={styles.text}>Lỗi phân quyền: Không xác định được Role ({role || 'null'}).</Text>
-            <Text style={styles.text}>Token cũ không tương thích.</Text>
-            <TouchableOpacity style={{ marginTop: 20, padding: 10, backgroundColor: Colors.danger, borderRadius: 8 }} onPress={() => useAuthStore.getState().logout()}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Đăng xuất (Xóa token lỗi)</Text>
-            </TouchableOpacity>
-          </View>
-        );
+    // Nếu role có giá trị: check đúng role
+    // Nếu role null hoặc ROLE_USER → hiển thị màn hình người dùng cá nhân
+    if (!role || role === 'ROLE_USER' || role.includes('ROLE_USER')) {
+      return <IndividualHomeScreen />;
     }
+    if (role === 'ROLE_ORGANIZATION' || role.includes('ROLE_ORGANIZATION')) {
+      return <OrganizationHomeScreen />;
+    }
+    if (role === 'ROLE_ADMIN' || role.includes('ROLE_ADMIN')) {
+      return <AdminHomeScreen />;
+    }
+    // Fallback: hiển thị luôn màn hình cá nhân
+    return <IndividualHomeScreen />;
   };
 
   return (

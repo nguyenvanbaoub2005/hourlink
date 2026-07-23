@@ -1,6 +1,6 @@
 package com.hourlink.chat.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.chat.service.ChatService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;
