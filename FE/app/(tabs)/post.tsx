@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
 
@@ -37,6 +37,9 @@ const FORMAT_MAP = {
 // ─── Component ─────────────────────────────────────────────
 export default function PostScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ editId?: string; editType?: 'needHelp' | 'shareSkill'; initialData?: string }>();
+  const { editId, editType, initialData } = params;
+
   const [activeTab, setActiveTab] = useState<'needHelp' | 'shareSkill'>('needHelp');
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
@@ -66,10 +69,54 @@ export default function PostScreen() {
   // ── Fetch categories ───────────────────────────────────
   useEffect(() => {
     SkillApi.getCategories()
-      .then(res => setCategories(res.data.data ?? []))
+      .then(res => {
+        const list = res.data.data ?? [];
+        const order = ['Lập trình', 'Ngôn ngữ', 'Thiết kế', 'Kinh doanh', 'Giáo dục', 'Sức khỏe', 'Nghệ thuật', 'Khác'];
+        const sorted = [...list].sort((a, b) => {
+          const idxA = order.indexOf(a.name);
+          const idxB = order.indexOf(b.name);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (a.name === 'Khác') return 1;
+          if (b.name === 'Khác') return -1;
+          return 0;
+        });
+        setCategories(sorted);
+      })
       .catch(() => setCategories([]))
       .finally(() => setLoadingCats(false));
   }, []);
+
+  useEffect(() => {
+    if (editId && initialData) {
+      try {
+        const data = JSON.parse(initialData);
+        if (editType) setActiveTab(editType);
+        setTitle(data.name || data.title || '');
+        setDescription(data.description || '');
+        setFormat(data.format === 'OFFLINE' ? 'Trực tiếp' : 'Online');
+        setRegion(data.region || '');
+        setLevel(data.level || '');
+        setCurrentLevel(data.currentLevel || '');
+        setFreeTime(data.freeTime || '');
+        setDesiredTime(data.desiredTime || '');
+        const durVal = data.duration || (data.timeCreditAmount ? data.timeCreditAmount * 60 : 60);
+        const durOpt = DURATION_OPTIONS.find(d => d.minutes === durVal) || DURATION_OPTIONS[1];
+        setSelectedDur(durOpt);
+      } catch (e) {
+        console.error('Error parsing initialData:', e);
+      }
+    }
+  }, [editId, initialData]);
+
+  useEffect(() => {
+    if (editId && initialData && categories.length > 0 && !category) {
+      try {
+        const data = JSON.parse(initialData);
+        const cat = categories.find(c => c.id === data.categoryId || c.name === data.categoryName);
+        if (cat) setCategory(cat);
+      } catch (e) {}
+    }
+  }, [categories, editId, initialData]);
 
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -78,7 +125,33 @@ export default function PostScreen() {
 
     setSubmitting(true);
     try {
-      if (activeTab === 'shareSkill') {
+      if (editId) {
+        if (activeTab === 'shareSkill') {
+          await SkillApi.updateSkill(editId, {
+            name:        title,
+            description,
+            level,
+            format:      FORMAT_MAP[format as keyof typeof FORMAT_MAP],
+            duration:    selectedDur.minutes,
+            freeTime,
+            region,
+            categoryId:  category.id,
+          });
+          Alert.alert('Thành công 🎉', 'Kỹ năng của bạn đã được cập nhật!');
+        } else {
+          await HelpRequestApi.updateRequest(editId, {
+            title,
+            description,
+            currentLevel,
+            format:      FORMAT_MAP[format as keyof typeof FORMAT_MAP],
+            desiredTime,
+            duration:    selectedDur.minutes,
+            region,
+            categoryId:  category.id,
+          });
+          Alert.alert('Thành công 🎉', 'Yêu cầu hỗ trợ đã được cập nhật!');
+        }
+      } else if (activeTab === 'shareSkill') {
         if (!level) return Alert.alert('Thiếu thông tin', 'Vui lòng chọn trình độ.');
         await SkillApi.createSkill({
           name:        title,
@@ -167,24 +240,33 @@ export default function PostScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Đăng bài</Text>
+      <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
+        {editId ? (
+          <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
+            <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        ) : null}
+        <Text style={styles.headerTitle}>
+          {editId ? (activeTab === 'needHelp' ? 'Chỉnh sửa yêu cầu' : 'Chỉnh sửa kỹ năng') : 'Đăng bài'}
+        </Text>
       </View>
 
       {/* Tab Switch */}
-      <View style={styles.tabBar}>
-        {(['needHelp', 'shareSkill'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'needHelp' ? '🙋 Cần hỗ trợ' : '🤝 Chia sẻ kỹ năng'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {!editId && (
+        <View style={styles.tabBar}>
+          {(['needHelp', 'shareSkill'] as const).map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab === 'needHelp' ? '🙋 Cần hỗ trợ' : '🤝 Chia sẻ kỹ năng'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
 
@@ -305,7 +387,7 @@ export default function PostScreen() {
           {submitting
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.submitBtnText}>
-                {activeTab === 'needHelp' ? '🤖 Đăng yêu cầu • AI tìm người' : '✨ Đăng kỹ năng'}
+                {editId ? '💾 Lưu thay đổi' : (activeTab === 'needHelp' ? '🤖 Đăng yêu cầu • AI tìm người' : '✨ Đăng kỹ năng')}
               </Text>
           }
         </TouchableOpacity>

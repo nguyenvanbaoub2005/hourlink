@@ -174,7 +174,12 @@ export default function ProfileScreen() {
           </View>
 
           {/* Muốn học */}
-          <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Muốn học</Text>
+          <View style={[styles.sectionHeaderRow, { marginTop: Spacing.lg }]}>
+            <Text style={styles.sectionTitle}>Muốn học</Text>
+            <TouchableOpacity onPress={() => router.push('/profile/help-requests' as any)}>
+              <Text style={styles.actionLink}>Quản lý</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.chipWrap}>
             {activeRequests.length > 0 ? (
               activeRequests.map(req => (

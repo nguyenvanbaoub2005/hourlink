@@ -63,6 +63,61 @@ public class HelpRequestService {
         return requests.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    @Transactional
+    public HelpRequestResponse updateHelpRequest(UUID id, HelpRequestRequest request) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        HelpRequest helpRequest = helpRequestRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        if (!helpRequest.getRequester().getEmail().equals(email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+
+        SkillCategory category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        helpRequest.setTitle(request.getTitle());
+        helpRequest.setDescription(request.getDescription());
+        helpRequest.setCurrentLevel(request.getCurrentLevel());
+        helpRequest.setFormat(request.getFormat());
+        helpRequest.setDesiredTime(request.getDesiredTime());
+        helpRequest.setDuration(request.getDuration());
+        helpRequest.setRegion(request.getRegion());
+        helpRequest.setCategory(category);
+        if (request.getDuration() != null) {
+            helpRequest.setTimeCreditAmount(request.getDuration());
+        }
+
+        return mapToResponse(helpRequestRepository.save(helpRequest));
+    }
+
+    @Transactional
+    public void deleteHelpRequest(UUID id) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        HelpRequest helpRequest = helpRequestRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        if (!helpRequest.getRequester().getEmail().equals(email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+
+        helpRequestRepository.delete(helpRequest);
+    }
+
+    @Transactional
+    public HelpRequestResponse closeHelpRequest(UUID id) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        HelpRequest helpRequest = helpRequestRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        if (!helpRequest.getRequester().getEmail().equals(email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+
+        helpRequest.setStatus(RequestStatus.COMPLETED);
+        return mapToResponse(helpRequestRepository.save(helpRequest));
+    }
+
     private HelpRequestResponse mapToResponse(HelpRequest request) {
         return HelpRequestResponse.builder()
                 .id(request.getId())

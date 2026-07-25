@@ -171,7 +171,7 @@ export default function IndividualHomeScreen() {
       {/* ── Yêu cầu đang hoạt động ───────────────────────────────────────── */}
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>Yêu cầu đang hoạt động</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/profile/help-requests' as any)}>
           <Text style={styles.seeAll}>Xem thêm</Text>
         </TouchableOpacity>
       </View>

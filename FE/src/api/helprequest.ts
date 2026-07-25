@@ -10,6 +10,8 @@ const HelpRequestApi = {
   getRequests: () => api.get('/help-request'),
   getMyRequests: () => api.get('/help-request/my-requests'),
   createRequest: (data: any) => api.post('/help-request', data),
+  updateRequest: (id: string, data: any) => api.put(`/help-request/${id}`, data),
+  deleteRequest: (id: string) => api.delete(`/help-request/${id}`),
   closeRequest: (id: string) => api.put(`/help-request/${id}/close`),
 };
 

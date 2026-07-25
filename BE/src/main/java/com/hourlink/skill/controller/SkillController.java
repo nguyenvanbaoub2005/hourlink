@@ -43,6 +43,12 @@ public class SkillController {
         return ApiResponse.success(skillService.toggleSkillVisibility(id));
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteSkill(@PathVariable java.util.UUID id) {
+        skillService.deleteSkill(id);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/categories")
     public ApiResponse<java.util.List<com.hourlink.skill.dto.response.SkillCategoryResponse>> getCategories() {
         return ApiResponse.success(skillService.getCategories());

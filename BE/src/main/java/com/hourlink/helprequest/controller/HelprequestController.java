@@ -28,4 +28,22 @@ public class HelpRequestController {
     public ApiResponse<java.util.List<com.hourlink.helprequest.dto.response.HelpRequestResponse>> getMyHelpRequests() {
         return ApiResponse.success(helpRequestService.getMyHelpRequests());
     }
+
+    @PutMapping("/{id}")
+    public ApiResponse<com.hourlink.helprequest.dto.response.HelpRequestResponse> updateHelpRequest(
+            @PathVariable java.util.UUID id,
+            @RequestBody @jakarta.validation.Valid com.hourlink.helprequest.dto.request.HelpRequestRequest request) {
+        return ApiResponse.success(helpRequestService.updateHelpRequest(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteHelpRequest(@PathVariable java.util.UUID id) {
+        helpRequestService.deleteHelpRequest(id);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/{id}/close")
+    public ApiResponse<com.hourlink.helprequest.dto.response.HelpRequestResponse> closeHelpRequest(@PathVariable java.util.UUID id) {
+        return ApiResponse.success(helpRequestService.closeHelpRequest(id));
+    }
 }

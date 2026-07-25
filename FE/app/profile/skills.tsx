@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Switch, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +40,40 @@ export default function SkillsScreen() {
     }
   };
 
+  const handleDelete = (id: string) => {
+    Alert.alert(
+      'Xác nhận xóa',
+      'Bạn có chắc chắn muốn xóa kỹ năng này?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xóa',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await SkillApi.deleteSkill(id);
+              setSkills(prev => prev.filter(s => s.id !== id));
+              Alert.alert('Thành công', 'Đã xóa kỹ năng');
+            } catch (error) {
+              Alert.alert('Lỗi', 'Không thể xóa kỹ năng này');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEdit = (item: any) => {
+    router.push({
+      pathname: '/(tabs)/post' as any,
+      params: {
+        editId: item.id,
+        editType: 'shareSkill',
+        initialData: JSON.stringify(item),
+      },
+    });
+  };
+
   const renderItem = ({ item }: { item: any }) => {
     const isVisible = item.status === 'VISIBLE';
     return (
@@ -47,7 +81,7 @@ export default function SkillsScreen() {
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.skillTitle}>{item.name}</Text>
-            <Text style={styles.skillSubtitle}>Lập trình · {item.level}</Text>
+            <Text style={styles.skillSubtitle}>{item.categoryName || 'Khác'} · {item.level}</Text>
           </View>
           <Switch
             value={isVisible}
@@ -67,12 +101,16 @@ export default function SkillsScreen() {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleEdit(item)}>
             <Ionicons name="pencil-outline" size={16} color={Colors.textMuted} />
             <Text style={styles.actionText}>Chỉnh sửa</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#f0fdfa' }]}>
-            <Text style={[styles.actionText, { color: Colors.primary }]}>Xem trước</Text>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#fef2f2' }]}
+            onPress={() => handleDelete(item.id)}
+          >
+            <Ionicons name="trash-outline" size={16} color="#ef4444" />
+            <Text style={[styles.actionText, { color: '#ef4444' }]}>Xóa</Text>
           </TouchableOpacity>
         </View>
       </View>

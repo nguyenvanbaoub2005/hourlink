@@ -102,13 +102,38 @@ public class SkillService {
     }
 
     public List<com.hourlink.skill.dto.response.SkillCategoryResponse> getCategories() {
+        List<String> order = List.of(
+                "Lập trình", "Ngôn ngữ", "Thiết kế", "Kinh doanh",
+                "Giáo dục", "Sức khỏe", "Nghệ thuật", "Khác"
+        );
         return categoryRepository.findAll().stream()
+                .sorted((a, b) -> {
+                    int idxA = order.indexOf(a.getName());
+                    int idxB = order.indexOf(b.getName());
+                    if (idxA != -1 && idxB != -1) return Integer.compare(idxA, idxB);
+                    if ("Khác".equals(a.getName())) return 1;
+                    if ("Khác".equals(b.getName())) return -1;
+                    return a.getName().compareTo(b.getName());
+                })
                 .map(c -> com.hourlink.skill.dto.response.SkillCategoryResponse.builder()
                         .id(c.getId())
                         .name(c.getName())
                         .description(c.getDescription())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteSkill(UUID skillId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        Skill skill = skillRepository.findById(skillId)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        if (!skill.getUser().getEmail().equals(email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+
+        skillRepository.delete(skill);
     }
 
     private SkillResponse mapToResponse(Skill skill) {
