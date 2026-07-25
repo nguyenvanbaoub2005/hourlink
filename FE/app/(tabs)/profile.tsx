@@ -47,6 +47,10 @@ export default function ProfileScreen() {
       router.push('/profile/help-requests' as any);
       return;
     }
+    if (label === 'Lời mời') {
+      router.push('/profile/invitations' as any);
+      return;
+    }
     Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
   };
 

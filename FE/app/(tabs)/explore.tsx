@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import SkillApi from '@api/skill';
 
@@ -35,6 +35,7 @@ type SkillItem = {
 };
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const [keyword, setKeyword] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null); // null = Tất cả, 'ONLINE', 'OFFLINE', 'BOTH'
@@ -450,12 +451,23 @@ export default function ExploreScreen() {
                     style={styles.modalBtnCancel}
                     onPress={() => setModalVisible(false)}
                   >
-                    <Text style={styles.modalBtnCancelText}>Đóng</Text>
+                    <Text style={styles.modalBtnCancelText}>Nhắn tin</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.modalBtnAction}
                     onPress={() => {
                       setModalVisible(false);
+                      if (selectedSkill) {
+                        router.push({
+                          pathname: '/profile/send-invitation' as any,
+                          params: {
+                            receiverId: selectedSkill.userId,
+                            receiverName: selectedSkill.userFullName ?? 'Thành viên',
+                            skillId: selectedSkill.id,
+                            skillName: selectedSkill.name,
+                          },
+                        });
+                      }
                     }}
                   >
                     <Text style={styles.modalBtnActionText}>Gửi lời mời hỗ trợ</Text>
