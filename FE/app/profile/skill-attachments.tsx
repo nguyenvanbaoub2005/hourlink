@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   ActivityIndicator, Alert, Image, Modal, ScrollView,
-  Platform, Linking,
+  Platform, Linking, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +49,10 @@ export default function SkillAttachmentsScreen() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [fileToRename, setFileToRename] = useState<{uri: string, name: string, type: string} | null>(null);
+  const [newFileName, setNewFileName] = useState('');
 
   const fetchAttachments = useCallback(async () => {
     if (!skillId) return;
@@ -104,7 +108,9 @@ export default function SkillAttachmentsScreen() {
       const asset = result.assets[0];
       const name = asset.fileName ?? `image_${Date.now()}.jpg`;
       const type = asset.mimeType ?? 'image/jpeg';
-      await uploadFile(asset.uri, name, type);
+      setFileToRename({ uri: asset.uri, name, type });
+      setNewFileName(name);
+      setRenameModalVisible(true);
     }
   };
 
@@ -121,7 +127,9 @@ export default function SkillAttachmentsScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      await uploadFile(asset.uri, asset.name, asset.mimeType ?? 'application/octet-stream');
+      setFileToRename({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/octet-stream' });
+      setNewFileName(asset.name);
+      setRenameModalVisible(true);
     }
   };
 
@@ -287,6 +295,42 @@ export default function SkillAttachmentsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Rename Modal */}
+      <Modal visible={renameModalVisible} transparent animationType="fade" onRequestClose={() => setRenameModalVisible(false)}>
+        <View style={styles.renameOverlay}>
+          <View style={styles.renameBox}>
+            <Text style={styles.renameTitle}>Đổi tên file</Text>
+            <Text style={styles.renameSub}>Nhập tên hiển thị cho file này trước khi tải lên</Text>
+            <TextInput
+              style={styles.renameInput}
+              value={newFileName}
+              onChangeText={setNewFileName}
+              autoFocus
+              selectTextOnFocus
+            />
+            <View style={styles.renameActions}>
+              <TouchableOpacity style={[styles.renameBtn, styles.renameCancel]} onPress={() => { setRenameModalVisible(false); setFileToRename(null); }}>
+                <Text style={styles.renameCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.renameBtn, styles.renameConfirm]} onPress={async () => {
+                if (!fileToRename || !newFileName.trim()) return;
+                setRenameModalVisible(false);
+                // Ensure extension is kept
+                let finalName = newFileName.trim();
+                const ext = fileToRename.name.split('.').pop();
+                if (ext && !finalName.toLowerCase().endsWith(`.${ext.toLowerCase()}`)) {
+                  finalName = `${finalName}.${ext}`;
+                }
+                await uploadFile(fileToRename.uri, finalName, fileToRename.type);
+                setFileToRename(null);
+              }}>
+                <Text style={styles.renameConfirmText}>Tải lên</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -400,4 +444,34 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   previewImg: { width: '95%', height: '80%' },
+
+  // Rename modal
+  renameOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center',
+    padding: 24,
+  },
+  renameBox: {
+    width: '100%', backgroundColor: '#fff',
+    borderRadius: 20, padding: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
+  },
+  renameTitle: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 6 },
+  renameSub: { fontSize: 13, color: '#64748B', marginBottom: 16 },
+  renameInput: {
+    borderWidth: 1, borderColor: '#E2E8F0',
+    borderRadius: 12, padding: 12, fontSize: 15,
+    color: '#0F172A', backgroundColor: '#F8FAFC',
+    marginBottom: 20,
+  },
+  renameActions: { flexDirection: 'row', gap: 12 },
+  renameBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  renameCancel: { backgroundColor: '#F1F5F9' },
+  renameConfirm: { backgroundColor: Colors.primary },
+  renameCancelText: { color: '#64748B', fontWeight: '600', fontSize: 15 },
+  renameConfirmText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 });
