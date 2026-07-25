@@ -1,6 +1,6 @@
 package com.hourlink.report.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.report.service.ReportService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;

@@ -7,10 +7,12 @@ import type { ApiResponse, PagedResponse } from '@types';
  * Base URL: /help-requests
  */
 const HelpRequestApi = {
-  getRequests: () => api.get('/help-requests'),
-  getMyRequests: () => api.get('/help-requests/me'),
-  createRequest: (data: any) => api.post('/help-requests', data),
-  closeRequest: (id: string) => api.put(`/help-requests/${id}/close`),
+  getRequests: () => api.get('/help-request'),
+  getMyRequests: () => api.get('/help-request/my-requests'),
+  createRequest: (data: any) => api.post('/help-request', data),
+  updateRequest: (id: string, data: any) => api.put(`/help-request/${id}`, data),
+  deleteRequest: (id: string) => api.delete(`/help-request/${id}`),
+  closeRequest: (id: string) => api.put(`/help-request/${id}/close`),
 };
 
 export default HelpRequestApi;

@@ -1,6 +1,6 @@
 package com.hourlink.invitation.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.invitation.service.InvitationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;

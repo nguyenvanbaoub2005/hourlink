@@ -25,4 +25,16 @@ public final class SecurityUtil {
         }
         return authentication.getName();
     }
+
+    /**
+     * Lấy email (subject) của người dùng hiện tại nếu có, trả về null nếu chưa đăng nhập hoặc anonymous.
+     */
+    public static String getCurrentUserEmailOrNull() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
+            return null;
+        }
+        return authentication.getName();
+    }
 }

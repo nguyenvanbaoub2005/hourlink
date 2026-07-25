@@ -1,6 +1,6 @@
 package com.hourlink.community.controller;
 
-import com.hourlink.common.response.ApiResponse;
+
 import com.hourlink.community.service.CommunityService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.AccessLevel;

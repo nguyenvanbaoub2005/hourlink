@@ -7,5 +7,5 @@ import java.util.UUID;
 
 @Repository
 public interface HelpRequestRepository extends JpaRepository<HelpRequest, UUID> {
-    // TODO: thêm custom queries
+    java.util.List<HelpRequest> findAllByRequester_Email(String email);
 }
