@@ -222,7 +222,7 @@ export default function IndividualHomeScreen() {
                 🕒 {req.duration ? req.duration / 60 : 1} giờ · {
                   req.format === 'OFFLINE' ? 'Trực tiếp' : 
                   req.format === 'BOTH' ? 'Cả hai' : 'Online'
-                } 📈 3 phản hồi
+                } 📈 {req.responseCount ?? 0} phản hồi
               </Text>
               <Text style={styles.aiSuggestText}>⚡ AI gợi ý</Text>
             </View>

@@ -134,6 +134,7 @@ public class HelpRequestService {
                 .categoryName(request.getCategory() != null ? request.getCategory().getName() : null)
                 .requesterId(request.getRequester().getId())
                 .requesterFullName(request.getRequester().getFullName())
+                .responseCount(request.getResponseCount() != null ? request.getResponseCount() : 0)
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
                 .build();

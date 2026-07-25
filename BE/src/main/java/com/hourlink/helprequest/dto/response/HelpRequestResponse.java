@@ -25,6 +25,7 @@ public class HelpRequestResponse {
     String categoryName;
     UUID requesterId;
     String requesterFullName;
+    Integer responseCount;
     Instant createdAt;
     Instant updatedAt;
 }

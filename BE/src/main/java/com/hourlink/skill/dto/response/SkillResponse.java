@@ -25,6 +25,11 @@ public class SkillResponse {
     String categoryName;
     UUID userId;
     String userFullName;
+    String userAvatarUrl;
+    Double userReputationScore;
+    Integer userCompletedSessions;
+    String userRegion;
+    String userOccupation;
     Instant createdAt;
     Instant updatedAt;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Image, ActivityIndicator, RefreshControl
+  Image, ActivityIndicator, RefreshControl, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -10,6 +10,7 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import UserApi from '@api/user';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
+import { useAuthStore } from '@store/authStore';
 import type { UserResponse } from '@types';
 
 type SkillItem = { id: string; name: string; status: string };
@@ -17,11 +18,37 @@ type RequestItem = { id: string; title: string; categoryName?: string; status: s
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { logout } = useAuthStore();
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const handleMenuPress = (label: string, isLogout?: boolean) => {
+    if (isLogout) {
+      Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi HourLink?', [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ]);
+      return;
+    }
+    if (label === 'Ví Time Credit') {
+      router.push('/(tabs)/wallet' as any);
+      return;
+    }
+    if (label === 'Yêu cầu của tôi') {
+      router.push('/profile/help-requests' as any);
+      return;
+    }
+    Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
+  };
 
   const fetchAll = async () => {
     try {
@@ -208,22 +235,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          {[
-            { icon: 'wallet-outline', color: '#0284C7', bg: '#E0F2FE', label: 'Ví Time Credit' },
-            { icon: 'book-outline',   color: '#9333EA', bg: '#F3E8FF', label: 'Yêu cầu của tôi' },
-          ].map(item => (
-            <TouchableOpacity key={item.label} style={styles.menuItem}>
-              <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
-                <Ionicons name={item.icon as any} size={20} color={item.color} />
-              </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
         {/* Nghề nghiệp & Ngôn ngữ */}
         {(profile.occupation || profile.languages) && (
           <View style={styles.section}>
@@ -249,6 +260,71 @@ export default function ProfileScreen() {
             )}
           </View>
         )}
+
+        {/* Menu Items (Theo ảnh 3) */}
+        <View style={styles.menuSection}>
+          <Text style={[styles.sectionTitle, { marginBottom: Spacing.md, marginTop: Spacing.sm }]}>Cài đặt & Tiện ích</Text>
+
+          {/* Nhóm 1: Hoạt động & Uy tín */}
+          {[
+            { icon: 'wallet-outline', color: '#059669', bg: '#D1FAE5', label: 'Ví Time Credit' },
+            { icon: 'book-outline', color: '#0284C7', bg: '#E0F2FE', label: 'Yêu cầu của tôi' },
+            { icon: 'star-outline', color: '#D97706', bg: '#FFEDD5', label: 'Đánh giá & Uy tín' },
+            { icon: 'people-outline', color: '#9333EA', bg: '#F3E8FF', label: 'Lời mời' },
+          ].map(item => (
+            <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
+              <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={20} color={item.color} />
+              </View>
+              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+
+          <View style={styles.menuDivider} />
+
+          {/* Nhóm 2: Cài đặt tài khoản */}
+          {[
+            { icon: 'notifications-outline', color: '#EA580C', bg: '#FFEDD5', label: 'Thông báo' },
+            { icon: 'lock-closed-outline', color: '#2563EB', bg: '#E0F2FE', label: 'Bảo mật' },
+            { icon: 'eye-off-outline', color: '#64748B', bg: '#F1F5F9', label: 'Quyền riêng tư' },
+          ].map(item => (
+            <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
+              <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={20} color={item.color} />
+              </View>
+              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+
+          <View style={styles.menuDivider} />
+
+          {/* Nhóm 3: Hỗ trợ & Khác */}
+          {[
+            { icon: 'help-circle-outline', color: '#10B981', bg: '#D1FAE5', label: 'Trợ giúp & FAQ' },
+            { icon: 'document-text-outline', color: '#64748B', bg: '#F1F5F9', label: 'Điều khoản dịch vụ' },
+          ].map(item => (
+            <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
+              <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={20} color={item.color} />
+              </View>
+              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+
+          <View style={styles.menuDivider} />
+
+          {/* Đăng xuất */}
+          <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuPress('Đăng xuất', true)}>
+            <View style={[styles.menuIconWrap, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+            </View>
+            <Text style={[styles.menuLabel, { color: '#DC2626', fontWeight: 'bold' }]}>Đăng xuất</Text>
+            <Ionicons name="chevron-forward" size={18} color="#FCA5A5" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -305,8 +381,9 @@ const styles = StyleSheet.create({
   badgeLabel:   { fontSize: 12, color: Colors.textMuted, textAlign: 'center', lineHeight: 16 },
 
   // Menu
-  menuSection:  { paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
-  menuItem:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.sm },
-  menuIconWrap: { width: 40, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
+  menuSection:  { paddingHorizontal: Spacing.md, marginBottom: Spacing.xl, marginTop: Spacing.md },
+  menuItem:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: Spacing.md, borderRadius: Radius.lg, marginBottom: 8, borderWidth: 1, borderColor: '#F1F5F9' },
+  menuIconWrap: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: Spacing.md },
   menuLabel:    { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.textPrimary },
+  menuDivider:  { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
 });

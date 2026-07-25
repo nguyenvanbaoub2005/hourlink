@@ -29,6 +29,7 @@ public class SkillService {
     private final SkillRepository skillRepository;
     private final SkillCategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final com.hourlink.skill.repository.SkillAttachmentRepository attachmentRepository;
 
     @Transactional
     public SkillResponse createSkill(SkillRequest request) {
@@ -59,7 +60,10 @@ public class SkillService {
     public List<SkillResponse> getMySkills() {
         String email = SecurityUtil.getCurrentUserEmail();
         List<Skill> skills = skillRepository.findAllByUser_Email(email);
-        return skills.stream().map(this::mapToResponse).collect(Collectors.toList());
+        return skills.stream()
+                .filter(s -> s.getStatus() != SkillStatus.DELETED)
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -133,7 +137,53 @@ public class SkillService {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
 
-        skillRepository.delete(skill);
+        // ── Kiểm tra ràng buộc nghiệp vụ (Cases 2 & 3) ───────────────────
+        // Hiện tại khi chưa có bảng Session/Booking riêng, ta kiểm tra số buổi học hoàn thành của Mentor.
+        boolean hasSessionHistory = skill.getUser().getCompletedSessions() > 0;
+
+        if (hasSessionHistory) {
+            // Kịch bản 3: Đã có lịch sử học tập -> Xóa mềm (Soft Delete / Archive)
+            skill.setStatus(SkillStatus.DELETED);
+            skillRepository.save(skill);
+        } else {
+            // Kịch bản 1: Chưa có phát sinh học tập -> Xóa vĩnh viễn (Hard Delete)
+            attachmentRepository.deleteAllBySkill_Id(skillId);
+            skillRepository.delete(skill);
+        }
+    }
+
+    public List<SkillResponse> searchSkills(String keyword, UUID categoryId, com.hourlink.skill.enums.SessionFormat format, String region) {
+        String currentEmail = SecurityUtil.getCurrentUserEmailOrNull();
+        List<Skill> skills = skillRepository.findAllByStatus(SkillStatus.VISIBLE);
+        return skills.stream()
+                .filter(s -> {
+                    if (currentEmail != null && s.getUser() != null && currentEmail.equals(s.getUser().getEmail())) {
+                        return false;
+                    }
+                    if (keyword != null && !keyword.trim().isEmpty()) {
+                        String kw = keyword.trim().toLowerCase();
+                        boolean matchName = s.getName() != null && s.getName().toLowerCase().contains(kw);
+                        boolean matchDesc = s.getDescription() != null && s.getDescription().toLowerCase().contains(kw);
+                        boolean matchUser = s.getUser() != null && s.getUser().getFullName() != null && s.getUser().getFullName().toLowerCase().contains(kw);
+                        boolean matchCat = s.getCategory() != null && s.getCategory().getName() != null && s.getCategory().getName().toLowerCase().contains(kw);
+                        if (!matchName && !matchDesc && !matchUser && !matchCat) return false;
+                    }
+                    if (categoryId != null) {
+                        if (s.getCategory() == null || !s.getCategory().getId().equals(categoryId)) return false;
+                    }
+                    if (format != null) {
+                        if (s.getFormat() != format) return false;
+                    }
+                    if (region != null && !region.trim().isEmpty()) {
+                        String reg = region.trim().toLowerCase();
+                        boolean matchSkillReg = s.getRegion() != null && s.getRegion().toLowerCase().contains(reg);
+                        boolean matchUserReg = s.getUser() != null && s.getUser().getRegion() != null && s.getUser().getRegion().toLowerCase().contains(reg);
+                        if (!matchSkillReg && !matchUserReg) return false;
+                    }
+                    return true;
+                })
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     private SkillResponse mapToResponse(Skill skill) {
@@ -151,6 +201,11 @@ public class SkillService {
                 .categoryName(skill.getCategory() != null ? skill.getCategory().getName() : null)
                 .userId(skill.getUser().getId())
                 .userFullName(skill.getUser().getFullName())
+                .userAvatarUrl(skill.getUser().getAvatarUrl())
+                .userReputationScore(skill.getUser().getReputationScore())
+                .userCompletedSessions(skill.getUser().getCompletedSessions())
+                .userRegion(skill.getUser().getRegion())
+                .userOccupation(skill.getUser().getOccupation())
                 .createdAt(skill.getCreatedAt())
                 .updatedAt(skill.getUpdatedAt())
                 .build();

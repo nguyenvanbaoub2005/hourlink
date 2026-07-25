@@ -58,6 +58,15 @@ public class SkillController {
         return ApiResponse.success(skillService.getCategories());
     }
 
+    @GetMapping("/search")
+    public ApiResponse<java.util.List<com.hourlink.skill.dto.response.SkillResponse>> searchSkills(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "categoryId", required = false) java.util.UUID categoryId,
+            @RequestParam(value = "format", required = false) com.hourlink.skill.enums.SessionFormat format,
+            @RequestParam(value = "region", required = false) String region) {
+        return ApiResponse.success(skillService.searchSkills(keyword, categoryId, format, region));
+    }
+
     // ─── Attachment endpoints ────────────────────────────────────────
 
     /**

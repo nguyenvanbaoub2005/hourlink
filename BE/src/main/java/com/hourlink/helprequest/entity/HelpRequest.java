@@ -46,6 +46,10 @@ public class HelpRequest extends BaseEntity {
     @Builder.Default
     RequestStatus status = RequestStatus.SEARCHING;
 
+    @Column(name = "response_count", nullable = false)
+    @Builder.Default
+    Integer responseCount = 0;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     SkillCategory category;

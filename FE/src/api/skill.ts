@@ -14,6 +14,8 @@ const SkillApi = {
   deleteSkill: (id: string) => api.delete(`/skill/${id}`),
   toggleVisibility: (id: string) => api.patch(`/skill/${id}/toggle-visibility`),
   getCategories: () => api.get('/skill/categories'),
+  searchSkills: (params?: { keyword?: string; categoryId?: string; format?: string; region?: string }) =>
+    api.get('/skill/search', { params }),
   // Attachment APIs
   uploadAttachment: (skillId: string, formData: FormData) =>
     api.post(`/skill/${skillId}/attachments`, formData, {

@@ -367,7 +367,7 @@ export default function PostScreen() {
         <Text style={styles.label}>Khu vực</Text>
         <TextInput
           style={styles.input}
-          placeholder="VD: TP.HCM, Hà Nội, Cần Thơ, Online toàn quốc"
+          placeholder="VD: TP.HCM, Hà Nội, Huế, Online toàn quốc"
           value={region} onChangeText={setRegion}
         />
 

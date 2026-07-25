@@ -127,7 +127,7 @@ export default function HelpRequestsScreen() {
           <View style={styles.tcBadge}>
             <Text style={styles.tcText}>⏱ {item.timeCreditAmount || 1} TC</Text>
           </View>
-          <Text style={styles.replyText}>3 phản hồi</Text>
+          <Text style={styles.replyText}>{item.responseCount ?? 0} phản hồi</Text>
         </View>
 
         <View style={styles.divider} />
