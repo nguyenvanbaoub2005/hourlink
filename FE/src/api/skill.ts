@@ -14,6 +14,13 @@ const SkillApi = {
   deleteSkill: (id: string) => api.delete(`/skill/${id}`),
   toggleVisibility: (id: string) => api.patch(`/skill/${id}/toggle-visibility`),
   getCategories: () => api.get('/skill/categories'),
+  // Attachment APIs
+  uploadAttachment: (skillId: string, formData: FormData) =>
+    api.post(`/skill/${skillId}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  getAttachments: (skillId: string) => api.get(`/skill/${skillId}/attachments`),
+  deleteAttachment: (attachmentId: string) => api.delete(`/skill/attachments/${attachmentId}`),
 };
 
 export default SkillApi;

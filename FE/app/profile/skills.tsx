@@ -106,6 +106,16 @@ export default function SkillsScreen() {
             <Text style={styles.actionText}>Chỉnh sửa</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#EFF6FF' }]}
+            onPress={() => router.push({
+              pathname: '/profile/skill-attachments' as any,
+              params: { skillId: item.id, skillName: item.name },
+            })}
+          >
+            <Ionicons name="attach-outline" size={16} color="#3B82F6" />
+            <Text style={[styles.actionText, { color: '#3B82F6' }]}>Minh chứng</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: '#fef2f2' }]}
             onPress={() => handleDelete(item.id)}
           >
@@ -168,9 +178,9 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 12, fontWeight: '600' },
   badgeTextVisible: { color: Colors.primary },
   badgeTextHidden: { color: Colors.textMuted },
-  actions: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 },
-  actionButton: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 8, backgroundColor: '#f8fafc', marginHorizontal: 4 },
-  actionText: { fontSize: 14, fontWeight: '600', color: Colors.textMuted, marginLeft: 4 },
+  actions: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12, gap: 6 },
+  actionButton: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 9, borderRadius: 8, backgroundColor: '#f8fafc' },
+  actionText: { fontSize: 12, fontWeight: '600', color: Colors.textMuted, marginLeft: 3 },
   addButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.primary, marginTop: 8 },
   addButtonText: { fontSize: 16, fontWeight: '600', color: Colors.primary, marginLeft: 8 },
 });
