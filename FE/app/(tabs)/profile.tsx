@@ -211,7 +211,7 @@ export default function ProfileScreen() {
             {activeRequests.length > 0 ? (
               activeRequests.map(req => (
                 <View key={req.id} style={styles.chipOrange}>
-                  <Text style={styles.chipOrangeText}>{req.categoryName || 'Khác'}</Text>
+                  <Text style={styles.chipOrangeText}>{req.title || req.categoryName || 'Khác'}</Text>
                 </View>
               ))
             ) : (
