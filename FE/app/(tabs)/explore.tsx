@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, RefreshControl, Image, Modal,
-  Dimensions
+  Dimensions, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import SkillApi from '@api/skill';
 
@@ -35,6 +35,7 @@ type SkillItem = {
 };
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const [keyword, setKeyword] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null); // null = Tất cả, 'ONLINE', 'OFFLINE', 'BOTH'
@@ -48,6 +49,7 @@ export default function ExploreScreen() {
   // Modal chi tiết kỹ năng / người hỗ trợ
   const [selectedSkill, setSelectedSkill] = useState<SkillItem | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [modalTab, setModalTab] = useState<'intro' | 'skills' | 'reviews'>('intro');
 
   const fetchCategories = async () => {
     try {
@@ -373,7 +375,7 @@ export default function ExploreScreen() {
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
                     <Ionicons name="star" size={16} color="#F59E0B" />
-                    <Text style={styles.statScore}>{item.userReputationScore?.toFixed(1) || '5.0'}</Text>
+                    <Text style={styles.statScore}>{item.userReputationScore ? item.userReputationScore.toFixed(1) : '0.0'}</Text>
                   </View>
                   <Text style={styles.statDot}>•</Text>
                   <Text style={styles.statSessions}>{item.userCompletedSessions || 0} buổi hỗ trợ</Text>
@@ -382,6 +384,7 @@ export default function ExploreScreen() {
                   style={styles.connectBtn}
                   onPress={() => {
                     setSelectedSkill(item);
+                    setModalTab('intro');
                     setModalVisible(true);
                   }}
                 >
@@ -394,7 +397,7 @@ export default function ExploreScreen() {
         )}
       </ScrollView>
 
-      {/* ── Modal Chi tiết Kỹ năng / Người hỗ trợ ───────────────────────── */}
+      {/* ── Modal Chi tiết Người hỗ trợ (Tham khảo giao diện mới) ────────── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -405,60 +408,226 @@ export default function ExploreScreen() {
           <View style={styles.modalContainer}>
             {selectedSkill && (
               <>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Chi tiết Người hỗ trợ</Text>
-                  <TouchableOpacity onPress={() => setModalVisible(false)}>
-                    <Ionicons name="close" size={24} color={Colors.textPrimary} />
+                {/* Top Bar */}
+                <View style={styles.modalTopBar}>
+                  <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalTopBtn}>
+                    <Ionicons name="chevron-back" size={26} color="#0F172A" />
+                  </TouchableOpacity>
+                  <View style={styles.modalHandle} />
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Thông báo', 'Tính năng nhắn tin trực tiếp đang được phát triển.')}
+                    style={styles.modalTopBtn}
+                  >
+                    <Ionicons name="chatbubble-ellipses-outline" size={24} color="#0F172A" />
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView style={{ maxHeight: 400 }}>
-                  <View style={styles.modalTutorRow}>
-                    {renderAvatar(selectedSkill)}
-                    <View style={{ marginLeft: 12 }}>
-                      <Text style={styles.tutorName}>{selectedSkill.userFullName || 'Thành viên'}</Text>
-                      <Text style={styles.tutorSub}>⭐ Uy tín: {selectedSkill.userReputationScore?.toFixed(1) || '5.0'} • {selectedSkill.userCompletedSessions || 0} buổi</Text>
-                      <Text style={styles.tutorSub}>📍 Khu vực: {selectedSkill.userRegion || selectedSkill.region || 'Toàn quốc'}</Text>
+                <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+                  {/* Header Profile Info */}
+                  <View style={styles.modalProfileHeader}>
+                    <View style={styles.modalAvatarWrap}>
+                      {selectedSkill.userAvatarUrl ? (
+                        <Image source={{ uri: selectedSkill.userAvatarUrl }} style={styles.modalAvatarImg} />
+                      ) : (
+                        <View style={styles.modalAvatarCircle}>
+                          <Text style={styles.modalAvatarLetter}>
+                            {selectedSkill.userFullName ? selectedSkill.userFullName.charAt(0).toUpperCase() : 'U'}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.onlineDot} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                      <View style={styles.modalNameRow}>
+                        <Text style={styles.modalTutorName} numberOfLines={1}>
+                          {selectedSkill.userFullName || 'Thành viên'}
+                        </Text>
+                      </View>
+                      <Text style={styles.modalOccupation}>
+                        {selectedSkill.userOccupation || selectedSkill.categoryName || 'Chuyên môn hỗ trợ'}
+                      </Text>
+                      <View style={styles.modalRatingRow}>
+                        <View style={{ flexDirection: 'row', marginRight: 4 }}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Ionicons
+                              key={star}
+                              name="star"
+                              size={14}
+                              color={selectedSkill.userReputationScore && star <= selectedSkill.userReputationScore ? "#F59E0B" : "#CBD5E1"}
+                            />
+                          ))}
+                        </View>
+                        <Text style={styles.modalScoreText}>
+                          {selectedSkill.userReputationScore ? selectedSkill.userReputationScore.toFixed(1) : '0.0'}
+                        </Text>
+                        <Text style={styles.modalSessionsText}>
+                          ({selectedSkill.userCompletedSessions || 0} buổi)
+                        </Text>
+                      </View>
+                      <View style={styles.modalLocRow}>
+                        <Ionicons name="location-outline" size={13} color="#64748B" style={{ marginRight: 3 }} />
+                        <Text style={styles.modalLocText}>
+                          {selectedSkill.userRegion || selectedSkill.region || 'Chưa cập nhật'}
+                        </Text>
+                        {selectedSkill.userCompletedSessions ? (
+                          <Text style={styles.modalTcText}>
+                            ⏱️ {selectedSkill.userCompletedSessions} TC hoàn thành
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
                   </View>
 
-                  <View style={styles.modalDivider} />
-
-                  <Text style={styles.modalSectionLabel}>Kỹ năng cung cấp:</Text>
-                  <Text style={styles.modalSkillName}>{selectedSkill.name}</Text>
-                  <View style={[styles.tagRow, { marginTop: 8 }]}>
-                    <View style={styles.catBadge}><Text style={styles.catBadgeText}>{selectedSkill.categoryName}</Text></View>
-                    <View style={styles.formatBadge}><Text style={styles.formatBadgeText}>{formatLabel(selectedSkill.format)}</Text></View>
-                    <View style={styles.levelTag}><Text style={styles.levelTagText}>{levelLabel(selectedSkill.level)}</Text></View>
+                  {/* 3-Column Summary Box */}
+                  <View style={styles.summaryCard}>
+                    <View style={styles.summaryCol}>
+                      <Text style={styles.summaryVal}>{selectedSkill.userCompletedSessions || 0} buổi</Text>
+                      <Text style={styles.summaryLbl}>Hoàn thành</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryCol}>
+                      <Text style={styles.summaryVal}>{selectedSkill.userReputationScore ? `${selectedSkill.userReputationScore.toFixed(1)}/5 ⭐` : '—'}</Text>
+                      <Text style={styles.summaryLbl}>Đánh giá</Text>
+                    </View>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryCol}>
+                      <Text style={styles.summaryVal}>—</Text>
+                      <Text style={styles.summaryLbl}>Phản hồi</Text>
+                    </View>
                   </View>
 
-                  <Text style={[styles.modalSectionLabel, { marginTop: 16 }]}>Mô tả chi tiết:</Text>
-                  <Text style={styles.modalDescText}>
-                    {selectedSkill.description || 'Chưa có mô tả chi tiết cho kỹ năng này.'}
-                  </Text>
+                  {/* Tabs Row */}
+                  <View style={styles.modalTabsRow}>
+                    {[
+                      { key: 'intro', label: 'Giới thiệu' },
+                      { key: 'skills', label: 'Kỹ năng' },
+                      { key: 'reviews', label: 'Đánh giá' },
+                    ].map((tab) => {
+                      const active = modalTab === tab.key;
+                      return (
+                        <TouchableOpacity
+                          key={tab.key}
+                          style={[styles.modalTabItem, active && styles.modalTabItemActive]}
+                          onPress={() => setModalTab(tab.key as any)}
+                        >
+                          <Text style={[styles.modalTabText, active && styles.modalTabTextActive]}>
+                            {tab.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
 
-                  {selectedSkill.freeTime ? (
-                    <>
-                      <Text style={[styles.modalSectionLabel, { marginTop: 16 }]}>Thời gian rảnh:</Text>
-                      <Text style={styles.modalDescText}>{selectedSkill.freeTime}</Text>
-                    </>
-                  ) : null}
+                  {/* Tab Content Area */}
+                  {modalTab === 'intro' && (
+                    <View style={styles.tabContent}>
+                      <View style={styles.bioCard}>
+                        <Text style={styles.bioText}>
+                          {selectedSkill.description || 'Chưa có lời giới thiệu chi tiết.'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.infoCard}>
+                        <View style={styles.infoRowItem}>
+                          <Text style={styles.infoRowLabel}>Khu vực</Text>
+                          <Text style={styles.infoRowValue}>{selectedSkill.userRegion || selectedSkill.region || '—'}</Text>
+                        </View>
+                        <View style={styles.infoRowItem}>
+                          <Text style={styles.infoRowLabel}>Thời gian rảnh</Text>
+                          <Text style={styles.infoRowValue}>{selectedSkill.freeTime || '—'}</Text>
+                        </View>
+                        <View style={styles.infoRowItem}>
+                          <Text style={styles.infoRowLabel}>Hình thức</Text>
+                          <Text style={styles.infoRowValue}>{formatLabel(selectedSkill.format) || '—'}</Text>
+                        </View>
+                        <View style={[styles.infoRowItem, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                          <Text style={styles.infoRowLabel}>Thời lượng</Text>
+                          <Text style={styles.infoRowValue}>{selectedSkill.duration ? `${selectedSkill.duration} phút / buổi` : '—'}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {modalTab === 'skills' && (
+                    <View style={styles.tabContent}>
+                      <View style={styles.skillDetailCard}>
+                        <View style={styles.skillTitleHeader}>
+                          <Text style={styles.skillDetailTitle}>{selectedSkill.name}</Text>
+                          <View style={styles.levelTag}><Text style={styles.levelTagText}>{levelLabel(selectedSkill.level)}</Text></View>
+                        </View>
+                        <View style={[styles.tagRow, { marginVertical: 8 }]}>
+                          <View style={styles.catBadge}><Text style={styles.catBadgeText}>{selectedSkill.categoryName || 'Chuyên môn'}</Text></View>
+                          <View style={styles.formatBadge}><Text style={styles.formatBadgeText}>{formatLabel(selectedSkill.format)}</Text></View>
+                        </View>
+                        <Text style={styles.skillDetailDesc}>
+                          {selectedSkill.description || 'Chưa có mô tả chi tiết cho kỹ năng này.'}
+                        </Text>
+                        {selectedSkill.freeTime ? (
+                          <View style={styles.skillFreeTimeBox}>
+                            <Ionicons name="time-outline" size={16} color="#0284C7" style={{ marginRight: 6 }} />
+                            <Text style={styles.skillFreeTimeText}>Lịch rảnh: {selectedSkill.freeTime}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  )}
+
+                  {modalTab === 'reviews' && (
+                    <View style={styles.tabContent}>
+                      <View style={styles.reviewSummaryBox}>
+                        <Text style={styles.reviewSummaryScore}>{selectedSkill.userReputationScore ? selectedSkill.userReputationScore.toFixed(1) : '0.0'} / 5.0</Text>
+                        <View style={{ flexDirection: 'row', marginVertical: 4 }}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Ionicons
+                              key={s}
+                              name="star"
+                              size={16}
+                              color={selectedSkill.userReputationScore && s <= selectedSkill.userReputationScore ? "#F59E0B" : "#CBD5E1"}
+                            />
+                          ))}
+                        </View>
+                        <Text style={styles.reviewSummaryCount}>Dựa trên {selectedSkill.userCompletedSessions || 0} buổi hỗ trợ</Text>
+                      </View>
+
+                      <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: '#fff', borderRadius: Radius.lg, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                        <Ionicons name="chatbubbles-outline" size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+                        <Text style={{ color: '#64748B', fontStyle: 'italic', fontSize: 13 }}>
+                          Chưa có bài đánh giá chi tiết nào.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </ScrollView>
 
-                <View style={styles.modalFooter}>
+                {/* Fixed Footer Buttons */}
+                <View style={styles.modalBottomBar}>
                   <TouchableOpacity
-                    style={styles.modalBtnCancel}
-                    onPress={() => setModalVisible(false)}
+                    style={styles.btnChat}
+                    onPress={() => Alert.alert('Thông báo', 'Tính năng nhắn tin trực tiếp đang được phát triển.')}
                   >
-                    <Text style={styles.modalBtnCancelText}>Đóng</Text>
+                    <Ionicons name="chatbubble-outline" size={18} color="#0D9488" style={{ marginRight: 6 }} />
+                    <Text style={styles.btnChatText}>Nhắn tin</Text>
                   </TouchableOpacity>
+
                   <TouchableOpacity
-                    style={styles.modalBtnAction}
+                    style={styles.btnInvite}
                     onPress={() => {
                       setModalVisible(false);
+                      if (selectedSkill) {
+                        router.push({
+                          pathname: '/profile/send-invitation' as any,
+                          params: {
+                            receiverId: selectedSkill.userId,
+                            receiverName: selectedSkill.userFullName ?? 'Thành viên',
+                            skillId: selectedSkill.id,
+                            skillName: selectedSkill.name,
+                          },
+                        });
+                      }
                     }}
                   >
-                    <Text style={styles.modalBtnActionText}>Gửi lời mời hỗ trợ</Text>
+                    <Ionicons name="calendar-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.btnInviteText}>Gửi lời mời</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -578,19 +747,73 @@ const styles = StyleSheet.create({
   connectBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.lg },
   connectBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: Spacing.lg },
-  modalContainer: { backgroundColor: '#fff', borderRadius: Radius.xl, padding: Spacing.lg, maxHeight: '80%' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, paddingBottom: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
-  modalTutorRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
-  modalDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
-  modalSectionLabel: { fontSize: 13, fontWeight: 'bold', color: Colors.textMuted, marginBottom: 4 },
-  modalSkillName: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary },
-  modalDescText: { fontSize: 14, color: Colors.textSecondary, lineHeight: 22 },
-  modalFooter: { flexDirection: 'row', gap: 12, marginTop: Spacing.lg, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
-  modalBtnCancel: { flex: 1, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: '#F1F5F9', alignItems: 'center' },
-  modalBtnCancelText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
-  modalBtnAction: { flex: 2, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: Colors.primary, alignItems: 'center' },
-  modalBtnActionText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  // Modal (Giao diện mới theo ảnh tham khảo)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalContainer: { backgroundColor: '#F8FAFC', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, maxHeight: '92%', flex: 1 },
+  modalTopBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingHorizontal: 4 },
+  modalTopBtn: { padding: 4 },
+  modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: '#CBD5E1' },
+
+  modalProfileHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 16, borderRadius: Radius.xl, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
+  modalAvatarWrap: { position: 'relative' },
+  modalAvatarImg: { width: 68, height: 68, borderRadius: 34 },
+  modalAvatarCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#E0F2FE', justifyContent: 'center', alignItems: 'center' },
+  modalAvatarLetter: { color: '#0284C7', fontSize: 26, fontWeight: 'bold' },
+  onlineDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 2, borderColor: '#fff', position: 'absolute', right: 2, bottom: 2 },
+
+  modalNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  modalTutorName: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', flex: 1, marginRight: 8 },
+  matchBadge: { backgroundColor: '#2563EB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  matchBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  modalOccupation: { fontSize: 13, color: '#64748B', marginBottom: 6 },
+  modalRatingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  modalScoreText: { fontSize: 13, fontWeight: 'bold', color: '#0F172A', marginRight: 4 },
+  modalSessionsText: { fontSize: 12, color: '#64748B' },
+  modalLocRow: { flexDirection: 'row', alignItems: 'center' },
+  modalLocText: { fontSize: 12, color: '#64748B' },
+  modalTcText: { fontSize: 12, color: '#0D9488', fontWeight: '600', marginLeft: 10 },
+
+  summaryCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: Radius.lg, paddingVertical: 14, marginVertical: 14, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 3, elevation: 1 },
+  summaryCol: { flex: 1, alignItems: 'center' },
+  summaryVal: { fontSize: 15, fontWeight: 'bold', color: '#0F172A' },
+  summaryLbl: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  summaryDivider: { width: 1, backgroundColor: '#E2E8F0', height: '70%', alignSelf: 'center' },
+
+  modalTabsRow: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: Radius.lg, marginBottom: 14, borderWidth: 1, borderColor: '#F1F5F9' },
+  modalTabItem: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  modalTabItemActive: { borderBottomColor: '#0D9488' },
+  modalTabText: { fontSize: 14, color: '#64748B', fontWeight: '500' },
+  modalTabTextActive: { color: '#0D9488', fontWeight: 'bold' },
+
+  tabContent: { paddingBottom: 20 },
+  bioCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  bioText: { fontSize: 14, color: '#334155', lineHeight: 22 },
+  infoCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+  infoRowItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  infoRowLabel: { fontSize: 13, color: '#64748B' },
+  infoRowValue: { fontSize: 13, fontWeight: '600', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 16 },
+
+  skillDetailCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' },
+  skillTitleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  skillDetailTitle: { fontSize: 16, fontWeight: 'bold', color: '#0F172A', flex: 1, marginRight: 8 },
+  skillDetailDesc: { fontSize: 14, color: '#475569', lineHeight: 22, marginTop: 4 },
+  skillFreeTimeBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0F2FE', padding: 10, borderRadius: Radius.md, marginTop: 12 },
+  skillFreeTimeText: { fontSize: 13, color: '#0369A1', fontWeight: '500' },
+
+  reviewSummaryBox: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  reviewSummaryScore: { fontSize: 24, fontWeight: 'bold', color: '#0F172A' },
+  reviewSummaryCount: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  reviewItemCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#F1F5F9' },
+  reviewItemHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  reviewAvatarCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' },
+  reviewAvatarText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  reviewerName: { fontSize: 13, fontWeight: 'bold', color: '#0F172A' },
+  reviewDate: { fontSize: 11, color: '#94A3B8' },
+  reviewComment: { fontSize: 13, color: '#334155', lineHeight: 19 },
+
+  modalBottomBar: { flexDirection: 'row', gap: 12, paddingTop: 12, paddingBottom: 4, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+  btnChat: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: Radius.lg, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#0D9488' },
+  btnChatText: { fontSize: 15, fontWeight: 'bold', color: '#0D9488' },
+  btnInvite: { flex: 1.2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: Radius.lg, backgroundColor: '#2563EB' },
+  btnInviteText: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
 });

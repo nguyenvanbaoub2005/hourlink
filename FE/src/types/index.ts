@@ -41,10 +41,26 @@ export interface PagedResponse<T> {
 
 // ─── Auth ────────────────────────────────────────────────────
 
+/** Mirror com.hourlink.auth.dto.response.AuthResponse */
 export interface AuthResponse {
-  accessToken: string;
+  token: string;
   refreshToken: string;
-  user: UserResponse;
+  authenticated: boolean;
+}
+
+/** Mirror com.hourlink.auth.dto.request.LoginRequest */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** Mirror com.hourlink.auth.dto.request.RegisterRequest */
+export interface RegisterRequest {
+  fullName: string;
+  email: string;
+  password: string;
+  /** Optional — không gửi field này nếu người dùng bỏ trống */
+  phone?: string;
 }
 
 // ─── User ────────────────────────────────────────────────────
