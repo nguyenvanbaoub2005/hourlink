@@ -9,6 +9,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius } from '@constants/Colors';
 import NotificationApi from '@api/notification';
 import { useNotificationStore } from '@store/notificationStore';
+import Avatar from '@components/Avatar';
+import { notificationTarget } from '@utils/notificationNav';
 
 type NotifItem = {
   id: string;
@@ -16,18 +18,35 @@ type NotifItem = {
   title: string;
   body: string;
   referenceId?: string;
+  /** Người gây ra thông báo — dùng để hiện ảnh đại diện */
+  actorId?: string;
+  actorName?: string;
+  actorAvatarUrl?: string;
   isRead: boolean;
   createdAt: string;
 };
 
 const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
-  INVITATION_RECEIVED:   { icon: 'mail-outline',          color: '#0284C7', bg: '#E0F2FE' },
-  INVITATION_ACCEPTED:   { icon: 'checkmark-circle-outline', color: '#15803D', bg: '#DCFCE7' },
-  INVITATION_REJECTED:   { icon: 'close-circle-outline',  color: '#DC2626', bg: '#FEE2E2' },
-  INVITATION_RESCHEDULED:{ icon: 'calendar-outline',      color: '#2563EB', bg: '#EFF6FF' },
-  INVITATION_CANCELLED:  { icon: 'ban-outline',           color: '#64748B', bg: '#F1F5F9' },
-  APPOINTMENT_REMINDER:  { icon: 'alarm-outline',         color: '#D97706', bg: '#FEF3C7' },
-  NEW_RATING:            { icon: 'star-outline',          color: '#9333EA', bg: '#F3E8FF' },
+  INVITATION_RECEIVED:     { icon: 'mail-outline',          color: '#0284C7', bg: '#E0F2FE' },
+  INVITATION_ACCEPTED:     { icon: 'checkmark-circle-outline', color: '#15803D', bg: '#DCFCE7' },
+  INVITATION_REJECTED:     { icon: 'close-circle-outline',  color: '#DC2626', bg: '#FEE2E2' },
+  INVITATION_RESCHEDULED:  { icon: 'calendar-outline',      color: '#2563EB', bg: '#EFF6FF' },
+  INVITATION_CANCELLED:    { icon: 'ban-outline',           color: '#64748B', bg: '#F1F5F9' },
+  APPOINTMENT_REMINDER:    { icon: 'alarm-outline',         color: '#D97706', bg: '#FEF3C7' },
+  NEW_RATING:              { icon: 'star-outline',          color: '#9333EA', bg: '#F3E8FF' },
+  NEW_MESSAGE:             { icon: 'chatbubble-ellipses',   color: '#0D9488', bg: '#CCFBF1' },
+  CHAT_RESCHEDULE_PROPOSED:{ icon: 'calendar-outline',      color: '#D97706', bg: '#FEF3C7' },
+};
+
+/** Huy hiệu nhỏ ở góc avatar cho biết loại thông báo — giống Facebook */
+const TYPE_BADGE: Record<string, { icon: string; color: string }> = {
+  NEW_MESSAGE:             { icon: 'chatbubble', color: '#0D9488' },
+  CHAT_RESCHEDULE_PROPOSED:{ icon: 'calendar',   color: '#D97706' },
+  INVITATION_RECEIVED:     { icon: 'mail',       color: '#0284C7' },
+  INVITATION_ACCEPTED:     { icon: 'checkmark',  color: '#15803D' },
+  INVITATION_REJECTED:     { icon: 'close',      color: '#DC2626' },
+  INVITATION_RESCHEDULED:  { icon: 'calendar',   color: '#2563EB' },
+  INVITATION_CANCELLED:    { icon: 'ban',        color: '#64748B' },
 };
 
 function timeAgo(isoStr: string): string {
@@ -83,12 +102,14 @@ export default function NotificationsScreen() {
   };
 
   const navigateToRef = (item: NotifItem) => {
-    // Navigate tới màn hình liên quan dựa vào type
-    if (item.type.startsWith('INVITATION_')) {
-      router.push('/profile/invitations' as any);
-    } else if (item.type === 'APPOINTMENT_REMINDER') {
-      router.push('/(tabs)/appointments' as any);
-    }
+    // Dùng chung logic điều hướng với toast nổi
+    const target = notificationTarget(item);
+    if (!target) return;
+    router.push(
+      (target.params
+        ? { pathname: target.pathname, params: target.params }
+        : target.pathname) as any
+    );
   };
 
   const handleMarkAllRead = async () => {
@@ -105,6 +126,8 @@ export default function NotificationsScreen() {
 
   const renderItem = ({ item }: { item: NotifItem }) => {
     const cfg = TYPE_CONFIG[item.type] ?? { icon: 'notifications-outline', color: '#64748B', bg: '#F1F5F9' };
+    const badge = TYPE_BADGE[item.type];
+    const hasActor = Boolean(item.actorAvatarUrl || item.actorName);
     return (
       <TouchableOpacity
         style={[styles.card, !item.isRead && styles.cardUnread]}
@@ -114,10 +137,21 @@ export default function NotificationsScreen() {
         {/* Unread dot */}
         {!item.isRead && <View style={styles.unreadDot} />}
 
-        {/* Icon */}
-        <View style={[styles.iconWrap, { backgroundColor: cfg.bg }]}>
-          <Ionicons name={cfg.icon as any} size={22} color={cfg.color} />
-        </View>
+        {/* Ảnh đại diện người gửi — không có thì rơi về icon theo loại */}
+        {hasActor ? (
+          <View style={styles.avatarWrap}>
+            <Avatar uri={item.actorAvatarUrl} name={item.actorName} size={46} />
+            {badge && (
+              <View style={[styles.badge, { backgroundColor: badge.color }]}>
+                <Ionicons name={badge.icon as any} size={10} color="#fff" />
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.iconWrap, { backgroundColor: cfg.bg }]}>
+            <Ionicons name={cfg.icon as any} size={22} color={cfg.color} />
+          </View>
+        )}
 
         {/* Content */}
         <View style={{ flex: 1, marginLeft: 12 }}>
@@ -229,6 +263,14 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 46, height: 46, borderRadius: 23,
     justifyContent: 'center', alignItems: 'center',
+  },
+  avatarWrap: { position: 'relative' },
+  badge: {
+    position: 'absolute',
+    right: -2, bottom: -2,
+    width: 19, height: 19, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#fff',
   },
   notifTitle: { fontSize: 14, color: '#334155', lineHeight: 20, marginBottom: 2 },
   notifTitleBold: { fontWeight: '700', color: '#0F172A' },

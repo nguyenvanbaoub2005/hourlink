@@ -31,6 +31,15 @@ public class SkillService {
     private final UserRepository userRepository;
     private final com.hourlink.skill.repository.SkillAttachmentRepository attachmentRepository;
 
+    /**
+     * Các kỹ năng đang hiển thị của một người dùng — dùng cho hồ sơ công khai
+     * khi xem thông tin người đang trò chuyện (chức năng 9.3 + 9.10).
+     */
+    public List<SkillResponse> getVisibleSkillsOfUser(UUID userId) {
+        return skillRepository.findAllByUser_IdAndStatus(userId, SkillStatus.VISIBLE)
+                .stream().map(this::mapToResponse).collect(Collectors.toList());
+    }
+
     @Transactional
     public SkillResponse createSkill(SkillRequest request) {
         String email = SecurityUtil.getCurrentUserEmail();

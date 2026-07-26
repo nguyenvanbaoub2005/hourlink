@@ -9,4 +9,8 @@ import java.util.UUID;
 public interface SkillRepository extends JpaRepository<Skill, UUID> {
     java.util.List<Skill> findAllByUser_Email(String email);
     java.util.List<Skill> findAllByStatus(com.hourlink.skill.enums.SkillStatus status);
+
+    /** Kỹ năng đang hiển thị của một người dùng — dùng cho hồ sơ công khai */
+    java.util.List<Skill> findAllByUser_IdAndStatus(
+            java.util.UUID userId, com.hourlink.skill.enums.SkillStatus status);
 }

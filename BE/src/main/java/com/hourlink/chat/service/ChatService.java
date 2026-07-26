@@ -347,7 +347,7 @@ public class ChatService {
         mirrorMessage(conv, saved);
         mirrorUnread(conv, receiver);
 
-        notificationService.createNotification(receiver, NotificationType.CHAT_RESCHEDULE_PROPOSED,
+        notificationService.createNotification(receiver, sender, NotificationType.CHAT_RESCHEDULE_PROPOSED,
                 "📅 Đề xuất đổi lịch",
                 sender.getFullName() + " đề xuất thời gian mới: " + request.getProposedTime(),
                 conv.getId());
@@ -485,7 +485,7 @@ public class ChatService {
         mirrorMessage(conv, msg);
         mirrorUnread(conv, receiver);
 
-        notificationService.createNotification(receiver, NotificationType.NEW_MESSAGE,
+        notificationService.createNotification(receiver, sender, NotificationType.NEW_MESSAGE,
                 "💬 Tin nhắn mới từ " + sender.getFullName(),
                 truncate(preview), conv.getId());
     }

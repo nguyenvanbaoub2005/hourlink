@@ -13,14 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ChatApi from '@api/chat';
+import Avatar from '@components/Avatar';
 import { useChatStore } from '@store/chatStore';
 import { initFirebaseAuth, isRealtimeReady } from '@lib/firebase';
 import { Colors } from '@constants/Colors';
-import {
-  formatConversationTime,
-  initialsOf,
-  avatarColorOf,
-} from '@utils/chatFormat';
+import { formatConversationTime } from '@utils/chatFormat';
 import type { Conversation, MessageType } from '@types';
 
 /** Icon đứng trước preview theo loại tin nhắn cuối */
@@ -83,6 +80,7 @@ export default function ConversationListScreen() {
         id: item.id,
         otherName: item.otherUserName,
         otherUserId: item.otherUserId,
+        otherAvatarUrl: item.otherUserAvatarUrl ?? '',
         skillName: item.skillName ?? '',
       },
     });
@@ -90,7 +88,6 @@ export default function ConversationListScreen() {
 
   const renderItem = ({ item }: { item: Conversation }) => {
     const unread = item.unreadCount > 0;
-    const color = avatarColorOf(item.otherUserName);
     const icon = item.lastMessageType ? PREVIEW_ICON[item.lastMessageType] : undefined;
 
     return (
@@ -99,17 +96,13 @@ export default function ConversationListScreen() {
         activeOpacity={0.7}
         onPress={() => openConversation(item)}
       >
-        {/* Avatar chữ + chấm trạng thái */}
-        <View style={styles.avatarWrap}>
-          <View style={[styles.avatar, { backgroundColor: color.bg }]}>
-            <Text style={[styles.avatarText, { color: color.fg }]}>
-              {initialsOf(item.otherUserName)}
-            </Text>
-          </View>
-          {item.isActive && !item.isBlockedByMe && !item.hasBlockedMe && (
-            <View style={styles.onlineDot} />
-          )}
-        </View>
+        {/* Ảnh đại diện thật, không có thì rơi về avatar chữ */}
+        <Avatar
+          uri={item.otherUserAvatarUrl}
+          name={item.otherUserName}
+          size={48}
+          showDot={item.isActive && !item.isBlockedByMe && !item.hasBlockedMe}
+        />
 
         {/* Nội dung */}
         <View style={styles.rowBody}>
@@ -255,21 +248,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   separator: { height: 1, backgroundColor: '#F1F5F9', marginLeft: 76 },
-
-  avatarWrap: { position: 'relative' },
-  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 16, fontWeight: '700' },
-  onlineDot: {
-    position: 'absolute',
-    right: 0,
-    bottom: 2,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
 
   rowBody: { flex: 1, gap: 2 },
   name: { fontSize: 15, fontWeight: '700', color: '#0F172A' },

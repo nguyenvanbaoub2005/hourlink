@@ -22,6 +22,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import ChatApi from '@api/chat';
+import Avatar from '@components/Avatar';
+import UserProfileSheet from '@components/UserProfileSheet';
 import { useChatStore } from '@store/chatStore';
 import { initFirebaseAuth, isRealtimeReady, listenToMessages } from '@lib/firebase';
 import { Colors } from '@constants/Colors';
@@ -29,11 +31,9 @@ import {
   formatTime,
   formatDateSeparator,
   formatBytes,
-  initialsOf,
-  avatarColorOf,
   fileIconOf,
 } from '@utils/chatFormat';
-import type { ChatMessage, ChatReportReason } from '@types';
+import type { ChatMessage, ChatReportReason, Conversation } from '@types';
 
 /** Lý do báo cáo tin nhắn — khớp enum ChatReportReason ở backend */
 const REPORT_REASONS: { value: ChatReportReason; label: string; icon: string }[] = [
@@ -51,14 +51,27 @@ const POLL_INTERVAL_MS = 4000;
 
 export default function ChatRoomScreen() {
   const router = useRouter();
-  const { id, otherName, otherUserId, skillName } = useLocalSearchParams<{
+  const { id, otherName, otherUserId, otherAvatarUrl, skillName } = useLocalSearchParams<{
     id: string;
     otherName?: string;
     otherUserId?: string;
+    otherAvatarUrl?: string;
     skillName?: string;
   }>();
 
   const { clearUnread } = useChatStore();
+
+  /**
+   * Thông tin hội thoại lấy từ server. Cần thiết khi màn này được mở từ thông
+   * báo (chỉ có mỗi conversationId, không có tham số tên/avatar đi kèm).
+   * Tham số điều hướng chỉ dùng để hiển thị ngay lập tức trong lúc chờ tải.
+   */
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+
+  const peerName = conversation?.otherUserName ?? otherName;
+  const peerAvatar = conversation?.otherUserAvatarUrl ?? (otherAvatarUrl || undefined);
+  const peerId = conversation?.otherUserId ?? otherUserId;
+  const peerSkill = conversation?.skillName ?? skillName;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,11 +89,10 @@ export default function ChatRoomScreen() {
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [meetingVisible, setMeetingVisible] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
+  const [profileVisible, setProfileVisible] = useState(false);
 
   const unsubscribeRef = useRef<null | (() => void)>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const avatarColor = avatarColorOf(otherName);
 
   // ─── Tải lịch sử tin nhắn qua REST ──────────────────────────────────────
   const fetchMessages = useCallback(async () => {
@@ -111,6 +123,15 @@ export default function ChatRoomScreen() {
     let cancelled = false;
 
     const setup = async () => {
+      // Lấy thông tin hội thoại trước — khi mở từ thông báo, đây là nguồn duy
+      // nhất biết được người kia là ai (dùng để phân biệt tin của mình/của họ)
+      try {
+        const res = await ChatApi.getConversation(id);
+        if (!cancelled) setConversation(res.data?.data ?? null);
+      } catch (e) {
+        console.log('Lỗi tải hội thoại:', e);
+      }
+
       await fetchMessages();
       await markRead();
 
@@ -326,7 +347,7 @@ export default function ChatRoomScreen() {
 
   // ─── Báo cáo & chặn ─────────────────────────────────────────────────────
   const onLongPressMessage = (msg: ChatMessage) => {
-    if (!msg.senderId || msg.senderId === otherUserId) {
+    if (!msg.senderId || msg.senderId === peerId) {
       // Chỉ báo cáo được tin của người kia
       if (!msg.senderId) return;
       Alert.alert('Tin nhắn', undefined, [
@@ -363,11 +384,11 @@ export default function ChatRoomScreen() {
 
   const confirmBlock = () => {
     setMenuVisible(false);
-    if (!otherUserId) return;
+    if (!peerId) return;
 
     Alert.alert(
       'Chặn người dùng',
-      `Sau khi chặn, bạn và ${otherName ?? 'người này'} sẽ không gửi được tin nhắn cho nhau nữa.`,
+      `Sau khi chặn, bạn và ${peerName ?? 'người này'} sẽ không gửi được tin nhắn cho nhau nữa.`,
       [
         { text: 'Không', style: 'cancel' },
         {
@@ -375,7 +396,7 @@ export default function ChatRoomScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await ChatApi.blockUser({ userId: otherUserId });
+              await ChatApi.blockUser({ userId: peerId });
               Alert.alert('🚫 Đã chặn', 'Bạn sẽ không nhận tin nhắn mới từ người này.', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
@@ -398,7 +419,7 @@ export default function ChatRoomScreen() {
       );
     }
 
-    const isMine = item.senderId !== otherUserId;
+    const isMine = item.senderId !== peerId;
 
     // Dải ngày — messages sắp xếp mới nhất trước nên so với phần tử kế tiếp
     const next = messages[index + 1];
@@ -518,11 +539,13 @@ export default function ChatRoomScreen() {
 
         <View style={[styles.msgRow, isMine ? styles.msgRowMine : styles.msgRowTheirs]}>
           {!isMine && (
-            <View style={[styles.msgAvatar, { backgroundColor: avatarColor.bg }]}>
-              <Text style={[styles.msgAvatarText, { color: avatarColor.fg }]}>
-                {initialsOf(otherName)}
-              </Text>
-            </View>
+            <TouchableOpacity onPress={() => setProfileVisible(true)} activeOpacity={0.7}>
+              <Avatar
+                uri={item.senderAvatarUrl || peerAvatar}
+                name={item.senderName || peerName}
+                size={28}
+              />
+            </TouchableOpacity>
           )}
 
           <TouchableOpacity
@@ -557,21 +580,26 @@ export default function ChatRoomScreen() {
           <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
         </TouchableOpacity>
 
-        <View style={[styles.headerAvatar, { backgroundColor: avatarColor.bg }]}>
-          <Text style={[styles.headerAvatarText, { color: avatarColor.fg }]}>
-            {initialsOf(otherName)}
-          </Text>
-          <View style={styles.headerDot} />
-        </View>
+        {/* Bấm vào avatar hoặc tên để xem hồ sơ chi tiết */}
+        <TouchableOpacity
+          style={styles.headerPerson}
+          activeOpacity={0.6}
+          onPress={() => setProfileVisible(true)}
+        >
+          <Avatar uri={peerAvatar} name={peerName} size={38} showDot />
 
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerName} numberOfLines={1}>
-            {otherName ?? 'Cuộc trò chuyện'}
-          </Text>
-          <Text style={styles.headerSub} numberOfLines={1}>
-            {skillName || (realtime ? 'Đang hoạt động' : 'Chế độ ngoại tuyến')}
-          </Text>
-        </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.headerNameRow}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {peerName ?? 'Cuộc trò chuyện'}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+            </View>
+            <Text style={styles.headerSub} numberOfLines={1}>
+              {peerSkill || (realtime ? 'Đang hoạt động' : 'Chế độ ngoại tuyến')}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.headerBtn} onPress={() => setMeetingVisible(true)}>
           <Ionicons name="videocam-outline" size={23} color={Colors.textPrimary} />
@@ -652,6 +680,16 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.menuSheet}>
             <View style={styles.modalHandle} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                setProfileVisible(true);
+              }}
+            >
+              <Ionicons name="person-outline" size={22} color={Colors.textPrimary} />
+              <Text style={styles.menuText}>Xem hồ sơ</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -815,6 +853,13 @@ export default function ChatRoomScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* ── Hồ sơ người đang trò chuyện ────────────────────────── */}
+      <UserProfileSheet
+        visible={profileVisible}
+        userId={peerId}
+        onClose={() => setProfileVisible(false)}
+      />
+
       {/* ── Xem ảnh toàn màn hình ──────────────────────────────── */}
       <Modal visible={!!previewImage} transparent animationType="fade">
         <View style={styles.imageOverlay}>
@@ -850,27 +895,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
   },
   headerBtn: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  headerAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  headerAvatarText: { fontSize: 13, fontWeight: '700' },
-  headerDot: {
-    position: 'absolute',
-    right: -1,
-    bottom: 0,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  headerName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  headerPerson: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  headerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  headerName: { fontSize: 15, fontWeight: '700', color: '#0F172A', flexShrink: 1 },
   headerSub: { fontSize: 12, color: Colors.primary },
 
   // Dải ngày
@@ -902,8 +929,6 @@ const styles = StyleSheet.create({
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 10 },
   msgRowMine: { justifyContent: 'flex-end' },
   msgRowTheirs: { justifyContent: 'flex-start' },
-  msgAvatar: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  msgAvatarText: { fontSize: 10, fontWeight: '700' },
 
   bubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
   bubbleMine: { borderBottomRightRadius: 6 },

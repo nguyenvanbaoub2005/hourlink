@@ -112,6 +112,7 @@ public class InvitationService {
         String skillName = skill != null ? skill.getName() : "kỹ năng của bạn";
         notificationService.createNotification(
                 receiver,
+                sender,
                 NotificationType.INVITATION_RECEIVED,
                 "📩 Lời mời hỗ trợ mới",
                 sender.getFullName() + " muốn bạn hỗ trợ về " + skillName,
@@ -183,6 +184,7 @@ public class InvitationService {
                 // Thông báo cho sender
                 notificationService.createNotification(
                         sender,
+                        receiver,
                         NotificationType.INVITATION_ACCEPTED,
                         "✅ Lời mời được chấp nhận",
                         receiver.getFullName() + " đã chấp nhận lời mời hỗ trợ về " + skillName,
@@ -195,6 +197,7 @@ public class InvitationService {
                 // Thông báo cho sender
                 notificationService.createNotification(
                         sender,
+                        receiver,
                         NotificationType.INVITATION_REJECTED,
                         "❌ Lời mời bị từ chối",
                         receiver.getFullName() + " đã từ chối lời mời về " + skillName,
@@ -207,6 +210,7 @@ public class InvitationService {
                 // Thông báo cho sender
                 notificationService.createNotification(
                         sender,
+                        receiver,
                         NotificationType.INVITATION_RESCHEDULED,
                         "📅 Đề xuất đổi lịch",
                         receiver.getFullName() + " đề xuất đổi sang: " + request.getRescheduleTime(),
@@ -254,6 +258,7 @@ public class InvitationService {
         // Thông báo cho receiver
         notificationService.createNotification(
                 inv.getReceiver(),
+                inv.getSender(),
                 NotificationType.INVITATION_CANCELLED,
                 "🚫 Lời mời đã bị hủy",
                 inv.getSender().getFullName() + " đã hủy lời mời hỗ trợ",

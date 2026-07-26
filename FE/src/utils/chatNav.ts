@@ -32,6 +32,7 @@ export async function openChatWithUser(
           id: found.id,
           otherName: found.otherUserName,
           otherUserId: found.otherUserId,
+          otherAvatarUrl: found.otherUserAvatarUrl ?? '',
           skillName: found.skillName ?? '',
         },
       });
@@ -73,6 +74,7 @@ export async function openChatFromInvitation(
         id: conv.id,
         otherName: conv.otherUserName,
         otherUserId: conv.otherUserId,
+        otherAvatarUrl: conv.otherUserAvatarUrl ?? '',
         skillName: conv.skillName ?? '',
       },
     });
