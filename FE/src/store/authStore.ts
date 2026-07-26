@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { TOKEN_KEY, REFRESH_KEY } from '@api/axiosInstance';
 import AuthApi from '@api/auth';
+import { signOutFirebase } from '@lib/firebase';
 import type { UserResponse } from '@types';
 
 interface AuthState {
@@ -58,6 +59,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (e) {
       // Ignore errors if token is already expired/invalid
     }
+    // Đăng xuất khỏi Firebase để không còn nghe tin nhắn realtime (9.10)
+    await signOutFirebase();
+
     await SecureStore.deleteItemAsync(TOKEN_KEY);
     await SecureStore.deleteItemAsync(REFRESH_KEY);
     set({ user: null, accessToken: null, role: null, isAuthenticated: false });

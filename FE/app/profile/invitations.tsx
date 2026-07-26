@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import InvitationApi from '@api/invitation';
+import { openChatFromInvitation } from '@utils/chatNav';
 
 type InvitationType = {
   id: string;
@@ -266,6 +267,17 @@ export default function InvitationsScreen() {
           <TouchableOpacity style={styles.btnCancel} onPress={() => handleCancel(item)}>
             <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
             <Text style={styles.btnCancelText}>Hủy lời mời</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Lời mời đã chấp nhận → mở cuộc trò chuyện (chức năng 9.10) */}
+        {(item.status === 'ACCEPTED' || item.status === 'RESCHEDULED') && (
+          <TouchableOpacity
+            style={styles.btnOpenChat}
+            onPress={() => openChatFromInvitation(router, item.id)}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#0D9488" />
+            <Text style={styles.btnOpenChatText}>Nhắn tin</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -554,6 +566,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#FECACA',
   },
   btnCancelText: { fontSize: 14, fontWeight: '600', color: '#DC2626' },
+
+  btnOpenChat: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, marginTop: 8,
+    borderRadius: Radius.lg, backgroundColor: '#F0FDFA',
+    borderWidth: 1.5, borderColor: '#0D9488',
+  },
+  btnOpenChatText: { fontSize: 14, fontWeight: '600', color: '#0D9488' },
 
   // ── Reschedule Modal ────────────────────────────────────────────────────────
   modalOverlay: {

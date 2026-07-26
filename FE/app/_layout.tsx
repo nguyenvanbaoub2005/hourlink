@@ -28,6 +28,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="chat" />
       </Stack>
       {/* Toast thông báo nổi — hoạt động trên tất cả màn hình */}
       <NotificationToast />

@@ -10,7 +10,25 @@ export type SkillLevel = 'basic' | 'intermediate' | 'advanced';
 export type SessionFormat = 'online' | 'offline';
 export type RequestStatus = 'open' | 'matched' | 'closed' | 'cancelled';
 export type InvitationStatus = 'pending' | 'accepted' | 'rejected' | 'reschedule_proposed' | 'cancelled';
-export type MessageType = 'text' | 'image' | 'document' | 'location' | 'meeting_link';
+/** Khớp com.hourlink.chat.enums.MessageType — BE trả về CHỮ HOA */
+export type MessageType =
+  | 'TEXT'
+  | 'IMAGE'
+  | 'DOCUMENT'
+  | 'LOCATION'
+  | 'MEETING_LINK'
+  | 'RESCHEDULE_PROPOSAL'
+  | 'SYSTEM';
+
+/** Khớp com.hourlink.chat.enums.ChatReportReason */
+export type ChatReportReason =
+  | 'OFFENSIVE'
+  | 'HARASSMENT'
+  | 'SPAM'
+  | 'SCAM'
+  | 'OUTSIDE_PAYMENT'
+  | 'ASK_CREDENTIALS'
+  | 'OTHER';
 export type AppointmentStatus = 'pending_confirmation' | 'confirmed' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'disputed';
 export type VerificationMethod = 'qr' | 'otp';
 export type ExtraCreditStatus = 'none' | 'pending' | 'accepted' | 'rejected';
@@ -197,22 +215,70 @@ export interface Invitation {
 
 // ─── Chat ────────────────────────────────────────────────────
 
+/** Mirror com.hourlink.chat.dto.response.ConversationResponse */
 export interface Conversation {
   id: string;
   invitationId: string;
-  otherUser: UserResponse;
-  lastMessage?: ChatMessage;
+  invitationStatus: string;
+  skillName?: string;
+
+  otherUserId: string;
+  otherUserName: string;
+  otherUserAvatarUrl?: string;
+  otherUserReputationScore?: number;
+
+  lastMessagePreview?: string;
+  lastMessageType?: MessageType;
+  lastMessageAt?: string;
+  unreadCount: number;
+
+  isBlockedByMe: boolean;
+  hasBlockedMe: boolean;
+  isActive: boolean;
   createdAt: string;
 }
 
+/** Mirror com.hourlink.chat.dto.response.ChatMessageResponse */
 export interface ChatMessage {
   id: string;
   conversationId: string;
-  sender: UserResponse;
+
+  /** null với tin nhắn hệ thống */
+  senderId?: string;
+  senderName?: string;
+  senderAvatarUrl?: string;
+
+  type: MessageType;
   content?: string;
-  messageType: MessageType;
+
+  /** IMAGE / DOCUMENT */
   attachmentUrl?: string;
+  originalName?: string;
+  fileSize?: number;
+
+  /** LOCATION */
+  latitude?: number;
+  longitude?: number;
+  locationLabel?: string;
+
+  /** MEETING_LINK */
+  meetingLink?: string;
+
+  /** RESCHEDULE_PROPOSAL */
+  proposedTime?: string;
+
+  isRead: boolean;
   createdAt: string;
+}
+
+/** Mirror com.hourlink.chat.dto.response.BlockedUserResponse */
+export interface BlockedUser {
+  id: string;
+  userId: string;
+  fullName: string;
+  avatarUrl?: string;
+  reason?: string;
+  blockedAt: string;
 }
 
 // ─── Appointment ─────────────────────────────────────────────

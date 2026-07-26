@@ -29,6 +29,10 @@ target/
 .env
 *.env.local
 
+### Firebase (chat realtime 9.10) — KHÔNG commit khoá service account ###
+firebase-service-account.json
+*firebase-adminsdk*.json
+
 ### Logs ###
 *.log
 logs/

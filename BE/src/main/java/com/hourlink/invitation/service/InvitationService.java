@@ -1,5 +1,6 @@
 package com.hourlink.invitation.service;
 
+import com.hourlink.chat.service.ChatService;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
@@ -39,6 +40,7 @@ public class InvitationService {
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
     private final HelpRequestRepository helpRequestRepository;
+    private final ChatService chatService;
     private final NotificationService notificationService;
 
     // ─── Gửi lời mời hỗ trợ ─────────────────────────────────────────────────
@@ -215,6 +217,12 @@ public class InvitationService {
         }
 
         Invitation saved = invitationRepository.save(inv);
+
+        // Chức năng 9.10: lời mời được chấp nhận → mở cuộc trò chuyện cho hai bên
+        if (saved.getStatus() == InvitationStatus.ACCEPTED) {
+            chatService.createConversationInternal(saved);
+        }
+
         log.info("Invitation {} responded with action={} by {}", id, request.getAction(), email);
         return mapToResponse(saved);
     }

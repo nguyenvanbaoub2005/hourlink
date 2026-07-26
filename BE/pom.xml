@@ -117,6 +117,14 @@
             <version>1.36.0</version>
         </dependency>
 
+        <!-- ===== Realtime Chat ===== -->
+        <!-- Firebase Admin SDK (mirror tin nhắn sang Firestore để chat realtime) -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.2.0</version>
+        </dependency>
+
         <!-- ===== QR Code ===== -->
         <!-- ZXing (QR code generation) -->
         <dependency>

@@ -19,6 +19,12 @@ public enum NotificationType {
     /** Lời mời bị hủy bởi người gửi */
     INVITATION_CANCELLED,
 
+    /** Có tin nhắn mới trong cuộc trò chuyện */
+    NEW_MESSAGE,
+
+    /** Người kia đề xuất đổi lịch ngay trong cuộc trò chuyện */
+    CHAT_RESCHEDULE_PROPOSED,
+
     /** Lịch hẹn sắp đến */
     APPOINTMENT_REMINDER,
 

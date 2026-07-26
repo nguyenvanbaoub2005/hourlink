@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import SkillApi from '@api/skill';
+import { openChatWithUser } from '@utils/chatNav';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -415,7 +416,25 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                   <View style={styles.modalHandle} />
                   <TouchableOpacity
-                    onPress={() => Alert.alert('Thông báo', 'Tính năng nhắn tin trực tiếp đang được phát triển.')}
+                    onPress={() => {
+                      if (!selectedSkill) return;
+                      setModalVisible(false);
+                      openChatWithUser(
+                        router,
+                        selectedSkill.userId,
+                        selectedSkill.userFullName ?? 'Thành viên',
+                        () =>
+                          router.push({
+                            pathname: '/profile/send-invitation' as any,
+                            params: {
+                              receiverId: selectedSkill.userId,
+                              receiverName: selectedSkill.userFullName ?? 'Thành viên',
+                              skillId: selectedSkill.id,
+                              skillName: selectedSkill.name,
+                            },
+                          })
+                      );
+                    }}
                     style={styles.modalTopBtn}
                   >
                     <Ionicons name="chatbubble-ellipses-outline" size={24} color="#0F172A" />
@@ -603,7 +622,25 @@ export default function ExploreScreen() {
                 <View style={styles.modalBottomBar}>
                   <TouchableOpacity
                     style={styles.btnChat}
-                    onPress={() => Alert.alert('Thông báo', 'Tính năng nhắn tin trực tiếp đang được phát triển.')}
+                    onPress={() => {
+                      if (!selectedSkill) return;
+                      setModalVisible(false);
+                      openChatWithUser(
+                        router,
+                        selectedSkill.userId,
+                        selectedSkill.userFullName ?? 'Thành viên',
+                        () =>
+                          router.push({
+                            pathname: '/profile/send-invitation' as any,
+                            params: {
+                              receiverId: selectedSkill.userId,
+                              receiverName: selectedSkill.userFullName ?? 'Thành viên',
+                              skillId: selectedSkill.id,
+                              skillName: selectedSkill.name,
+                            },
+                          })
+                      );
+                    }}
                   >
                     <Ionicons name="chatbubble-outline" size={18} color="#0D9488" style={{ marginRight: 6 }} />
                     <Text style={styles.btnChatText}>Nhắn tin</Text>
