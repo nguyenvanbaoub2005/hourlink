@@ -99,7 +99,7 @@ export default function PostScreen() {
         setCurrentLevel(data.currentLevel || '');
         setFreeTime(data.freeTime || '');
         setDesiredTime(data.desiredTime || '');
-        const durVal = data.duration || (data.timeCreditAmount ? data.timeCreditAmount * 60 : 60);
+        const durVal = data.duration || (data.timeCreditAmount > 10 ? data.timeCreditAmount : (data.timeCreditAmount ? data.timeCreditAmount * 60 : 60));
         const durOpt = DURATION_OPTIONS.find(d => d.minutes === durVal) || DURATION_OPTIONS[1];
         setSelectedDur(durOpt);
       } catch (e) {

@@ -98,7 +98,12 @@ export default function HelpRequestsScreen() {
   const renderItem = ({ item }: { item: any }) => {
     const isCompleted = item.status === 'COMPLETED';
     const isCancelled = item.status === 'CANCELLED';
-    const durMin = item.duration || (item.timeCreditAmount ? item.timeCreditAmount * 60 : 60);
+    const durMin = item.duration || (item.timeCreditAmount > 10 ? item.timeCreditAmount : Number(item.timeCreditAmount || 1) * 60);
+    const tcVal = item.duration
+      ? Number((item.duration / 60).toFixed(1))
+      : (item.timeCreditAmount > 10
+          ? Number((item.timeCreditAmount / 60).toFixed(1))
+          : Number(Number(item.timeCreditAmount || 1).toFixed(1)));
 
     return (
       <View style={styles.card}>
@@ -125,7 +130,7 @@ export default function HelpRequestsScreen() {
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>🕒 {durMin} phút · {item.format === 'OFFLINE' ? 'Trực tiếp' : 'Online'}</Text>
           <View style={styles.tcBadge}>
-            <Text style={styles.tcText}>⏱ {item.timeCreditAmount || 1} TC</Text>
+            <Text style={styles.tcText}>⏱ {tcVal} TC</Text>
           </View>
           <Text style={styles.replyText}>{item.responseCount ?? 0} phản hồi</Text>
         </View>

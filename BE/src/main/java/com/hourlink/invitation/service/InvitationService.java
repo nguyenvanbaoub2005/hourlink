@@ -11,6 +11,8 @@ import com.hourlink.invitation.dto.response.InvitationResponse;
 import com.hourlink.invitation.entity.Invitation;
 import com.hourlink.invitation.enums.InvitationStatus;
 import com.hourlink.invitation.repository.InvitationRepository;
+import com.hourlink.notification.enums.NotificationType;
+import com.hourlink.notification.service.NotificationService;
 import com.hourlink.skill.entity.Skill;
 import com.hourlink.skill.repository.SkillRepository;
 import com.hourlink.user.entity.User;
@@ -37,6 +39,7 @@ public class InvitationService {
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
     private final HelpRequestRepository helpRequestRepository;
+    private final NotificationService notificationService;
 
     // ─── Gửi lời mời hỗ trợ ─────────────────────────────────────────────────
 
@@ -102,6 +105,17 @@ public class InvitationService {
 
         Invitation saved = invitationRepository.save(invitation);
         log.info("Invitation sent: {} → {}", senderEmail, receiver.getEmail());
+
+        // Gửi thông báo cho receiver
+        String skillName = skill != null ? skill.getName() : "kỹ năng của bạn";
+        notificationService.createNotification(
+                receiver,
+                NotificationType.INVITATION_RECEIVED,
+                "📩 Lời mời hỗ trợ mới",
+                sender.getFullName() + " muốn bạn hỗ trợ về " + skillName,
+                saved.getId()
+        );
+
         return mapToResponse(saved);
     }
 
@@ -157,15 +171,45 @@ public class InvitationService {
             throw new AppException(ErrorCode.INVITATION_ALREADY_RESPONDED);
         }
 
+        User sender   = inv.getSender();
+        User receiver = inv.getReceiver();
+        String skillName = inv.getSkill() != null ? inv.getSkill().getName() : "kỹ năng";
+
         switch (request.getAction().toUpperCase()) {
-            case "ACCEPT" -> inv.setStatus(InvitationStatus.ACCEPTED);
+            case "ACCEPT" -> {
+                inv.setStatus(InvitationStatus.ACCEPTED);
+                // Thông báo cho sender
+                notificationService.createNotification(
+                        sender,
+                        NotificationType.INVITATION_ACCEPTED,
+                        "✅ Lời mời được chấp nhận",
+                        receiver.getFullName() + " đã chấp nhận lời mời hỗ trợ về " + skillName,
+                        inv.getId()
+                );
+            }
             case "REJECT" -> {
                 inv.setStatus(InvitationStatus.REJECTED);
                 inv.setRejectReason(request.getRejectReason());
+                // Thông báo cho sender
+                notificationService.createNotification(
+                        sender,
+                        NotificationType.INVITATION_REJECTED,
+                        "❌ Lời mời bị từ chối",
+                        receiver.getFullName() + " đã từ chối lời mời về " + skillName,
+                        inv.getId()
+                );
             }
             case "RESCHEDULE" -> {
                 inv.setStatus(InvitationStatus.RESCHEDULED);
                 inv.setRescheduleTime(request.getRescheduleTime());
+                // Thông báo cho sender
+                notificationService.createNotification(
+                        sender,
+                        NotificationType.INVITATION_RESCHEDULED,
+                        "📅 Đề xuất đổi lịch",
+                        receiver.getFullName() + " đề xuất đổi sang: " + request.getRescheduleTime(),
+                        inv.getId()
+                );
             }
             default -> throw new AppException(ErrorCode.INVALID_REQUEST);
         }
@@ -198,6 +242,16 @@ public class InvitationService {
 
         inv.setStatus(InvitationStatus.CANCELLED);
         Invitation saved = invitationRepository.save(inv);
+
+        // Thông báo cho receiver
+        notificationService.createNotification(
+                inv.getReceiver(),
+                NotificationType.INVITATION_CANCELLED,
+                "🚫 Lời mời đã bị hủy",
+                inv.getSender().getFullName() + " đã hủy lời mời hỗ trợ",
+                saved.getId()
+        );
+
         log.info("Invitation {} cancelled by sender {}", id, email);
         return mapToResponse(saved);
     }

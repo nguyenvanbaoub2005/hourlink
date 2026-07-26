@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert
+  ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,6 +52,12 @@ export default function InvitationsScreen() {
   const [received, setReceived] = useState<InvitationType[]>([]);
   const [sent, setSent] = useState<InvitationType[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal đề xuất đổi giờ
+  const [rescheduleModal, setRescheduleModal] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<InvitationType | null>(null);
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -117,6 +123,40 @@ export default function InvitationsScreen() {
     ]);
   };
 
+  // ── Helper: Mở modal đề xuất đổi giờ ──────────────────────────────────────
+  const openReschedule = (item: InvitationType) => {
+    setRescheduleTarget(item);
+    setRescheduleTime(item.proposedTime ?? '');
+    setRescheduleModal(true);
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleTarget) return;
+    const trimmed = rescheduleTime.trim();
+    if (!trimmed) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập thời gian đề xuất.');
+      return;
+    }
+    setRescheduleLoading(true);
+    try {
+      await InvitationApi.respond(rescheduleTarget.id, {
+        action: 'RESCHEDULE',
+        rescheduleTime: trimmed,
+      });
+      setReceived(prev => prev.map(i =>
+        i.id === rescheduleTarget.id
+          ? { ...i, status: 'RESCHEDULED', rescheduleTime: trimmed }
+          : i
+      ));
+      setRescheduleModal(false);
+      Alert.alert('📅 Đã gửi đề xuất', 'Người gửi sẽ nhận được thông báo đề xuất đổi lịch của bạn.');
+    } catch {
+      Alert.alert('Lỗi', 'Không thể gửi đề xuất đổi giờ. Vui lòng thử lại.');
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
   // ── Render Item ─────────────────────────────────────────────────────────────
   const renderItem = ({ item }: { item: InvitationType }) => {
     const isSentTab = activeTab === 'SENT';
@@ -180,7 +220,11 @@ export default function InvitationsScreen() {
         {/* Reschedule info */}
         {item.status === 'RESCHEDULED' && item.rescheduleTime ? (
           <View style={styles.rescheduleBox}>
-            <Text style={styles.rescheduleText}>📅 Đề xuất đổi sang: {item.rescheduleTime}</Text>
+            <Ionicons name="calendar-outline" size={15} color="#1D4ED8" style={{ marginRight: 6 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rescheduleLabel}>Đề xuất đổi sang:</Text>
+              <Text style={styles.rescheduleTime}>{item.rescheduleTime}</Text>
+            </View>
           </View>
         ) : null}
 
@@ -191,20 +235,34 @@ export default function InvitationsScreen() {
           </View>
         ) : null}
 
-        {/* Action Buttons */}
+        {/* Action Buttons — Receiver tab PENDING */}
         {isPending && activeTab === 'RECEIVED' && (
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.btnReject} onPress={() => handleReject(item)}>
-              <Ionicons name="close" size={16} color="#DC2626" />
+              <Ionicons name="close" size={15} color="#DC2626" />
               <Text style={styles.btnRejectText}>Từ chối</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.btnReschedule} onPress={() => openReschedule(item)}>
+              <Ionicons name="calendar-outline" size={15} color="#2563EB" />
+              <Text style={styles.btnRescheduleText}>Đổi giờ</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.btnAccept} onPress={() => handleAccept(item)}>
-              <Ionicons name="checkmark" size={16} color="#fff" />
+              <Ionicons name="checkmark" size={15} color="#fff" />
               <Text style={styles.btnAcceptText}>Chấp nhận</Text>
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Action Buttons — Sender tab PENDING */}
         {isPending && activeTab === 'SENT' && (
+          <TouchableOpacity style={styles.btnCancel} onPress={() => handleCancel(item)}>
+            <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+            <Text style={styles.btnCancelText}>Hủy lời mời</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Sender nhận RESCHEDULED → có thể hủy */}
+        {item.status === 'RESCHEDULED' && activeTab === 'SENT' && (
           <TouchableOpacity style={styles.btnCancel} onPress={() => handleCancel(item)}>
             <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
             <Text style={styles.btnCancelText}>Hủy lời mời</Text>
@@ -295,6 +353,86 @@ export default function InvitationsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* ── Modal Đề xuất đổi giờ ──────────────────────────────────────── */}
+      <Modal
+        visible={rescheduleModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRescheduleModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.rescheduleModalBox}>
+            {/* Handle */}
+            <View style={styles.modalHandle} />
+
+            {/* Title */}
+            <View style={styles.modalTitleRow}>
+              <Ionicons name="calendar-outline" size={22} color="#2563EB" style={{ marginRight: 8 }} />
+              <Text style={styles.modalTitle}>Đề xuất đổi thời gian</Text>
+            </View>
+
+            {rescheduleTarget ? (
+              <Text style={styles.modalSubtitle}>
+                Lời mời từ <Text style={{ fontWeight: 'bold' }}>{rescheduleTarget.senderName}</Text>
+                {rescheduleTarget.skillName ? ` về "${rescheduleTarget.skillName}"` : ''}
+              </Text>
+            ) : null}
+
+            {/* Original proposed time */}
+            {rescheduleTarget?.proposedTime ? (
+              <View style={styles.originalTimeBox}>
+                <Text style={styles.originalTimeLabel}>⏰ Giờ đề xuất ban đầu:</Text>
+                <Text style={styles.originalTimeVal}>{rescheduleTarget.proposedTime}</Text>
+              </View>
+            ) : null}
+
+            {/* Input */}
+            <Text style={styles.inputLabel}>Thời gian đề xuất mới của bạn *</Text>
+            <TextInput
+              style={styles.rescheduleInput}
+              placeholder="Ví dụ: Tối thứ Bảy 19:00 hoặc 28/7 buổi sáng"
+              placeholderTextColor="#94A3B8"
+              value={rescheduleTime}
+              onChangeText={setRescheduleTime}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.inputHint}>
+              💡 Nhập thời gian bạn có thể, người gửi sẽ nhận được thông báo ngay.
+            </Text>
+
+            {/* Buttons */}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setRescheduleModal(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnConfirm, rescheduleLoading && { opacity: 0.6 }]}
+                onPress={handleReschedule}
+                disabled={rescheduleLoading}
+              >
+                {rescheduleLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={15} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.modalBtnConfirmText}>Gửi đề xuất</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -374,10 +512,12 @@ const styles = StyleSheet.create({
   messageText: { flex: 1, fontSize: 13, color: '#475569', fontStyle: 'italic', lineHeight: 18 },
 
   rescheduleBox: {
-    backgroundColor: '#EFF6FF', padding: 10, borderRadius: 10, marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#EFF6FF', padding: 12, borderRadius: 12, marginBottom: 10,
     borderWidth: 1, borderColor: '#BFDBFE',
   },
-  rescheduleText: { fontSize: 13, color: '#1D4ED8', fontWeight: '500' },
+  rescheduleLabel: { fontSize: 12, color: '#3B82F6', fontWeight: '500' },
+  rescheduleTime: { fontSize: 14, color: '#1D4ED8', fontWeight: 'bold', marginTop: 2 },
 
   rejectBox: {
     backgroundColor: '#FFF1F2', padding: 10, borderRadius: 10, marginBottom: 10,
@@ -385,19 +525,27 @@ const styles = StyleSheet.create({
   },
   rejectText: { fontSize: 13, color: '#BE123C' },
 
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+
   btnReject: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: 11, borderRadius: Radius.lg,
+    gap: 4, paddingVertical: 10, borderRadius: Radius.lg,
     backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA',
   },
-  btnRejectText: { fontSize: 14, fontWeight: '600', color: '#DC2626' },
+  btnRejectText: { fontSize: 13, fontWeight: '600', color: '#DC2626' },
+
+  btnReschedule: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: 10, borderRadius: Radius.lg,
+    backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE',
+  },
+  btnRescheduleText: { fontSize: 13, fontWeight: '600', color: '#2563EB' },
 
   btnAccept: {
-    flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: 11, borderRadius: Radius.lg, backgroundColor: Colors.primary,
+    flex: 1.2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: 10, borderRadius: Radius.lg, backgroundColor: Colors.primary,
   },
-  btnAcceptText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  btnAcceptText: { fontSize: 13, fontWeight: '600', color: '#fff' },
 
   btnCancel: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -406,4 +554,48 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#FECACA',
   },
   btnCancelText: { fontSize: 14, fontWeight: '600', color: '#DC2626' },
+
+  // ── Reschedule Modal ────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+  },
+  rescheduleModalBox: {
+    backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 36,
+  },
+  modalHandle: {
+    width: 40, height: 5, borderRadius: 3, backgroundColor: '#CBD5E1',
+    alignSelf: 'center', marginBottom: 20,
+  },
+  modalTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
+  modalSubtitle: { fontSize: 13, color: '#64748B', marginBottom: 14, lineHeight: 20 },
+
+  originalTimeBox: {
+    backgroundColor: '#FFF7ED', padding: 12, borderRadius: 12,
+    borderWidth: 1, borderColor: '#FED7AA', marginBottom: 16,
+  },
+  originalTimeLabel: { fontSize: 12, color: '#92400E', marginBottom: 4 },
+  originalTimeVal: { fontSize: 14, fontWeight: 'bold', color: '#92400E' },
+
+  inputLabel: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 8 },
+  rescheduleInput: {
+    borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 14,
+    padding: 14, fontSize: 14, color: '#0F172A',
+    backgroundColor: '#F8FAFC', minHeight: 70,
+    marginBottom: 10,
+  },
+  inputHint: { fontSize: 12, color: '#94A3B8', lineHeight: 18, marginBottom: 20 },
+
+  modalBtnRow: { flexDirection: 'row', gap: 12 },
+  modalBtnCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: Radius.lg,
+    backgroundColor: '#F1F5F9', alignItems: 'center',
+  },
+  modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  modalBtnConfirm: {
+    flex: 2, flexDirection: 'row', paddingVertical: 14, borderRadius: Radius.lg,
+    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
+  },
+  modalBtnConfirmText: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
 });
