@@ -29,6 +29,37 @@ import java.util.Map;
 public class UserService {
     private final com.hourlink.user.repository.UserRepository userRepository;
     private final Cloudinary cloudinary;
+    private final com.hourlink.skill.service.SkillService skillService;
+
+    /**
+     * Hồ sơ công khai của một người dùng khác — dùng khi xem thông tin người
+     * đang trò chuyện hoặc người hỗ trợ tiềm năng (chức năng 9.3 + 9.10).
+     *
+     * <p>Không trả về email / số điện thoại / ngày sinh theo yêu cầu bảo mật
+     * ở mục 14.</p>
+     */
+    public com.hourlink.user.dto.PublicProfileResponse getPublicProfile(java.util.UUID userId) {
+        com.hourlink.user.entity.User user = userRepository.findById(userId)
+                .orElseThrow(() -> new com.hourlink.common.exception.AppException(
+                        com.hourlink.common.exception.ErrorCode.USER_NOT_FOUND));
+
+        return com.hourlink.user.dto.PublicProfileResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .bio(user.getBio())
+                .region(user.getRegion())
+                .occupation(user.getOccupation())
+                .languages(user.getLanguages())
+                .userType(user.getUserType())
+                .isVerified(user.isVerified())
+                .reputationScore(user.getReputationScore())
+                .completedSessions(user.getCompletedSessions())
+                .cancelRate(user.getCancelRate())
+                .joinedAt(user.getCreatedAt())
+                .skills(skillService.getVisibleSkillsOfUser(userId))
+                .build();
+    }
 
     public com.hourlink.user.dto.UserDto getMyProfile() {
         String email = com.hourlink.common.util.SecurityUtil.getCurrentUserEmail();

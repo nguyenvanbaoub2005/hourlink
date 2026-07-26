@@ -19,6 +19,12 @@ public class NotificationResponse {
     String title;
     String body;
 
+    // ─── Người gây ra thông báo (để hiện avatar trên thông báo) ──────────────
+    /** Null với thông báo do hệ thống sinh */
+    UUID actorId;
+    String actorName;
+    String actorAvatarUrl;
+
     /** ID tham chiếu (invitation_id...) để FE navigate tới màn hình tương ứng */
     UUID referenceId;
 

@@ -8,6 +8,8 @@ import { useRouter } from 'expo-router';
 import { useNotificationStore } from '@store/notificationStore';
 import NotificationApi from '@api/notification';
 import { useAuthStore } from '@store/authStore';
+import Avatar from '@components/Avatar';
+import { notificationTarget } from '@utils/notificationNav';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const TOAST_DURATION = 4500; // ms hiển thị tự động
@@ -16,16 +18,32 @@ type ToastData = {
   title: string;
   body: string;
   type: string;
+  referenceId?: string;
+  actorName?: string;
+  actorAvatarUrl?: string;
 };
 
 const TYPE_ICON: Record<string, { icon: string; color: string; bg: string }> = {
-  INVITATION_RECEIVED:    { icon: 'mail-unread-outline',      color: '#0284C7', bg: '#E0F2FE' },
-  INVITATION_ACCEPTED:    { icon: 'checkmark-circle-outline', color: '#15803D', bg: '#DCFCE7' },
-  INVITATION_REJECTED:    { icon: 'close-circle-outline',     color: '#DC2626', bg: '#FEE2E2' },
-  INVITATION_RESCHEDULED: { icon: 'calendar-outline',         color: '#2563EB', bg: '#EFF6FF' },
-  INVITATION_CANCELLED:   { icon: 'ban-outline',              color: '#64748B', bg: '#F1F5F9' },
-  APPOINTMENT_REMINDER:   { icon: 'alarm-outline',            color: '#D97706', bg: '#FEF3C7' },
-  NEW_RATING:             { icon: 'star-outline',             color: '#9333EA', bg: '#F3E8FF' },
+  INVITATION_RECEIVED:      { icon: 'mail-unread-outline',      color: '#0284C7', bg: '#E0F2FE' },
+  INVITATION_ACCEPTED:      { icon: 'checkmark-circle-outline', color: '#15803D', bg: '#DCFCE7' },
+  INVITATION_REJECTED:      { icon: 'close-circle-outline',     color: '#DC2626', bg: '#FEE2E2' },
+  INVITATION_RESCHEDULED:   { icon: 'calendar-outline',         color: '#2563EB', bg: '#EFF6FF' },
+  INVITATION_CANCELLED:     { icon: 'ban-outline',              color: '#64748B', bg: '#F1F5F9' },
+  APPOINTMENT_REMINDER:     { icon: 'alarm-outline',            color: '#D97706', bg: '#FEF3C7' },
+  NEW_RATING:               { icon: 'star-outline',             color: '#9333EA', bg: '#F3E8FF' },
+  NEW_MESSAGE:              { icon: 'chatbubble-ellipses',      color: '#0D9488', bg: '#CCFBF1' },
+  CHAT_RESCHEDULE_PROPOSED: { icon: 'calendar-outline',         color: '#D97706', bg: '#FEF3C7' },
+};
+
+/** Huy hiệu nhỏ gắn ở góc avatar, cho biết loại thông báo — giống Facebook */
+const TYPE_BADGE: Record<string, { icon: string; color: string }> = {
+  NEW_MESSAGE:              { icon: 'chatbubble', color: '#0D9488' },
+  CHAT_RESCHEDULE_PROPOSED: { icon: 'calendar',   color: '#D97706' },
+  INVITATION_RECEIVED:      { icon: 'mail',       color: '#0284C7' },
+  INVITATION_ACCEPTED:      { icon: 'checkmark',  color: '#15803D' },
+  INVITATION_REJECTED:      { icon: 'close',      color: '#DC2626' },
+  INVITATION_RESCHEDULED:   { icon: 'calendar',   color: '#2563EB' },
+  INVITATION_CANCELLED:     { icon: 'ban',        color: '#64748B' },
 };
 
 /**
@@ -73,6 +91,9 @@ export default function NotificationToast() {
               title: newest.title,
               body: newest.body,
               type: newest.type,
+              referenceId: newest.referenceId,
+              actorName: newest.actorName,
+              actorAvatarUrl: newest.actorAvatarUrl,
             });
             lastSeenId.current = newest.id;
           }
@@ -159,6 +180,7 @@ export default function NotificationToast() {
   if (!visible || !toast) return null;
 
   const cfg = TYPE_ICON[toast.type] ?? { icon: 'notifications-outline', color: '#10B981', bg: '#D1FAE5' };
+  const badge = TYPE_BADGE[toast.type];
 
   return (
     <Animated.View
@@ -170,15 +192,31 @@ export default function NotificationToast() {
         activeOpacity={0.92}
         onPress={() => {
           dismiss();
-          if (toast.type.startsWith('INVITATION_')) {
-            router.push('/notifications' as any);
+          const target = notificationTarget(toast);
+          if (target) {
+            router.push(
+              (target.params
+                ? { pathname: target.pathname, params: target.params }
+                : target.pathname) as any
+            );
           }
         }}
       >
-        {/* Icon */}
-        <View style={[styles.iconWrap, { backgroundColor: cfg.bg }]}>
-          <Ionicons name={cfg.icon as any} size={22} color={cfg.color} />
-        </View>
+        {/* Ảnh đại diện người gửi — không có thì rơi về icon theo loại */}
+        {toast.actorAvatarUrl || toast.actorName ? (
+          <View style={styles.avatarWrap}>
+            <Avatar uri={toast.actorAvatarUrl} name={toast.actorName} size={44} />
+            {badge && (
+              <View style={[styles.badge, { backgroundColor: badge.color }]}>
+                <Ionicons name={badge.icon as any} size={10} color="#fff" />
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.iconWrap, { backgroundColor: cfg.bg }]}>
+            <Ionicons name={cfg.icon as any} size={22} color={cfg.color} />
+          </View>
+        )}
 
         {/* Text */}
         <View style={styles.textWrap}>
@@ -228,6 +266,14 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center',
     marginRight: 12,
+  },
+  avatarWrap: { marginRight: 12, position: 'relative' },
+  badge: {
+    position: 'absolute',
+    right: -2, bottom: -2,
+    width: 18, height: 18, borderRadius: 9,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#fff',
   },
   textWrap: { flex: 1 },
   toastTitle: {

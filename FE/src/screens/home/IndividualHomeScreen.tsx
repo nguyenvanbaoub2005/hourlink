@@ -4,6 +4,8 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
+import { useChatStore } from '@store/chatStore';
+import ChatApi from '@api/chat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
@@ -35,6 +37,7 @@ export default function IndividualHomeScreen() {
   const { user } = useAuthStore();
   const router = useRouter();
   const { unreadCount } = useNotificationStore();
+  const { totalUnread: chatUnread, setTotalUnread: setChatUnread } = useChatStore();
   const [myRequests, setMyRequests] = useState<HelpRequestItem[]>([]);
   const [firstName, setFirstName] = useState<string>('Bạn');
   const [refreshing, setRefreshing] = useState(false);
@@ -54,6 +57,14 @@ export default function IndividualHomeScreen() {
       }
     } catch {
       setMyRequests([]);
+    }
+
+    // Badge tin nhắn chưa đọc — tách riêng để lỗi chat không làm hỏng màn hình
+    try {
+      const unreadRes = await ChatApi.getUnreadCount();
+      setChatUnread(unreadRes.data?.data ?? 0);
+    } catch {
+      // bỏ qua
     }
   };
 
@@ -84,8 +95,18 @@ export default function IndividualHomeScreen() {
           <Text style={styles.brandName}>HourLink</Text>
         </View>
         <View style={styles.topRight}>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity
+            style={[styles.iconBtn, { position: 'relative' }]}
+            onPress={() => router.push('/chat' as any)}
+          >
             <Ionicons name="chatbubble-outline" size={24} color={Colors.textPrimary} />
+            {chatUnread > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {chatUnread > 9 ? '9+' : String(chatUnread)}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.iconBtn, { position: 'relative' }]}

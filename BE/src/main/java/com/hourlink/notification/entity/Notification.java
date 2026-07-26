@@ -27,6 +27,15 @@ public class Notification extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     User user;
 
+    /**
+     * Người gây ra thông báo (người gửi tin nhắn, người gửi lời mời...).
+     * Null với thông báo do hệ thống tự sinh. FE dùng để hiển thị ảnh đại diện
+     * của người đó trên thông báo, giống Facebook.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "actor_id")
+    User actor;
+
     /** Loại thông báo */
     @Enumerated(EnumType.STRING)
     @Column(name = "type", length = 60, nullable = false)

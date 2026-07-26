@@ -56,6 +56,14 @@ jwt:
   valid-duration: 86400        # 1 ngày (giây)
   refreshable-duration: 604800 # 7 ngày (giây)
 
+# Firebase (chat realtime — chức năng 9.10)
+# Mặc định đọc từ classpath nên KHÔNG phụ thuộc thư mục chạy app:
+#   đặt file service-account tại BE/src/main/resources/firebase-service-account.json
+# Nếu chưa có file: chat vẫn chạy qua REST, chỉ mất realtime.
+firebase:
+  credentials: ${FIREBASE_CREDENTIALS:classpath:firebase-service-account.json}
+  database-url: ${FIREBASE_DATABASE_URL:}
+
 # Cloudinary
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:your_cloud_name}

@@ -31,6 +31,14 @@ public class UserController {
 
     UserService userService;
 
+    @Operation(summary = "Xem hồ sơ công khai của một người dùng",
+            description = "Không trả về email / số điện thoại / ngày sinh. Kèm danh sách kỹ năng đang hiển thị.")
+    @GetMapping("/{id}")
+    public ApiResponse<com.hourlink.user.dto.PublicProfileResponse> getPublicProfile(
+            @PathVariable java.util.UUID id) {
+        return ApiResponse.success(userService.getPublicProfile(id));
+    }
+
     @Operation(summary = "Xem hồ sơ bản thân")
     @GetMapping("/profile")
     public ApiResponse<com.hourlink.user.dto.UserDto> getMyProfile() {

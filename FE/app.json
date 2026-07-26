@@ -50,6 +50,12 @@
         {
           "photosPermission": "HourLink cần truy cập thư viện ảnh để cập nhật ảnh đại diện."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "HourLink cần truy cập vị trí để bạn chia sẻ địa điểm gặp mặt trong cuộc trò chuyện."
+        }
       ]
     ],
     "experiments": {

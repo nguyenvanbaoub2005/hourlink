@@ -37,8 +37,21 @@ public class NotificationService {
     @Transactional
     public void createNotification(User user, NotificationType type,
                                    String title, String body, UUID referenceId) {
+        createNotification(user, null, type, title, body, referenceId);
+    }
+
+    /**
+     * Tạo thông báo kèm người gây ra thông báo (actor).
+     *
+     * <p>FE dùng {@code actor} để hiển thị ảnh đại diện của người gửi trên
+     * thông báo. Truyền {@code null} cho thông báo do hệ thống sinh.</p>
+     */
+    @Transactional
+    public void createNotification(User user, User actor, NotificationType type,
+                                   String title, String body, UUID referenceId) {
         Notification notif = Notification.builder()
                 .user(user)
+                .actor(actor)
                 .type(type)
                 .title(title)
                 .body(body)
@@ -98,6 +111,9 @@ public class NotificationService {
                 .type(n.getType())
                 .title(n.getTitle())
                 .body(n.getBody())
+                .actorId(n.getActor() != null ? n.getActor().getId() : null)
+                .actorName(n.getActor() != null ? n.getActor().getFullName() : null)
+                .actorAvatarUrl(n.getActor() != null ? n.getActor().getAvatarUrl() : null)
                 .referenceId(n.getReferenceId())
                 .isRead(n.getIsRead())
                 .createdAt(n.getCreatedAt())
