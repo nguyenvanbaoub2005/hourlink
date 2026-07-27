@@ -10,7 +10,7 @@ const AuthApi = {
   register: (data: RegisterRequest) => api.post<ApiResponse<AuthResponse>>('/auth/register', data),
   sendOtp: (data: any) => api.post('/auth/send-otp', data),
   verifyOtp: (data: any) => api.post('/auth/verify-otp', data),
-  refresh: (data: any) => api.post('/auth/refresh', data),
+  refresh: (data: { token: string }) => api.post('/auth/refresh', data),
   logout: (data: { token: string, refreshToken: string | null }) => api.post('/auth/logout', data),
 };
 

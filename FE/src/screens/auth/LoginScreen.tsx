@@ -17,23 +17,34 @@ export default function LoginScreen() {
   const setAuth = useAuthStore(state => state.setAuth);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (loading) return;
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
       Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
+      return;
+    }
+    // BE hiện chỉ hỗ trợ đăng nhập bằng email (LoginRequest validate @Email)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      Alert.alert('Lỗi', 'Email không đúng định dạng');
       return;
     }
 
     try {
       setLoading(true);
-      const response = await AuthApi.login({ email, password });
-      
+      const response = await AuthApi.login({ email: cleanEmail, password });
+
       const { token, refreshToken } = response.data.data;
-      
-      // Since backend doesn't return user info in AuthResponse yet, mock a basic user
-      await setAuth({ id: '1', email, fullName: 'HourLink User' } as any, token, refreshToken);
-      
+
+      // Lưu token + fetch hồ sơ thật từ BE (không mock user nữa)
+      await setAuth(token, refreshToken);
+
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      Alert.alert('Đăng nhập thất bại', error.response?.data?.message || 'Có lỗi xảy ra');
+      Alert.alert(
+        'Đăng nhập thất bại',
+        error.response?.data?.message || 'Không thể kết nối máy chủ, vui lòng thử lại'
+      );
     } finally {
       setLoading(false);
     }
@@ -64,7 +75,8 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.formContainer}>
-            <Text style={styles.label}>Email hoặc số điện thoại</Text>
+            {/* BE chưa hỗ trợ đăng nhập bằng SĐT — chỉ hiện Email */}
+            <Text style={styles.label}>Email</Text>
             <View style={styles.inputContainer}>
               <Feather name="mail" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
