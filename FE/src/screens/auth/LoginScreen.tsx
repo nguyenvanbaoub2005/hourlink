@@ -7,7 +7,9 @@ import { useRouter } from 'expo-router';
 import AuthApi from '@api/auth';
 import { useAuthStore } from '@store/authStore';
 import { Alert } from 'react-native';
-
+import UserApi from '@api/user';
+import * as SecureStore from 'expo-secure-store';
+import { TOKEN_KEY, REFRESH_KEY } from '@api/axiosInstance';
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -36,8 +38,15 @@ export default function LoginScreen() {
 
       const { token, refreshToken } = response.data.data;
 
-      // Lưu token + fetch hồ sơ thật từ BE (không mock user nữa)
-      await setAuth(token, refreshToken);
+      // Lưu tạm token vào SecureStore để axiosInstance lấy ra dùng cho request getMyProfile
+      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await SecureStore.setItemAsync(REFRESH_KEY, refreshToken);
+
+      // Fetch hồ sơ thật từ BE
+      const userRes = await UserApi.getMyProfile();
+
+      // Lưu đầy đủ state (user, token) vào store
+      await setAuth(userRes.data.data, token, refreshToken);
 
       router.replace('/(tabs)/home');
     } catch (error: any) {
