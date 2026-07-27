@@ -12,18 +12,16 @@ export default function HomeScreen() {
   const { role } = useAuthStore();
 
   const renderHomeContent = () => {
-    // Nếu role có giá trị: check đúng role
-    // Nếu role null hoặc ROLE_USER → hiển thị màn hình người dùng cá nhân
-    if (!role || role === 'ROLE_USER' || role.includes('ROLE_USER')) {
-      return <IndividualHomeScreen />;
-    }
-    if (role === 'ROLE_ORGANIZATION' || role.includes('ROLE_ORGANIZATION')) {
-      return <OrganizationHomeScreen />;
-    }
-    if (role === 'ROLE_ADMIN' || role.includes('ROLE_ADMIN')) {
+    // role là claim "scope" trong JWT, có thể chứa nhiều role cách nhau
+    // bởi dấu cách (vd: "ROLE_USER ROLE_ADMIN") → check theo độ ưu tiên
+    // cao nhất trước: ADMIN > ORGANIZATION > USER/mặc định
+    if (role?.includes('ROLE_ADMIN')) {
       return <AdminHomeScreen />;
     }
-    // Fallback: hiển thị luôn màn hình cá nhân
+    if (role?.includes('ROLE_ORGANIZATION')) {
+      return <OrganizationHomeScreen />;
+    }
+    // ROLE_USER, role null (decode lỗi) hoặc role lạ → màn cá nhân
     return <IndividualHomeScreen />;
   };
 

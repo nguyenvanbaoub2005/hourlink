@@ -8,6 +8,17 @@ import AuthApi from '@api/auth';
 import { useAuthStore } from '@store/authStore';
 import { Alert } from 'react-native';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// SĐT Việt Nam: 10 số, bắt đầu bằng 0
+const PHONE_REGEX = /^0\d{9}$/;
+
+type FieldErrors = {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  password?: string;
+};
+
 export default function RegisterScreen() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
@@ -17,27 +28,64 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const setAuth = useAuthStore(state => state.setAuth);
 
-  const handleRegister = async () => {
-    if (!agreed) return;
-    
-    if (!fullName || !email || !password) {
-      Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ họ tên, email và mật khẩu');
-      return;
+  const validate = (): boolean => {
+    const next: FieldErrors = {};
+
+    if (!fullName.trim()) {
+      next.fullName = 'Vui lòng nhập họ và tên';
     }
+
+    if (!email.trim()) {
+      next.email = 'Vui lòng nhập email';
+    } else if (!EMAIL_REGEX.test(email.trim())) {
+      next.email = 'Email không đúng định dạng';
+    }
+
+    // Phone không bắt buộc (BE cho phép null), nhưng nếu nhập thì phải hợp lệ
+    const cleanPhone = phone.replace(/\s/g, '');
+    if (cleanPhone && !PHONE_REGEX.test(cleanPhone)) {
+      next.phone = 'Số điện thoại phải gồm 10 số, bắt đầu bằng 0';
+    }
+
+    if (!password) {
+      next.password = 'Vui lòng nhập mật khẩu';
+    } else if (password.length < 6) {
+      next.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleRegister = async () => {
+    if (!agreed || loading) return;
+    if (!validate()) return;
 
     try {
       setLoading(true);
-      const response = await AuthApi.register({ fullName, email, phone, password });
-      
+      const cleanPhone = phone.replace(/\s/g, '');
+      const response = await AuthApi.register({
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: cleanPhone || undefined,
+        password,
+      });
+
       const { token, refreshToken } = response.data.data;
-      
-      await setAuth({ id: '1', email, fullName } as any, token, refreshToken);
-      
+
+      // Lưu token + fetch hồ sơ thật từ BE (không mock user nữa)
+      await setAuth(token, refreshToken);
+
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      Alert.alert('Đăng ký thất bại', error.response?.data?.message || 'Có lỗi xảy ra');
+      // BE trả message tiếng Việt theo ErrorCode (email/SĐT đã tồn tại...)
+      Alert.alert(
+        'Đăng ký thất bại',
+        error.response?.data?.message || 'Không thể kết nối máy chủ, vui lòng thử lại'
+      );
     } finally {
       setLoading(false);
     }
@@ -71,63 +119,69 @@ export default function RegisterScreen() {
             
             {/* Họ và tên */}
             <Text style={styles.label}>Họ và tên</Text>
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, !!errors.fullName && styles.inputError]}>
               <Feather name="user" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Nguyễn Văn Việt"
                 placeholderTextColor={Colors.textMuted}
                 value={fullName}
-                onChangeText={setFullName}
+                onChangeText={(text) => { setFullName(text); if (errors.fullName) setErrors(e => ({ ...e, fullName: undefined })); }}
                 autoCapitalize="words"
               />
             </View>
+            {!!errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
 
             {/* Email */}
             <Text style={[styles.label, { marginTop: Spacing.md }]}>Email</Text>
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, !!errors.email && styles.inputError]}>
               <Feather name="mail" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="example@email.com"
                 placeholderTextColor={Colors.textMuted}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => { setEmail(text); if (errors.email) setErrors(e => ({ ...e, email: undefined })); }}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
+            {!!errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
             {/* Số điện thoại */}
-            <Text style={[styles.label, { marginTop: Spacing.md }]}>Số điện thoại</Text>
-            <View style={styles.inputContainer}>
+            <Text style={[styles.label, { marginTop: Spacing.md }]}>Số điện thoại (không bắt buộc)</Text>
+            <View style={[styles.inputContainer, !!errors.phone && styles.inputError]}>
               <Feather name="phone" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="0901 234 567"
                 placeholderTextColor={Colors.textMuted}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(text) => { setPhone(text); if (errors.phone) setErrors(e => ({ ...e, phone: undefined })); }}
                 keyboardType="phone-pad"
+                maxLength={12}
               />
             </View>
+            {!!errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
 
             {/* Mật khẩu */}
             <Text style={[styles.label, { marginTop: Spacing.md }]}>Mật khẩu</Text>
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, !!errors.password && styles.inputError]}>
               <Feather name="lock" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Ít nhất 8 ký tự"
+                placeholder="Ít nhất 6 ký tự"
                 placeholderTextColor={Colors.textMuted}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => { setPassword(text); if (errors.password) setErrors(e => ({ ...e, password: undefined })); }}
                 secureTextEntry={!showPassword}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
                 <Feather name={showPassword ? "eye" : "eye-off"} size={20} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
+            {!!errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
             {/* Điều khoản */}
             <TouchableOpacity 
@@ -208,6 +262,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     height: 52,
     backgroundColor: Colors.bgInput,
+  },
+  inputError: {
+    borderColor: Colors.danger,
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: 13,
+    marginTop: Spacing.xs,
   },
   inputIcon: {
     paddingHorizontal: Spacing.md,

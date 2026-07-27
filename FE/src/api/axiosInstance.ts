@@ -28,6 +28,13 @@ api.interceptors.request.use(
 );
 
 // ─── Response interceptor: auto refresh token ────────────────
+// Handler do authStore đăng ký: được gọi khi refresh thất bại
+// để reset state đăng nhập (tránh import vòng authStore ↔ axiosInstance)
+let onUnauthorized: (() => void) | null = null;
+export const setUnauthorizedHandler = (handler: () => void) => {
+  onUnauthorized = handler;
+};
+
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: Function; reject: Function }> = [];
 
@@ -43,7 +50,11 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 401 từ chính các endpoint /auth (đăng nhập sai mật khẩu, refresh hỏng...)
+    // thì trả lỗi thẳng cho màn hình, không đi vào luồng refresh
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -66,8 +77,14 @@ api.interceptors.response.use(
           token: refreshToken,
         });
 
+        // BE dùng refresh token rotation: token cũ bị blacklist,
+        // PHẢI lưu cả cặp token mới, nếu không lần refresh sau sẽ fail
         const newToken = data.data.token;
+        const newRefreshToken = data.data.refreshToken;
         await SecureStore.setItemAsync(TOKEN_KEY, newToken);
+        if (newRefreshToken) {
+          await SecureStore.setItemAsync(REFRESH_KEY, newRefreshToken);
+        }
         processQueue(null, newToken);
 
         if (originalRequest.headers) {
@@ -76,9 +93,10 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError as AxiosError, null);
-        // Xóa token cũ → redirect về login
+        // Xóa token cũ và báo authStore reset state → layout tự redirect về login
         await SecureStore.deleteItemAsync(TOKEN_KEY);
         await SecureStore.deleteItemAsync(REFRESH_KEY);
+        onUnauthorized?.();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
