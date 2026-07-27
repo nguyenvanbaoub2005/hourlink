@@ -3,11 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import { Colors } from '@constants/Colors';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const { unreadCount } = useNotificationStore();
+
+
 
   // Đang đọc token từ SecureStore → hiển thị màn hình chờ
   if (isLoading) {
@@ -110,3 +112,5 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+

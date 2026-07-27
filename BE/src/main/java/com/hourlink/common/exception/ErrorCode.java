@@ -54,6 +54,13 @@ public enum ErrorCode {
     INVITATION_ALREADY_RESPONDED(4002, "Lời mời đã được phản hồi",             HttpStatus.BAD_REQUEST),
     CONVERSATION_NOT_FOUND(4003,   "Không tìm thấy cuộc trò chuyện",           HttpStatus.NOT_FOUND),
     USER_BLOCKED(4004,             "Không thể gửi tin nhắn đến người dùng này",HttpStatus.FORBIDDEN),
+    MESSAGE_NOT_FOUND(4005,        "Không tìm thấy tin nhắn",                  HttpStatus.NOT_FOUND),
+    CHAT_NOT_ALLOWED(4006,         "Chỉ có thể trò chuyện sau khi lời mời được chấp nhận", HttpStatus.FORBIDDEN),
+    ALREADY_BLOCKED(4007,          "Bạn đã chặn người dùng này rồi",           HttpStatus.BAD_REQUEST),
+    NOT_BLOCKED(4008,              "Bạn chưa chặn người dùng này",             HttpStatus.BAD_REQUEST),
+    CANNOT_BLOCK_SELF(4009,        "Không thể tự chặn chính mình",             HttpStatus.BAD_REQUEST),
+    MESSAGE_ALREADY_REPORTED(4010, "Bạn đã báo cáo tin nhắn này rồi",          HttpStatus.BAD_REQUEST),
+    CANNOT_REPORT_OWN_MESSAGE(4011,"Không thể báo cáo tin nhắn của chính bạn", HttpStatus.BAD_REQUEST),
 
     // ─── Appointment (5xxx) ───────────────────────────────────────────
     APPOINTMENT_NOT_FOUND(5001,    "Không tìm thấy lịch hẹn",                  HttpStatus.NOT_FOUND),

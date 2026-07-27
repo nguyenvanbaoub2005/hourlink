@@ -50,7 +50,7 @@ public class HelpRequestService {
                 .category(category)
                 .requester(user)
                 .status(RequestStatus.SEARCHING)
-                .timeCreditAmount(request.getDuration() != null ? request.getDuration() : 1)
+                .timeCreditAmount(request.getDuration() != null ? Math.max(1, (int) Math.round(request.getDuration() / 60.0)) : 1)
                 .build();
 
         HelpRequest saved = helpRequestRepository.save(helpRequest);
@@ -85,7 +85,7 @@ public class HelpRequestService {
         helpRequest.setRegion(request.getRegion());
         helpRequest.setCategory(category);
         if (request.getDuration() != null) {
-            helpRequest.setTimeCreditAmount(request.getDuration());
+            helpRequest.setTimeCreditAmount(Math.max(1, (int) Math.round(request.getDuration() / 60.0)));
         }
 
         return mapToResponse(helpRequestRepository.save(helpRequest));

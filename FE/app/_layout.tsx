@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@store/authStore';
+import NotificationToast from '@components/NotificationToast';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,7 +27,11 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="chat" />
       </Stack>
+      {/* Toast thông báo nổi — hoạt động trên tất cả màn hình */}
+      <NotificationToast />
     </QueryClientProvider>
   );
 }

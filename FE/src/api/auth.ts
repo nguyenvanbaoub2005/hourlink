@@ -1,14 +1,13 @@
 import api from './axiosInstance';
+import type { ApiResponse, AuthResponse, LoginRequest, RegisterRequest } from '@types';
 
 /**
  * AuthApi — API calls cho module auth.
  * Base URL: /auth
  */
 const AuthApi = {
-  login: (data: { email: string; password: string }) => api.post('/auth/login', data),
-  register: (data: { fullName: string; email: string; password: string; phone?: string }) =>
-    api.post('/auth/register', data),
-  // ⚠️ BE CHƯA có 2 endpoint OTP này (thuộc scope DEV1) — đừng gọi cho tới khi BE xong
+  login: (data: LoginRequest) => api.post<ApiResponse<AuthResponse>>('/auth/login', data),
+  register: (data: RegisterRequest) => api.post<ApiResponse<AuthResponse>>('/auth/register', data),
   sendOtp: (data: any) => api.post('/auth/send-otp', data),
   verifyOtp: (data: any) => api.post('/auth/verify-otp', data),
   refresh: (data: { token: string }) => api.post('/auth/refresh', data),

@@ -10,7 +10,9 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import UserApi from '@api/user';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
+import NotificationApi from '@api/notification';
 import { useAuthStore } from '@store/authStore';
+import { useNotificationStore } from '@store/notificationStore';
 import type { UserResponse } from '@types';
 
 type SkillItem = { id: string; name: string; status: string };
@@ -19,6 +21,7 @@ type RequestItem = { id: string; title: string; categoryName?: string; status: s
 export default function ProfileScreen() {
   const router = useRouter();
   const { logout } = useAuthStore();
+  const { unreadCount, setUnreadCount } = useNotificationStore();
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
@@ -47,6 +50,10 @@ export default function ProfileScreen() {
       router.push('/profile/help-requests' as any);
       return;
     }
+    if (label === 'Lời mời') {
+      router.push('/profile/invitations' as any);
+      return;
+    }
     Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
   };
 
@@ -64,6 +71,14 @@ export default function ProfileScreen() {
       console.log('Lỗi tải hồ sơ:', e);
     } finally {
       setLoading(false);
+    }
+    // Poll unread notification count
+    try {
+      const nRes = await NotificationApi.getUnreadCount();
+      const count = nRes.data?.data?.count ?? 0;
+      setUnreadCount(Number(count));
+    } catch {
+      // ignore silently
     }
   };
 
@@ -105,9 +120,20 @@ export default function ProfileScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Cá nhân</Text>
-        <View style={{ flexDirection: 'row' }}>
-          <TouchableOpacity style={styles.iconBtn}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* Bell icon với badge thông báo thực */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push('/notifications' as any)}
+          >
             <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+            {unreadCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {unreadCount > 9 ? '9+' : String(unreadCount)}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
             <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
@@ -335,8 +361,17 @@ const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#fff' },
   header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: '#fff' },
   headerTitle:  { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary },
-  iconBtn:      { marginLeft: Spacing.md },
+  iconBtn:      { marginLeft: Spacing.md, position: 'relative' },
   content:      { paddingBottom: 40 },
+
+  // Notification badge
+  notifBadge: {
+    position: 'absolute', top: -4, right: -6,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 4, borderWidth: 2, borderColor: '#fff',
+  },
+  notifBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
 
   // Avatar
   infoRow:      { flexDirection: 'row', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, alignItems: 'center' },
@@ -387,3 +422,4 @@ const styles = StyleSheet.create({
   menuLabel:    { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.textPrimary },
   menuDivider:  { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
 });
+
