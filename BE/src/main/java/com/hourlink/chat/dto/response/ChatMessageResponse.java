@@ -42,6 +42,12 @@ public class ChatMessageResponse {
     /** Thời gian đề xuất mới (RESCHEDULE_PROPOSAL) */
     String proposedTime;
 
+    /** ID lịch hẹn (APPOINTMENT_CARD) */
+    UUID appointmentId;
+
+    /** JSON data snapshot lịch hẹn (APPOINTMENT_CARD) */
+    String appointmentData;
+
     // ─── Trạng thái ──────────────────────────────────────────────────────────
     Boolean isRead;
     Instant createdAt;

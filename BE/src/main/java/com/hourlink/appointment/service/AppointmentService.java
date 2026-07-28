@@ -6,6 +6,7 @@ import com.hourlink.appointment.entity.*;
 import com.hourlink.appointment.enums.AppointmentStatus;
 import com.hourlink.appointment.enums.VerificationMethod;
 import com.hourlink.appointment.repository.*;
+import com.hourlink.chat.service.ChatService;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
@@ -48,6 +49,7 @@ public class AppointmentService {
     private final InvitationRepository invitationRepository;
     private final SkillRepository skillRepository;
     private final NotificationService notificationService;
+    private final ChatService chatService;
 
     // ─── 1. Tạo lịch hẹn (9.11) ──────────────────────────────────────────────
 
@@ -74,6 +76,20 @@ public class AppointmentService {
                     .orElseThrow(() -> new AppException(ErrorCode.SKILL_NOT_FOUND));
         }
 
+        // Validate: nếu hình thức Online thì người tạo phải cung cấp link họp
+        if (req.getMeetingType() == SessionFormat.ONLINE) {
+            if (req.getLocationOrLink() == null || req.getLocationOrLink().trim().isEmpty()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST, "Hình thức Online yêu cầu cung cấp link họp.");
+            }
+        }
+
+        // Validate: người tạo phải là 1 trong 2 bên
+        boolean isProvider = currentUser.getId().equals(provider.getId());
+        boolean isReceiver = currentUser.getId().equals(receiver.getId());
+        if (!isProvider && !isReceiver) {
+            throw new AppException(ErrorCode.ACCESS_DENIED, "Bạn không phải người tham gia lịch hẹn này.");
+        }
+
         Appointment appointment = Appointment.builder()
                 .provider(provider)
                 .receiver(receiver)
@@ -94,14 +110,42 @@ public class AppointmentService {
         appointment = appointmentRepository.save(appointment);
 
         // Gửi thông báo cho bên kia
-        User targetUser = currentUser.getId().equals(provider.getId()) ? receiver : provider;
+        User targetUser = isProvider ? receiver : provider;
         notificationService.createNotification(targetUser, currentUser, NotificationType.APPOINTMENT_CREATED,
                 "Lịch hẹn mới: " + req.getTitle(),
-                currentUser.getFullName() + " đã tạo lịch hẹn hỗ trợ với bạn.",
+                currentUser.getFullName() + " đã đề xuất lịch hẹn với bạn.",
                 appointment.getId());
+
+        // Gửi card lịch hẹn vào chat để bên kia có thể phản hồi trực tiếp
+        try {
+            UUID conversationId = chatService.findConversationIdByUsers(provider.getId(), receiver.getId());
+            if (conversationId != null) {
+                String aptData = buildAppointmentCardData(appointment);
+                chatService.sendAppointmentCardInternal(conversationId, appointment.getId(), aptData, currentUser);
+            }
+        } catch (Exception e) {
+            log.warn("Không gửi được card lịch hẹn vào chat: {}", e.getMessage());
+        }
 
         log.info("Created appointment ID [{}] by user [{}]", appointment.getId(), currentUserEmail);
         return AppointmentResponse.fromEntity(appointment);
+    }
+
+    /** Tạo JSON snapshot đơn giản của lịch hẹn để nhúng vào APPOINTMENT_CARD */
+    private String buildAppointmentCardData(Appointment apt) {
+        return String.format(
+            "{\"id\":\"%s\",\"title\":\"%s\",\"date\":\"%s\",\"start\":\"%s\",\"end\":\"%s\"," +
+            "\"meetingType\":\"%s\",\"locationOrLink\":\"%s\",\"timeCreditAmount\":%s,\"status\":\"%s\"}",
+            apt.getId(),
+            apt.getTitle() != null ? apt.getTitle().replace("\"", "'") : "",
+            apt.getAppointmentDate(),
+            apt.getStartTime(),
+            apt.getEndTime(),
+            apt.getMeetingType(),
+            apt.getLocationOrLink() != null ? apt.getLocationOrLink().replace("\"", "'") : "",
+            apt.getTimeCreditAmount(),
+            apt.getStatus()
+        );
     }
 
     // ─── 2. Quản lý lịch cá nhân (9.12) ──────────────────────────────────────
@@ -150,8 +194,17 @@ public class AppointmentService {
         String action = req.getAction() != null ? req.getAction().toUpperCase() : "";
 
         if ("CONFIRM".equals(action)) {
+            // Cả hai bên đều có thể xác nhận lịch hẹn (người không tạo thì xác nhận đồng ý)
             if (appointment.getStatus() != AppointmentStatus.PENDING && appointment.getStatus() != AppointmentStatus.RESCHEDULED) {
                 throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
+            }
+            if (appointment.getMeetingType() == SessionFormat.ONLINE) {
+                if (appointment.getLocationOrLink() == null || appointment.getLocationOrLink().trim().isEmpty()) {
+                    if (req.getLocationOrLink() == null || req.getLocationOrLink().trim().isEmpty()) {
+                        throw new AppException(ErrorCode.INVALID_REQUEST, "Hình thức Online yêu cầu cung cấp link họp khi xác nhận.");
+                    }
+                    appointment.setLocationOrLink(req.getLocationOrLink());
+                }
             }
             appointment.setStatus(AppointmentStatus.CONFIRMED);
             // TODO (Wallet Hook): Tạo lệnh hold Time Credit của receiver khi chốt lịch

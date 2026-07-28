@@ -236,7 +236,7 @@ export default function AppointmentsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Lịch Hẹn Hỗ Trợ</Text>
+        <Text style={styles.headerTitle}>Lịch Hẹn</Text>
         <TouchableOpacity style={styles.refreshIcon} onPress={() => fetchAppointments(true)}>
           <Ionicons name="refresh-outline" size={22} color={Colors.textPrimary} />
         </TouchableOpacity>
@@ -244,18 +244,30 @@ export default function AppointmentsScreen() {
 
       {/* Filter Tabs */}
       <View style={styles.tabBar}>
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tabItem, isActive && styles.tabItemActive]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'UPCOMING' && styles.tabItemActive]}
+          onPress={() => setActiveTab('UPCOMING')}
+        >
+          <Text style={[styles.tabText, activeTab === 'UPCOMING' && styles.tabTextActive]}>
+            Sắp tới
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'IN_PROGRESS' && styles.tabItemActive]}
+          onPress={() => setActiveTab('IN_PROGRESS')}
+        >
+          <Text style={[styles.tabText, activeTab === 'IN_PROGRESS' && styles.tabTextActive]}>
+            Đang diễn ra
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'HISTORY' && styles.tabItemActive]}
+          onPress={() => setActiveTab('HISTORY')}
+        >
+          <Text style={[styles.tabText, activeTab === 'HISTORY' && styles.tabTextActive]}>
+            Lịch sử
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -293,8 +305,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   headerTitle: { fontSize: 22, fontWeight: '700', color: Colors.textPrimary },
   refreshIcon: { padding: 4 },

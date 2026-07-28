@@ -14,4 +14,6 @@ public class RespondAppointmentRequest {
     String reason;
 
     String newTime;
+
+    String locationOrLink;
 }

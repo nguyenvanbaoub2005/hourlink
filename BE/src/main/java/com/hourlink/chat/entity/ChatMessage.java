@@ -6,6 +6,7 @@ import com.hourlink.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import java.util.UUID;
 
 /**
  * ChatMessage — Một tin nhắn trong cuộc trò chuyện (chức năng 9.10).
@@ -93,4 +94,14 @@ public class ChatMessage extends BaseEntity {
     @Column(name = "is_read", nullable = false)
     @Builder.Default
     Boolean isRead = false;
+
+    // ─── Lịch hẹn (APPOINTMENT_CARD) ────────────────────────────────────────
+
+    /** ID lịch hẹn được nhúng vào card chat */
+    @Column(name = "appointment_id")
+    UUID appointmentId;
+
+    /** JSON snapshot thông tin lịch hẹn (để hiển thị ngay mà không cần query) */
+    @Column(name = "appointment_data", columnDefinition = "TEXT")
+    String appointmentData;
 }

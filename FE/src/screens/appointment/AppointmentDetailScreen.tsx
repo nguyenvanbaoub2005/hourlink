@@ -58,9 +58,22 @@ export default function AppointmentDetailScreen() {
     }, [fetchDetail])
   );
 
-  const handleRespond = async (action: 'CONFIRM' | 'CANCEL') => {
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [meetingLink, setMeetingLink] = useState('');
+
+  const handleRespond = async (action: 'CONFIRM' | 'CANCEL', link?: string) => {
     if (!id || !appointment) return;
     const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
+    
+    // Nếu là xác nhận và là Online, kiểm tra link
+    if (action === 'CONFIRM' && (appointment.meetingType?.toUpperCase() === 'ONLINE' || (appointment as any).format === 'online')) {
+      const existingLink = appointment.locationOrLink || (appointment as any).meetingLink;
+      if (!existingLink && !link) {
+        setShowLinkModal(true);
+        return;
+      }
+    }
+
     Alert.alert(
       `${action === 'CONFIRM' ? 'Xác nhận' : 'Hủy'} lịch hẹn`,
       `Bạn có chắc chắn muốn ${actionText} lịch hẹn này?`,
@@ -72,8 +85,13 @@ export default function AppointmentDetailScreen() {
           onPress: async () => {
             try {
               setActionLoading(true);
-              await AppointmentApi.respond(id, { action, reason: action === 'CANCEL' ? 'Người dùng hủy từ màn chi tiết' : undefined });
+              await AppointmentApi.respond(id, { 
+                action, 
+                reason: action === 'CANCEL' ? 'Người dùng hủy từ màn chi tiết' : undefined,
+                locationOrLink: link
+              });
               Alert.alert('Thành công', `Đã ${actionText} lịch hẹn.`);
+              setShowLinkModal(false);
               fetchDetail();
             } catch (err: any) {
               Alert.alert('Lỗi', err?.response?.data?.message || `Không thể ${actionText} lịch hẹn.`);
@@ -298,40 +316,42 @@ export default function AppointmentDetailScreen() {
       </ScrollView>
 
       {/* Footer Actions */}
-      <View style={styles.footer}>
-        {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && (
-          <View style={styles.footerRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: Colors.success }]}
-              onPress={() => handleRespond('CONFIRM')}
-              disabled={actionLoading}
-            >
-              {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnTextWhite}>Chấp nhận lịch</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA' }]}
-              onPress={() => handleRespond('CANCEL')}
-              disabled={actionLoading}
-            >
-              <Text style={{ color: '#DC2626', fontWeight: '600' }}>Từ chối</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+      {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED' || statusStr === 'UPCOMING' || statusStr === 'IN_PROGRESS') && (
+        <View style={styles.footer}>
+          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && (
+            <View style={styles.footerRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: Colors.success }]}
+                onPress={() => handleRespond('CONFIRM')}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnTextWhite}>Chấp nhận lịch</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA' }]}
+                onPress={() => handleRespond('CANCEL')}
+                disabled={actionLoading}
+              >
+                <Text style={{ color: '#DC2626', fontWeight: '600' }}>Từ chối</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {(statusStr === 'CONFIRMED' || statusStr === 'UPCOMING') && (
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#0D9488' }]} onPress={handleVerify}>
-            <Ionicons name={isOffline ? 'qr-code' : 'keypad'} size={18} color="#FFF" style={{ marginRight: 8 }} />
-            <Text style={styles.btnTextWhite}>Bắt Đầu / Xác Thực {isOffline ? 'QR Code' : 'OTP'}</Text>
-          </TouchableOpacity>
-        )}
+          {(statusStr === 'UPCOMING') && (
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#0D9488' }]} onPress={handleVerify}>
+              <Ionicons name={isOffline ? 'qr-code' : 'keypad'} size={18} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.btnTextWhite}>Bắt Đầu / Xác Thực {isOffline ? 'QR Code' : 'OTP'}</Text>
+            </TouchableOpacity>
+          )}
 
-        {statusStr === 'IN_PROGRESS' && (
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#9333EA' }]} onPress={() => setShowModal(true)}>
-            <Ionicons name="checkmark-done-circle" size={18} color="#FFF" style={{ marginRight: 8 }} />
-            <Text style={styles.btnTextWhite}>Xác Nhận Hoàn Thành Buổi Hỗ Trợ</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {statusStr === 'IN_PROGRESS' && (
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#9333EA' }]} onPress={() => setShowModal(true)}>
+              <Ionicons name="checkmark-done-circle" size={18} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.btnTextWhite}>Xác Nhận Hoàn Thành Buổi Hỗ Trợ</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Completion Modal */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
@@ -394,6 +414,46 @@ export default function AppointmentDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Provide Link Modal */}
+      <Modal visible={showLinkModal} transparent animationType="fade" onRequestClose={() => setShowLinkModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Cung Cấp Link Họp</Text>
+            <Text style={styles.modalSub}>Vì đây là buổi hỗ trợ Online, bạn cần cung cấp link Google Meet, Zoom... để người nhận tham gia.</Text>
+            
+            <Text style={styles.inputLabel}>Link họp / Phòng học *</Text>
+            <TextInput
+              style={styles.input}
+              value={meetingLink}
+              onChangeText={setMeetingLink}
+              placeholder="https://meet.google.com/..."
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.bgCard }]} onPress={() => setShowLinkModal(false)}>
+                <Text style={{ color: Colors.textPrimary, fontWeight: '600' }}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: Colors.success }]}
+                onPress={() => {
+                  if (!meetingLink.trim()) {
+                    Alert.alert('Lỗi', 'Vui lòng nhập link họp hợp lệ!');
+                    return;
+                  }
+                  handleRespond('CONFIRM', meetingLink.trim());
+                }}
+                disabled={actionLoading}
+              >
+                {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnTextWhite}>Xác Nhận</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }

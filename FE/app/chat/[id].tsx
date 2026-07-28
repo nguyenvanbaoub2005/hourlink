@@ -131,9 +131,14 @@ export default function ChatRoomScreen() {
   const [aptEnd, setAptEnd] = useState('10:00');
   const [aptFormat, setAptFormat] = useState<'ONLINE' | 'OFFLINE'>('ONLINE');
   const [aptCredit, setAptCredit] = useState('1');
+  const [aptLocation, setAptLocation] = useState('');
   const [creatingApt, setCreatingApt] = useState(false);
-  const [isMyService, setIsMyService] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+
+  // Lấy thông tin invitation từ conversation để xác định provider/receiver
+  const invitationId = conversation?.invitationId;
+  const convProviderId = conversation?.invitationProviderId; // nếu có
+  const convReceiverId = conversation?.invitationReceiverId; // nếu có
 
   const updateEndTime = (start: string, creditStr: string) => {
     try {
@@ -392,6 +397,21 @@ export default function ChatRoomScreen() {
     }
   };
 
+  const openCreateAppointmentModal = () => {
+    setAptTitle(peerSkill ? `Hỗ trợ: ${peerSkill}` : 'Buổi hỗ trợ kỹ năng');
+
+    // Tìm tin nhắn chứa link họp gần nhất (MEETING_LINK) để điền tự động
+    const lastLinkMsg = [...messages].reverse().find(m => m.type === 'MEETING_LINK');
+    if (lastLinkMsg && lastLinkMsg.meetingLink) {
+      setAptFormat('ONLINE');
+      setAptLocation(lastLinkMsg.meetingLink);
+    } else {
+      setAptLocation('');
+    }
+
+    setAptModalVisible(true);
+  };
+
   const submitCreateAppointment = async () => {
     if (!user?.id || !peerId) {
       Alert.alert('Lỗi', 'Không thể xác định thông tin người dùng.');
@@ -407,26 +427,48 @@ export default function ChatRoomScreen() {
       Alert.alert('Lỗi định dạng', 'Vui lòng nhập giờ theo định dạng HH:MM (ví dụ: 09:00, 14:30)');
       return;
     }
+    if (aptFormat === 'ONLINE' && !aptLocation.trim()) {
+      Alert.alert('Thiếu thông tin', 'Hình thức Online yêu cầu cung cấp link họp (Google Meet, Zoom...).');
+      return;
+    }
+
+    // Xác định provider/receiver từ invitation (để đúng nghiệp vụ)
+    // conversation.invitationProviderId là người hỗ trợ (skill owner)
+    // Nếu không có thông tin này, dùng peerId làm provider (quy ước tạm)
+    const invData = conversation?.invitationSenderId;
+    const invRecv = conversation?.invitationReceiverId;
+    // Provider = người gửi lời mời (invitation sender = người offer kỹ năng)
+    // Receiver = người nhận lời mời
+    let providerId = peerId;  // mặc định peer là provider
+    let receiverId = user.id; // mặc định mình là receiver
+    if (invData && invRecv) {
+      providerId = invData; // sender invitation thường là người offer kỹ năng
+      receiverId = invRecv;
+    }
 
     setCreatingApt(true);
     try {
       const payload = {
-        providerId: isMyService ? user.id : peerId,
-        receiverId: isMyService ? peerId : user.id,
+        providerId,
+        receiverId,
+        invitationId: invitationId || undefined,
         title: aptTitle.trim() || 'Buổi hỗ trợ kỹ năng',
         appointmentDate: aptDate.trim(),
         startTime: `${aptStart.trim()}:00`,
         endTime: `${aptEnd.trim()}:00`,
         meetingType: aptFormat,
-        locationOrLink: aptFormat === 'OFFLINE' ? 'Gặp mặt trực tiếp' : 'Online Video Call',
+        locationOrLink: aptFormat === 'OFFLINE'
+          ? (aptLocation.trim() || 'Gặp mặt trực tiếp')
+          : aptLocation.trim(),
         timeCreditAmount: parseFloat(aptCredit) || 1,
       };
       await AppointmentApi.create(payload);
       setAptModalVisible(false);
-      Alert.alert('Thành công', 'Đã tạo lịch hẹn thành công!', [
-        { text: 'Xem lịch hẹn', onPress: () => router.push('/(tabs)/appointments' as any) },
-        { text: 'Đóng', style: 'cancel' }
+      setAptLocation('');
+      Alert.alert('✅ Đã gửi đề xuất', 'Lịch hẹn đã được gửi vào cuộc trò chuyện. Hãy đợi người kia xác nhận!', [
+        { text: 'OK', style: 'default' }
       ]);
+      if (!realtime) await fetchMessages();
     } catch (err: any) {
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể tạo lịch hẹn. Vui lòng thử lại.');
     } finally {
@@ -444,10 +486,7 @@ export default function ChatRoomScreen() {
       { text: '📅  Đề xuất đổi lịch', onPress: () => setRescheduleVisible(true) },
       {
         text: '🗓️  Tạo lịch hẹn mới',
-        onPress: () => {
-          setAptTitle(peerSkill ? `Hỗ trợ: ${peerSkill}` : 'Buổi hỗ trợ kỹ năng');
-          setAptModalVisible(true);
-        },
+        onPress: openCreateAppointmentModal,
       },
       { text: 'Hủy', style: 'cancel' },
     ]);
@@ -631,6 +670,90 @@ export default function ChatRoomScreen() {
           </View>
         )}
 
+        {item.type === 'APPOINTMENT_CARD' && (() => {
+          let aptData: any = {};
+          try { aptData = item.appointmentData ? JSON.parse(item.appointmentData) : {}; } catch {}
+          const isPending = aptData.status === 'PENDING';
+          const isOtherPerson = !isMine; // người không tạo lịch
+          return (
+            <View style={{
+              backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : '#F0FDFA',
+              borderRadius: 12, padding: 12, minWidth: 220,
+              borderWidth: isMine ? 0 : 1.5, borderColor: '#0D9488'
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                <Ionicons name="calendar" size={18} color={isMine ? '#fff' : '#0D9488'} style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: isMine ? '#fff' : '#0F172A', flex: 1 }} numberOfLines={2}>
+                  {aptData.title || 'Lịch hẹn mới'}
+                </Text>
+              </View>
+              <View style={{ gap: 4, marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="calendar-outline" size={13} color={isMine ? '#D1FAE5' : '#0D9488'} />
+                  <Text style={{ fontSize: 12, color: isMine ? '#D1FAE5' : '#334155' }}>
+                    {aptData.date} · {aptData.start?.slice(0,5)} → {aptData.end?.slice(0,5)}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name={aptData.meetingType === 'ONLINE' ? 'videocam-outline' : 'location-outline'} size={13} color={isMine ? '#D1FAE5' : '#0D9488'} />
+                  <Text style={{ fontSize: 12, color: isMine ? '#D1FAE5' : '#334155' }} numberOfLines={1}>
+                    {aptData.meetingType === 'ONLINE' ? 'Trực tuyến' : 'Trực tiếp'}{aptData.locationOrLink ? ` · ${aptData.locationOrLink}` : ''}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="time-outline" size={13} color={isMine ? '#D1FAE5' : '#0D9488'} />
+                  <Text style={{ fontSize: 12, color: isMine ? '#D1FAE5' : '#334155' }}>
+                    {aptData.timeCreditAmount} Time Credit
+                  </Text>
+                </View>
+              </View>
+              {isPending && isOtherPerson && item.appointmentId && (
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: '#0D9488', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}
+                    onPress={async () => {
+                      try {
+                        await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CONFIRM' });
+                        if (!realtime) await fetchMessages();
+                        Alert.alert('✅ Đã xác nhận', 'Lịch hẹn đã được xác nhận thành công!');
+                      } catch (e: any) {
+                        Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
+                      }
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>✓ Đồng ý</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: '#FEE2E2', borderRadius: 8, paddingVertical: 7, alignItems: 'center', borderWidth: 1, borderColor: '#FECACA' }}
+                    onPress={() => {
+                      Alert.alert('Từ chối lịch hẹn', 'Bạn có chắc muốn từ chối lịch hẹn này?', [
+                        { text: 'Không', style: 'cancel' },
+                        { text: 'Từ chối', style: 'destructive', onPress: async () => {
+                          try {
+                            await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CANCEL', reason: 'Từ chối lịch hẹn' });
+                            if (!realtime) await fetchMessages();
+                          } catch (e: any) {
+                            Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể từ chối lịch hẹn.');
+                          }
+                        }}
+                      ]);
+                    }}
+                  >
+                    <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 12 }}>✗ Từ chối</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {!isPending && (
+                <View style={{ backgroundColor: aptData.status === 'CONFIRMED' ? '#DCFCE7' : '#FEE2E2', borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: aptData.status === 'CONFIRMED' ? '#15803D' : '#DC2626' }}>
+                    {aptData.status === 'CONFIRMED' ? '✓ Đã xác nhận' : aptData.status === 'CANCELLED' ? '✗ Đã hủy' : aptData.status}
+                  </Text>
+                </View>
+              )}
+            </View>
+          );
+        })()}
+
         <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
           {formatTime(item.createdAt)}
         </Text>
@@ -662,16 +785,28 @@ export default function ChatRoomScreen() {
             style={{ maxWidth: '78%' }}
           >
             {isMine ? (
-              <LinearGradient
-                colors={[Colors.secondary, Colors.primary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.bubble, styles.bubbleMine]}
-              >
-                {bubbleBody}
-              </LinearGradient>
+              item.type === 'IMAGE' && !item.content ? (
+                <View style={[styles.bubble, styles.bubbleMine, { paddingHorizontal: 0, paddingVertical: 0, backgroundColor: 'transparent' }]}>
+                  {bubbleBody}
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={[Colors.secondary, Colors.primary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.bubble, styles.bubbleMine]}
+                >
+                  {bubbleBody}
+                </LinearGradient>
+              )
             ) : (
-              <View style={[styles.bubble, styles.bubbleTheirs]}>{bubbleBody}</View>
+              <View style={[
+                styles.bubble, 
+                styles.bubbleTheirs, 
+                item.type === 'IMAGE' && !item.content ? { paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' } : {}
+              ]}>
+                {bubbleBody}
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -711,10 +846,7 @@ export default function ChatRoomScreen() {
 
         <TouchableOpacity
           style={styles.headerBtn}
-          onPress={() => {
-            setAptTitle(peerSkill ? `Hỗ trợ: ${peerSkill}` : 'Buổi hỗ trợ kỹ năng');
-            setAptModalVisible(true);
-          }}
+          onPress={openCreateAppointmentModal}
         >
           <Ionicons name="calendar-outline" size={23} color={Colors.primary} />
         </TouchableOpacity>
@@ -811,8 +943,7 @@ export default function ChatRoomScreen() {
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
-                setAptTitle(peerSkill ? `Hỗ trợ: ${peerSkill}` : 'Buổi hỗ trợ kỹ năng');
-                setAptModalVisible(true);
+                openCreateAppointmentModal();
               }}
             >
               <Ionicons name="calendar" size={22} color={Colors.primary} />
@@ -1012,41 +1143,25 @@ export default function ChatRoomScreen() {
         >
           <View style={[styles.sheet, { maxHeight: '90%', paddingBottom: 24 }]}>
             <View style={styles.modalHandle} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={styles.sheetTitle}>🗓️ Tạo lịch hẹn chính thức</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.sheetTitle}>🗓️ Đề xuất lịch hẹn</Text>
               <TouchableOpacity onPress={() => setAptModalVisible(false)} style={{ padding: 4 }}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.sheetDesc}>Thiết lập thông tin buổi hỗ trợ kĩ năng giữa hai bạn</Text>
+            <Text style={styles.sheetDesc}>Điền thông tin bên dưới, người kia sẽ thấy và có thể phản hồi trong chat</Text>
 
-            {/* Chọn vai trò */}
-            <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 8, padding: 4, marginBottom: 12 }}>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 8, borderRadius: 6, backgroundColor: !isMyService ? '#fff' : 'transparent', alignItems: 'center' }}
-                onPress={() => setIsMyService(false)}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: !isMyService ? Colors.primary : '#64748B' }}>Tôi nhận hỗ trợ</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ flex: 1, paddingVertical: 8, borderRadius: 6, backgroundColor: isMyService ? '#fff' : 'transparent', alignItems: 'center' }}
-                onPress={() => setIsMyService(true)}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: isMyService ? Colors.primary : '#64748B' }}>Tôi cung cấp</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 }}>Tiêu đề lịch hẹn *</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 }}>Tiêu đề *</Text>
             <TextInput
               style={[styles.sheetInput, { marginBottom: 12 }]}
-              placeholder="VD: Hỗ trợ kỹ năng lập trình Java..."
+              placeholder="VD: Học lập trình Java buổi 1..."
               placeholderTextColor={Colors.textMuted}
               value={aptTitle}
               onChangeText={setAptTitle}
             />
 
-            {/* Chọn Ngày (Mở lịch hẹn) */}
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>Chọn ngày hẹn (YYYY-MM-DD) *</Text>
+            {/* Chọn Ngày */}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>Ngày hẹn *</Text>
             <TouchableOpacity
               style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -1088,13 +1203,13 @@ export default function ChatRoomScreen() {
               })}
             </View>
 
-            {/* Chọn Khung Giờ Bắt Đầu (Mở bộ chọn) */}
+            {/* Chọn Khung Giờ */}
             <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>Khung giờ bắt đầu *</Text>
             <TouchableOpacity
               style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                 paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10,
-                borderWidth: 1.5, borderColor: '#0D9488', backgroundColor: '#F0FDFA', marginBottom: 12
+                borderWidth: 1.5, borderColor: '#0D9488', backgroundColor: '#F0FDFA', marginBottom: 8
               }}
               onPress={() => setPickerMode('time')}
             >
@@ -1104,12 +1219,54 @@ export default function ChatRoomScreen() {
               </View>
               <Ionicons name="chevron-down" size={20} color="#0D9488" />
             </TouchableOpacity>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDFA', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#CCFBF1', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDFA', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#CCFBF1', marginBottom: 12 }}>
               <Ionicons name="time" size={16} color="#0D9488" style={{ marginRight: 8 }} />
               <Text style={{ fontSize: 12, color: '#0F172A' }}>
-                Khung giờ hỗ trợ: <Text style={{ fontWeight: 'bold', color: '#0D9488' }}>{aptStart} ➔ {aptEnd}</Text> ({aptCredit} Time Credit)
+                Khung giờ: <Text style={{ fontWeight: 'bold', color: '#0D9488' }}>{aptStart} ➔ {aptEnd}</Text> ({aptCredit} TC)
               </Text>
             </View>
+
+            {/* Chọn Hình Thức */}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>Hình thức gặp mặt *</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              {(['ONLINE', 'OFFLINE'] as const).map((fmt) => {
+                const active = aptFormat === fmt;
+                return (
+                  <TouchableOpacity
+                    key={fmt}
+                    style={{
+                      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      paddingVertical: 10, borderRadius: 10, gap: 6,
+                      borderWidth: 1.5, borderColor: active ? '#0D9488' : '#E2E8F0',
+                      backgroundColor: active ? '#F0FDFA' : '#F8FAFC',
+                    }}
+                    onPress={() => {
+                      setAptFormat(fmt);
+                      setAptLocation('');
+                    }}
+                  >
+                    <Ionicons name={fmt === 'ONLINE' ? 'videocam-outline' : 'location-outline'} size={16} color={active ? '#0D9488' : '#64748B'} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: active ? '#0D9488' : '#64748B' }}>
+                      {fmt === 'ONLINE' ? 'Trực tuyến' : 'Trực tiếp'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Link họp / Địa điểm */}
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
+              {aptFormat === 'ONLINE' ? '🔗 Link họp *' : '📍 Địa điểm gặp mặt'}
+            </Text>
+            <TextInput
+              style={[styles.sheetInput, { marginBottom: 16 }]}
+              placeholder={aptFormat === 'ONLINE' ? 'https://meet.google.com/...' : 'Nhà sách, quán café, trường... (không bắt buộc)'}
+              placeholderTextColor={Colors.textMuted}
+              value={aptLocation}
+              onChangeText={setAptLocation}
+              autoCapitalize="none"
+              keyboardType={aptFormat === 'ONLINE' ? 'url' : 'default'}
+            />
 
 
             <View style={styles.sheetActions}>

@@ -53,6 +53,7 @@ export interface RespondAppointmentPayload {
   action: 'CONFIRM' | 'CANCEL' | 'RESCHEDULE';
   reason?: string;
   newTime?: string;
+  locationOrLink?: string;
 }
 
 export interface VerifyCodePayload {

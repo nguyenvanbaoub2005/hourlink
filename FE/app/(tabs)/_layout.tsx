@@ -105,8 +105,7 @@ export default function TabsLayout() {
           title: 'Cá nhân',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
-          ),
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          )
         }}
       />
     </Tabs>

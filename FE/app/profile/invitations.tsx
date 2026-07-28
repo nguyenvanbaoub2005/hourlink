@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ScrollView
+  ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ScrollView, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -303,6 +303,7 @@ export default function InvitationsScreen() {
   const renderItem = ({ item }: { item: InvitationType }) => {
     const isSentTab = activeTab === 'SENT';
     const otherName = isSentTab ? item.receiverName : item.senderName;
+    const otherAvatar = isSentTab ? item.receiverAvatarUrl : item.senderAvatarUrl;
     const otherLetter = otherName ? otherName.charAt(0).toUpperCase() : '?';
     const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.PENDING;
     const isPending = item.status === 'PENDING';
@@ -311,9 +312,13 @@ export default function InvitationsScreen() {
       <View style={styles.card}>
         {/* Header: Avatar + Name + Status */}
         <View style={styles.cardHeader}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarLetter}>{otherLetter}</Text>
-          </View>
+          {otherAvatar ? (
+            <Image source={{ uri: otherAvatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarLetter}>{otherLetter}</Text>
+            </View>
+          )}
 
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.otherName}>{otherName}</Text>
