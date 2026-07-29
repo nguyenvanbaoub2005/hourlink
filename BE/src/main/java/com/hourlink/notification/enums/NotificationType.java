@@ -30,4 +30,19 @@ public enum NotificationType {
 
     /** Có đánh giá mới */
     NEW_RATING,
+
+    /** Tạo lịch hẹn mới */
+    APPOINTMENT_CREATED,
+
+    /** Xác nhận lịch hẹn */
+    APPOINTMENT_CONFIRMED,
+
+    /** Hủy lịch hẹn */
+    APPOINTMENT_CANCELLED,
+
+    /** Đổi lịch hẹn */
+    APPOINTMENT_RESCHEDULED,
+
+    /** Hoàn thành lịch hẹn */
+    APPOINTMENT_COMPLETED,
 }

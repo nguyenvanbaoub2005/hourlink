@@ -52,13 +52,20 @@ WHERE TABLE_SCHEMA = DATABASE()
   AND COLUMN_NAME = 'type';
 
 -- -------------------------------------------------------------
--- Ghi chú: 4 bảng chat (conversation, chat_message, user_block,
--- chat_report) KHÔNG cần migration vì chúng được Hibernate tạo mới
--- hoàn toàn với đầy đủ cột và enum.
---
--- BÀI HỌC CHO CÁC MODULE SAU: mỗi lần thêm giá trị vào một enum
--- Java đã có cột trong DB, phải viết một ALTER TABLE tương tự.
--- Nếu muốn tránh hẳn, đổi sang @Column(columnDefinition = "VARCHAR(60)")
--- để Hibernate sinh VARCHAR thay vì ENUM (cần ALTER một lần cho mỗi
--- cột đang tồn tại).
+-- chat_message.type & conversation.last_message_type
+-- Bổ sung APPOINTMENT_CARD (Thẻ lịch hẹn)
+-- -------------------------------------------------------------
+ALTER TABLE `chat_message`
+  MODIFY COLUMN `type` ENUM(
+    'TEXT', 'IMAGE', 'DOCUMENT', 'LOCATION', 'MEETING_LINK', 'RESCHEDULE_PROPOSAL', 'SYSTEM',
+    'APPOINTMENT_CARD' -- ↓ Thêm mới cho tính năng gửi thẻ lịch hẹn
+  ) COLLATE utf8mb4_unicode_ci NOT NULL;
+
+ALTER TABLE `conversation`
+  MODIFY COLUMN `last_message_type` ENUM(
+    'TEXT', 'IMAGE', 'DOCUMENT', 'LOCATION', 'MEETING_LINK', 'RESCHEDULE_PROPOSAL', 'SYSTEM',
+    'APPOINTMENT_CARD' -- ↓ Thêm mới cho tính năng gửi thẻ lịch hẹn
+  ) COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+
+-- Ghi chú: Hãy cẩn thận khi thêm giá trị mới vào ENUM, phải luôn NỐI VÀO CUỐI cùng.
 -- -------------------------------------------------------------

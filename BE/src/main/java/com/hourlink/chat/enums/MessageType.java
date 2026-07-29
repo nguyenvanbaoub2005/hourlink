@@ -22,6 +22,9 @@ public enum MessageType {
     /** Đề xuất đổi lịch — gắn với Invitation.rescheduleTime */
     RESCHEDULE_PROPOSAL,
 
+    /** Card lịch hẹn — hiển thị thông tin lịch hẹn trong chat */
+    APPOINTMENT_CARD,
+
     /** Tin nhắn hệ thống (mở đầu cuộc trò chuyện, thông báo trạng thái) */
     SYSTEM
 }

@@ -1,14 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform
+  ActivityIndicator, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ScrollView, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import InvitationApi from '@api/invitation';
+import AppointmentApi from '@api/appointment';
 import { openChatFromInvitation } from '@utils/chatNav';
+import DateTimePickerModal from '@components/DateTimePickerModal';
 
 type InvitationType = {
   id: string;
@@ -47,6 +49,33 @@ const FORMAT_LABEL: Record<string, string> = {
   BOTH:    'Cả hai 🌐',
 };
 
+// Helper tạo danh sách 14 ngày tới
+const getNextDays = (count = 14) => {
+  const days = [];
+  const today = new Date();
+  const dayNames = ['C.Nhật', 'T.Hai', 'T.Ba', 'T.Tư', 'T.Năm', 'T.Sáu', 'T.Bảy'];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    let label = dayNames[d.getDay()];
+    if (i === 0) label = 'Hôm nay';
+    if (i === 1) label = 'N.mai';
+    days.push({ iso, label, dateStr });
+  }
+  return days;
+};
+
+const COMMON_TIMES = ['07:00', '08:00', '09:00', '10:00', '14:00', '15:00', '16:00', '19:00', '20:00', '21:00'];
+
+const CREDIT_OPTIONS = [
+  { tc: '0.5', label: '0.5 TC', desc: '(30p)', min: 30 },
+  { tc: '1', label: '1.0 TC', desc: '(60p)', min: 60 },
+  { tc: '1.5', label: '1.5 TC', desc: '(90p)', min: 90 },
+  { tc: '2', label: '2.0 TC', desc: '(120p)', min: 120 },
+];
+
 export default function InvitationsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('RECEIVED');
@@ -59,6 +88,33 @@ export default function InvitationsScreen() {
   const [rescheduleTarget, setRescheduleTarget] = useState<InvitationType | null>(null);
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+  // Modal tạo lịch hẹn
+  const [aptModalVisible, setAptModalVisible] = useState(false);
+  const [aptTarget, setAptTarget] = useState<InvitationType | null>(null);
+  const [aptTitle, setAptTitle] = useState('');
+  const [aptDate, setAptDate] = useState('');
+  const [aptStart, setAptStart] = useState('09:00');
+  const [aptEnd, setAptEnd] = useState('10:00');
+  const [aptFormat, setAptFormat] = useState<'ONLINE' | 'OFFLINE'>('ONLINE');
+  const [aptCredit, setAptCredit] = useState('1');
+  const [creatingApt, setCreatingApt] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+
+  const updateEndTime = (start: string, creditStr: string) => {
+    try {
+      const tc = parseFloat(creditStr) || 1;
+      const durMin = Math.round(tc * 60);
+      const startH = parseInt(start.split(':')[0], 10) || 9;
+      const startM = parseInt(start.split(':')[1] || '00', 10) || 0;
+      const totalMin = startH * 60 + startM + durMin;
+      const endH = Math.min(Math.floor(totalMin / 60), 23);
+      const endM = totalMin % 60;
+      setAptEnd(`${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`);
+    } catch {
+      setAptEnd('10:00');
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -158,10 +214,96 @@ export default function InvitationsScreen() {
     }
   };
 
+  const openCreateAptModal = (item: InvitationType) => {
+    setAptTarget(item);
+    setAptTitle(item.skillName ? `Hỗ trợ: ${item.skillName}` : 'Buổi hỗ trợ kỹ năng');
+
+    // Extract valid date YYYY-MM-DD
+    let validDate = new Date().toISOString().slice(0, 10);
+    if (item.proposedTime) {
+      const isoMatch = item.proposedTime.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+      if (isoMatch) {
+        validDate = isoMatch[1];
+      } else {
+        const dmyMatch = item.proposedTime.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
+        if (dmyMatch) {
+          validDate = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+        } else {
+          const tmr = new Date();
+          tmr.setDate(tmr.getDate() + 1);
+          validDate = tmr.toISOString().slice(0, 10);
+        }
+      }
+    }
+    setAptDate(validDate);
+
+    // Extract time HH:MM
+    let startT = '09:00';
+    if (item.proposedTime) {
+      const tMatch = item.proposedTime.match(/\b(\d{1,2}:\d{2})\b/);
+      if (tMatch) {
+        startT = tMatch[1].padStart(5, '0');
+      }
+    }
+    setAptStart(startT);
+
+    // Chuẩn hóa duration từ phút sang Time Credit (1 TC = 60 phút, hỗ trợ mốc 0.5 TC = 30 phút)
+    const durationMin = item.duration || 60;
+    const tc = durationMin > 10 ? Math.max(0.5, Math.round((durationMin / 60) * 2) / 2) : durationMin;
+    setAptCredit(tc.toString());
+    updateEndTime(startT, tc.toString());
+
+    setAptFormat((item.format?.toUpperCase() === 'OFFLINE' ? 'OFFLINE' : 'ONLINE') as any);
+    setAptModalVisible(true);
+  };
+
+  const submitCreateAppointment = async () => {
+    if (!aptTarget) return;
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(aptDate.trim())) {
+      Alert.alert('Lỗi định dạng', 'Vui lòng nhập ngày theo định dạng YYYY-MM-DD (ví dụ: 2026-07-28)');
+      return;
+    }
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (!timeRegex.test(aptStart.trim()) || !timeRegex.test(aptEnd.trim())) {
+      Alert.alert('Lỗi định dạng', 'Vui lòng nhập giờ theo định dạng HH:MM (ví dụ: 09:00, 14:30)');
+      return;
+    }
+
+    setCreatingApt(true);
+    try {
+      const payload = {
+        invitationId: aptTarget.id,
+        providerId: aptTarget.receiverId || aptTarget.senderId,
+        receiverId: aptTarget.senderId || aptTarget.receiverId,
+        skillId: aptTarget.skillId,
+        title: aptTitle.trim() || 'Buổi hỗ trợ kỹ năng',
+        description: aptTarget.content || aptTarget.message,
+        appointmentDate: aptDate.trim(),
+        startTime: `${aptStart.trim()}:00`,
+        endTime: `${aptEnd.trim()}:00`,
+        meetingType: aptFormat,
+        locationOrLink: aptFormat === 'OFFLINE' ? 'Gặp mặt trực tiếp' : 'Online Video Call',
+        timeCreditAmount: parseFloat(aptCredit) || 1,
+      };
+      await AppointmentApi.create(payload);
+      setAptModalVisible(false);
+      Alert.alert('Thành công', 'Đã tạo lịch hẹn mới từ lời mời!', [
+        { text: 'Xem lịch hẹn', onPress: () => router.push(`/(tabs)/appointments` as any) },
+        { text: 'Đóng', style: 'cancel' }
+      ]);
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể tạo lịch hẹn. Vui lòng thử lại.');
+    } finally {
+      setCreatingApt(false);
+    }
+  };
+
   // ── Render Item ─────────────────────────────────────────────────────────────
   const renderItem = ({ item }: { item: InvitationType }) => {
     const isSentTab = activeTab === 'SENT';
     const otherName = isSentTab ? item.receiverName : item.senderName;
+    const otherAvatar = isSentTab ? item.receiverAvatarUrl : item.senderAvatarUrl;
     const otherLetter = otherName ? otherName.charAt(0).toUpperCase() : '?';
     const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.PENDING;
     const isPending = item.status === 'PENDING';
@@ -170,9 +312,13 @@ export default function InvitationsScreen() {
       <View style={styles.card}>
         {/* Header: Avatar + Name + Status */}
         <View style={styles.cardHeader}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarLetter}>{otherLetter}</Text>
-          </View>
+          {otherAvatar ? (
+            <Image source={{ uri: otherAvatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarLetter}>{otherLetter}</Text>
+            </View>
+          )}
 
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.otherName}>{otherName}</Text>
@@ -270,15 +416,26 @@ export default function InvitationsScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Lời mời đã chấp nhận → mở cuộc trò chuyện (chức năng 9.10) */}
+        {/* Lời mời đã chấp nhận → mở cuộc trò chuyện & tạo lịch hẹn */}
         {(item.status === 'ACCEPTED' || item.status === 'RESCHEDULED') && (
-          <TouchableOpacity
-            style={styles.btnOpenChat}
-            onPress={() => openChatFromInvitation(router, item.id)}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#0D9488" />
-            <Text style={styles.btnOpenChatText}>Nhắn tin</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <TouchableOpacity
+              style={[styles.btnOpenChat, { flex: 1, marginTop: 0 }]}
+              onPress={() => openChatFromInvitation(router, item.id)}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color="#0D9488" />
+              <Text style={styles.btnOpenChatText}>Nhắn tin</Text>
+            </TouchableOpacity>
+            {item.status === 'ACCEPTED' && (
+              <TouchableOpacity
+                style={[styles.btnOpenChat, { flex: 1, marginTop: 0, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
+                onPress={() => openCreateAptModal(item)}
+              >
+                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                <Text style={[styles.btnOpenChatText, { color: '#2563EB' }]}>Tạo lịch hẹn</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       </View>
     );
@@ -445,6 +602,143 @@ export default function InvitationsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Modal Tạo Lịch Hẹn */}
+      <Modal visible={aptModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.rescheduleModalBox, { maxHeight: '92%' }]}>
+            <View style={[styles.modalTitleRow, { justifyContent: 'space-between' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="calendar-outline" size={22} color="#0D9488" style={{ marginRight: 8 }} />
+                <Text style={styles.modalTitle}>Tạo Lịch Hẹn Chính Thức</Text>
+              </View>
+              <TouchableOpacity onPress={() => setAptModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
+              Chọn nhanh ngày giờ bên dưới để tạo lịch hẹn chính xác tuyệt đối.
+            </Text>
+
+            <Text style={styles.inputLabel}>Tiêu đề lịch hẹn *</Text>
+            <TextInput
+              style={[styles.rescheduleInput, { height: 42, minHeight: 42, marginBottom: 12 }]}
+              placeholder="Tiêu đề..."
+              placeholderTextColor="#94A3B8"
+              value={aptTitle}
+              onChangeText={setAptTitle}
+            />
+
+            {/* Chọn Ngày (Mở lịch hẹn) */}
+            <Text style={styles.inputLabel}>Chọn ngày hẹn (YYYY-MM-DD) *</Text>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10,
+                borderWidth: 1.5, borderColor: '#0D9488', backgroundColor: '#F0FDFA', marginBottom: 12
+              }}
+              onPress={() => setPickerMode('date')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="calendar-outline" size={20} color="#0D9488" style={{ marginRight: 10 }} />
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0F172A' }}>{aptDate || 'Chọn ngày'}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color="#0D9488" />
+            </TouchableOpacity>
+
+            {/* Chọn Time Credit */}
+            <Text style={styles.inputLabel}>Số Time Credit (1 TC = 1 giờ) *</Text>
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+              {CREDIT_OPTIONS.map((opt) => {
+                const active = aptCredit === opt.tc;
+                return (
+                  <TouchableOpacity
+                    key={opt.tc}
+                    style={{
+                      flex: 1, paddingVertical: 8, borderRadius: 10,
+                      borderWidth: 1.5, borderColor: active ? '#0D9488' : '#E2E8F0',
+                      backgroundColor: active ? '#0D9488' : '#F8FAFC',
+                      alignItems: 'center'
+                    }}
+                    onPress={() => {
+                      setAptCredit(opt.tc);
+                      updateEndTime(aptStart, opt.tc);
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: active ? '#fff' : '#334155' }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 10, color: active ? '#CCFBF1' : '#64748B' }}>{opt.desc}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Chọn Khung Giờ Bắt Đầu (Mở bộ chọn) */}
+            <Text style={styles.inputLabel}>Khung giờ bắt đầu *</Text>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10,
+                borderWidth: 1.5, borderColor: '#0D9488', backgroundColor: '#F0FDFA', marginBottom: 12
+              }}
+              onPress={() => setPickerMode('time')}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="time-outline" size={20} color="#0D9488" style={{ marginRight: 10 }} />
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0F172A' }}>{aptStart || 'Chọn giờ'}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color="#0D9488" />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDFA', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#CCFBF1', marginBottom: 16 }}>
+              <Ionicons name="time" size={16} color="#0D9488" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 12, color: '#0F172A' }}>
+                Khung giờ hỗ trợ: <Text style={{ fontWeight: 'bold', color: '#0D9488' }}>{aptStart} ➔ {aptEnd}</Text> ({aptCredit} Time Credit)
+              </Text>
+            </View>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setAptModalVisible(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnConfirm, { backgroundColor: '#0D9488' }, creatingApt && { opacity: 0.6 }]}
+                onPress={submitCreateAppointment}
+                disabled={creatingApt}
+              >
+                {creatingApt ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.modalBtnConfirmText}>Xác nhận tạo</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+
+        <DateTimePickerModal
+          visible={pickerMode !== null}
+          mode={pickerMode || 'date'}
+          initialValue={pickerMode === 'date' ? aptDate : aptStart}
+          onClose={() => setPickerMode(null)}
+          onSelect={(val) => {
+            if (pickerMode === 'date') {
+              setAptDate(val);
+            } else {
+              setAptStart(val);
+              updateEndTime(val, aptCredit);
+            }
+          }}
+        />
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -581,7 +875,7 @@ const styles = StyleSheet.create({
   },
   rescheduleModalBox: {
     backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 36,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: Platform.OS === 'ios' ? 44 : 24,
   },
   modalHandle: {
     width: 40, height: 5, borderRadius: 3, backgroundColor: '#CBD5E1',
@@ -607,14 +901,14 @@ const styles = StyleSheet.create({
   },
   inputHint: { fontSize: 12, color: '#94A3B8', lineHeight: 18, marginBottom: 20 },
 
-  modalBtnRow: { flexDirection: 'row', gap: 12 },
+  modalBtnRow: { flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 4 },
   modalBtnCancel: {
-    flex: 1, paddingVertical: 14, borderRadius: Radius.lg,
-    backgroundColor: '#F1F5F9', alignItems: 'center',
+    flex: 1, height: 48, borderRadius: Radius.lg,
+    backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center',
   },
   modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
   modalBtnConfirm: {
-    flex: 2, flexDirection: 'row', paddingVertical: 14, borderRadius: Radius.lg,
+    flex: 2, height: 48, flexDirection: 'row', borderRadius: Radius.lg,
     backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
   },
   modalBtnConfirmText: { fontSize: 15, fontWeight: 'bold', color: '#fff' },

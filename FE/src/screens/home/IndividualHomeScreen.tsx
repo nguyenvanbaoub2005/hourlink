@@ -21,6 +21,7 @@ type HelpRequestItem = {
   duration: number;
   categoryName?: string;
   format?: string;
+  responseCount?: number;
   createdAt: string;
 };
 

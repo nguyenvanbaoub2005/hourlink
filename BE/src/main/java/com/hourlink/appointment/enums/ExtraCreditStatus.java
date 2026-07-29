@@ -1,8 +1,11 @@
 package com.hourlink.appointment.enums;
 
 /**
- * ExtraCreditStatus — TODO: thêm values theo DBML schema.
+ * ExtraCreditStatus — Trạng thái xin thêm tín dụng giờ khi lịch hẹn kéo dài hơn dự kiến.
  */
 public enum ExtraCreditStatus {
-    // TODO
+    NONE,       // Không xin thêm
+    PENDING,    // Chờ duyệt
+    APPROVED,   // Đã chấp thuận
+    REJECTED    // Từ chối
 }

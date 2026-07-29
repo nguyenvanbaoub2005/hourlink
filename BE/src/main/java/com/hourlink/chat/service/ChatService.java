@@ -356,6 +356,56 @@ public class ChatService {
         return mapToMessageResponse(saved);
     }
 
+    /**
+     * Gửi card lịch hẹn vào cuộc trò chuyện (được AppointmentService gọi sau khi tạo lịch).
+     * Không yêu cầu người dùng đăng nhập — gọi nội bộ từ AppointmentService.
+     */
+    @Transactional
+    public void sendAppointmentCardInternal(UUID conversationId, UUID appointmentId, String appointmentData,
+                                            User sender) {
+        if (conversationId == null) return;
+        Conversation conv = conversationRepository.findById(conversationId)
+                .orElse(null);
+        if (conv == null) return;
+
+        User receiver = otherUserOf(conv, sender.getEmail());
+
+        ChatMessage saved = chatMessageRepository.save(ChatMessage.builder()
+                .conversation(conv)
+                .sender(sender)
+                .type(MessageType.APPOINTMENT_CARD)
+                .content("📅 Lịch hẹn mới được đề xuất")
+                .appointmentId(appointmentId)
+                .appointmentData(appointmentData)
+                .isRead(false)
+                .build());
+
+        conv.setLastMessagePreview(truncate("📅 Đề xuất lịch hẹn mới"));
+        conv.setLastMessageType(MessageType.APPOINTMENT_CARD);
+        conv.setLastMessageAt(saved.getCreatedAt() != null ? saved.getCreatedAt() : Instant.now());
+        conversationRepository.save(conv);
+
+        mirrorConversation(conv);
+        mirrorMessage(conv, saved);
+        mirrorUnread(conv, receiver);
+
+        log.info("Appointment card sent to conversation {} for appointment {}", conversationId, appointmentId);
+    }
+
+    /**
+     * Tìm cuộc trò chuyện giữa hai người dùng bất kỳ.
+     */
+    public UUID findConversationIdByUsers(UUID userId1, UUID userId2) {
+        return conversationRepository.findAllByParticipantEmail(
+                userRepository.findById(userId1).map(User::getEmail).orElse("")
+        ).stream()
+                .filter(c -> (c.getUserOne().getId().equals(userId1) && c.getUserTwo().getId().equals(userId2))
+                        || (c.getUserOne().getId().equals(userId2) && c.getUserTwo().getId().equals(userId1)))
+                .map(c -> c.getId())
+                .findFirst()
+                .orElse(null);
+    }
+
     /** Đánh dấu toàn bộ tin nhắn của người kia là đã đọc */
     @Transactional
     public void markAsRead(UUID conversationId) {
@@ -603,6 +653,8 @@ public class ChatService {
         data.put("locationLabel", m.getLocationLabel());
         data.put("meetingLink", m.getMeetingLink());
         data.put("proposedTime", m.getProposedTime());
+        data.put("appointmentId", m.getAppointmentId() != null ? m.getAppointmentId().toString() : null);
+        data.put("appointmentData", m.getAppointmentData());
         data.put("createdAt", m.getCreatedAt() != null
                 ? m.getCreatedAt().toEpochMilli() : Instant.now().toEpochMilli());
 
@@ -668,6 +720,8 @@ public class ChatService {
                 .locationLabel(m.getLocationLabel())
                 .meetingLink(m.getMeetingLink())
                 .proposedTime(m.getProposedTime())
+                .appointmentId(m.getAppointmentId())
+                .appointmentData(m.getAppointmentData())
                 .isRead(m.getIsRead())
                 .createdAt(m.getCreatedAt())
                 .build();

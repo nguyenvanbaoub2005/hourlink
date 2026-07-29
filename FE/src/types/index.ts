@@ -29,9 +29,9 @@ export type ChatReportReason =
   | 'OUTSIDE_PAYMENT'
   | 'ASK_CREDENTIALS'
   | 'OTHER';
-export type AppointmentStatus = 'pending_confirmation' | 'confirmed' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'disputed';
-export type VerificationMethod = 'qr' | 'otp';
-export type ExtraCreditStatus = 'none' | 'pending' | 'accepted' | 'rejected';
+export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'RESCHEDULED' | 'pending_confirmation' | 'confirmed' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'disputed';
+export type VerificationMethod = 'QR' | 'OTP' | 'qr' | 'otp';
+export type ExtraCreditStatus = 'NONE' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'none' | 'pending' | 'accepted' | 'rejected';
 export type WalletTxType = 'earn' | 'spend' | 'hold' | 'release' | 'refund' | 'extra_earn' | 'extra_spend' | 'activity_bonus' | 'admin_adjustment';
 export type ReportReason = 'no_show' | 'offensive_behavior' | 'harassment' | 'credit_fraud' | 'wrong_guidance' | 'outside_payment_request' | 'password_otp_request' | 'fake_account' | 'other';
 export type ReportStatus = 'pending' | 'reviewing' | 'resolved' | 'dismissed';
@@ -285,19 +285,40 @@ export interface BlockedUser {
 
 export interface Appointment {
   id: string;
-  helper: UserResponse;
-  receiver: UserResponse;
-  content?: string;
+  providerId?: string;
+  providerName?: string;
+  providerAvatarUrl?: string;
+  receiverId?: string;
+  receiverName?: string;
+  receiverAvatarUrl?: string;
+  invitationId?: string;
+  skillId?: string;
+  skillName?: string;
+  title?: string;
+  description?: string;
   appointmentDate: string;
   startTime: string;
   endTime: string;
-  format: SessionFormat;
+  meetingType?: string;
+  locationOrLink?: string;
+  timeCreditAmount?: number;
+  notes?: string;
+  status: AppointmentStatus;
+  cancelReason?: string;
+  rescheduleProposedTime?: string;
+  extraCreditStatus?: string;
+  createdAt: string;
+  updatedAt?: string;
+
+  // Legacy mappings for compatibility
+  helper?: UserResponse;
+  receiver?: UserResponse;
+  content?: string;
+  format?: SessionFormat;
   location?: string;
   meetingLink?: string;
-  timeCredit: number;
+  timeCredit?: number;
   note?: string;
-  status: AppointmentStatus;
-  createdAt: string;
 }
 
 export interface AppointmentVerification {
@@ -307,7 +328,11 @@ export interface AppointmentVerification {
   code: string;
   expiresAt?: string;
   verifiedAt?: string;
+  verifiedById?: string;
+  createdAt?: string;
 }
+
+export * from './appointment';
 
 // ─── Wallet ──────────────────────────────────────────────────
 
