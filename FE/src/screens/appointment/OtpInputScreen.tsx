@@ -142,7 +142,7 @@ export default function OtpInputScreen() {
                   <Text style={styles.otpDisplay}>{verification.code}</Text>
                 </View>
                 <Text style={styles.expiresText}>
-                  <Ionicons name="time-outline" size={12} /> Có hiệu lực trong 2 giờ kể từ khi tạo.
+                  <Ionicons name="time-outline" size={12} /> Có hiệu lực trong suốt thời gian diễn ra cuộc hẹn.
                 </Text>
               </View>
             ) : (

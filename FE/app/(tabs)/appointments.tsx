@@ -31,7 +31,7 @@ const TABS = [
 
 export default function AppointmentsScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [activeTab, setActiveTab] = useState<string>('UPCOMING');
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);

@@ -258,11 +258,13 @@ public class AppointmentService {
             code = String.valueOf(100000 + new Random().nextInt(900000));
         }
 
+        LocalDateTime appointmentEndDateTime = LocalDateTime.of(appointment.getAppointmentDate(), appointment.getEndTime());
+        
         AppointmentVerification verification = AppointmentVerification.builder()
                 .appointment(appointment)
                 .method(method)
                 .code(code)
-                .expiresAt(LocalDateTime.now().plusHours(2))
+                .expiresAt(appointmentEndDateTime.plusHours(1)) // Hết hạn sau 1 tiếng kể từ lúc lịch hẹn kết thúc
                 .build();
 
         verification = verificationRepository.save(verification);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image,
-  ActivityIndicator, Alert, TextInput, ScrollView
+  ActivityIndicator, Alert, TextInput, ScrollView, Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -124,12 +124,8 @@ export default function QrScanScreen() {
             ) : qrImageUrl ? (
               <View style={styles.qrContainer}>
                 <Image source={{ uri: qrImageUrl }} style={styles.qrImage} />
-                <View style={styles.codeBox}>
-                  <Text style={styles.codeLabel}>Mã ký tự:</Text>
-                  <Text style={styles.codeText}>{verification?.code}</Text>
-                </View>
                 <Text style={styles.expiresText}>
-                  <Ionicons name="time-outline" size={12} /> Có hiệu lực trong 2 giờ kể từ khi tạo.
+                  <Ionicons name="time-outline" size={12} /> Có hiệu lực trong suốt thời gian diễn ra lịch hẹn.
                 </Text>
               </View>
             ) : (
@@ -160,7 +156,23 @@ export default function QrScanScreen() {
                 <View style={styles.camMsgBox}>
                   <Ionicons name="camera-reverse-outline" size={48} color={Colors.textMuted} />
                   <Text style={styles.camMsg}>Cần quyền truy cập camera để quét mã QR</Text>
-                  <TouchableOpacity style={styles.permBtn} onPress={requestPermission}>
+                  <TouchableOpacity 
+                    style={styles.permBtn} 
+                    onPress={async () => {
+                      if (!permission.canAskAgain) {
+                        Alert.alert(
+                          'Quyền bị từ chối', 
+                          'Bạn đã từ chối quyền truy cập Camera. Vui lòng mở Cài đặt thiết bị để cấp quyền.',
+                          [
+                            { text: 'Hủy', style: 'cancel' },
+                            { text: 'Mở Cài đặt', onPress: () => Linking.openSettings() }
+                          ]
+                        );
+                      } else {
+                        await requestPermission();
+                      }
+                    }}
+                  >
                     <Text style={styles.permBtnText}>Cấp quyền Camera</Text>
                   </TouchableOpacity>
                 </View>
@@ -181,27 +193,6 @@ export default function QrScanScreen() {
                   )}
                 </View>
               )}
-            </View>
-
-            {/* Manual input fallback */}
-            <View style={styles.manualSection}>
-              <Text style={styles.manualTitle}>Hoặc nhập mã ký tự thủ công:</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nhập mã xác minh..."
-                  value={manualCode}
-                  onChangeText={setManualCode}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={[styles.verifyBtn, !manualCode.trim() && { opacity: 0.5 }]}
-                  disabled={!manualCode.trim() || verifying}
-                  onPress={() => handleVerifyCode(manualCode)}
-                >
-                  {verifying ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.verifyBtnText}>Xác thực</Text>}
-                </TouchableOpacity>
-              </View>
             </View>
           </View>
         )}
