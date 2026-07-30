@@ -141,7 +141,7 @@ export default function HelpRequestsScreen() {
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={styles.aiButton}
-            onPress={() => Alert.alert('⚡ AI Gợi ý', 'Hệ thống đang phân tích chuyên gia phù hợp nhất với yêu cầu của bạn!')}
+            onPress={() => router.push({ pathname: '/profile/ai-suggest', params: { helpRequestId: item.id } })}
           >
             <Text style={styles.aiButtonText}>⚡ Xem AI gợi ý</Text>
           </TouchableOpacity>
