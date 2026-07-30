@@ -13,4 +13,6 @@ public interface SkillRepository extends JpaRepository<Skill, UUID> {
     /** Kỹ năng đang hiển thị của một người dùng — dùng cho hồ sơ công khai */
     java.util.List<Skill> findAllByUser_IdAndStatus(
             java.util.UUID userId, com.hourlink.skill.enums.SkillStatus status);
+            
+    java.util.List<Skill> findAllByCategory_Id(java.util.UUID categoryId);
 }

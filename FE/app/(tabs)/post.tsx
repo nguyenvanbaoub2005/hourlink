@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
+import AiMatchingApi from '@api/aimatching';
 
 // ─── Types ─────────────────────────────────────────────────
 type Category = { id: string; name: string };
@@ -51,6 +52,7 @@ export default function PostScreen() {
   const [format, setFormat] = useState('Online');
   const [selectedDur, setSelectedDur] = useState<DurOption>(DURATION_OPTIONS[1]);
   const [category, setCategory] = useState<Category | null>(null);
+  const [isPredictingCat, setIsPredictingCat] = useState(false);
   const [region, setRegion] = useState('');
 
   // ── Skill-only ─────────────────────────────────────────
@@ -117,6 +119,66 @@ export default function PostScreen() {
       } catch (e) {}
     }
   }, [categories, editId, initialData]);
+
+  // ── AI Auto-Predict Category ───────────────────────────
+  const handleDescriptionBlur = async () => {
+    if (editId) return; // Không tự đổi nếu đang edit
+    if (!description || description.trim().length < 10) return; // Mô tả quá ngắn
+
+    setIsPredictingCat(true);
+    try {
+      const res = await AiMatchingApi.predictCategory({ description: description.trim() });
+      if (res.data.data?.category_name) {
+        // Tìm category khớp với tên hoặc ánh xạ
+        const aiName = res.data.data.category_name.toLowerCase();
+        const cat = categories.find(c => {
+            const dbName = c.name.toLowerCase();
+            return dbName === aiName || 
+                   aiName.includes(dbName) || 
+                   dbName.includes(aiName) ||
+                   (aiName.includes('lập trình') && dbName.includes('lập trình')) ||
+                   (aiName.includes('ngoại ngữ') && dbName.includes('ngôn ngữ')) ||
+                   (aiName.includes('âm nhạc') && dbName.includes('nghệ thuật'));
+        });
+        // Tự động điền các trường còn trống dựa trên gợi ý của AI
+        const aiData = res.data.data;
+        let filledFields = [];
+        
+        if (cat && !category) {
+          setCategory(cat);
+          filledFields.push(`Danh mục: ${cat.name}`);
+        }
+        
+        if (aiData.suggested_title && !title) {
+          setTitle(aiData.suggested_title);
+          filledFields.push(`Tiêu đề: ${aiData.suggested_title}`);
+        }
+        
+        if (aiData.suggested_level && !currentLevel) {
+          setCurrentLevel(aiData.suggested_level);
+          filledFields.push(`Mức độ: ${aiData.suggested_level}`);
+        }
+        
+        if (aiData.suggested_format && !format) {
+          setFormat(aiData.suggested_format);
+          filledFields.push(`Hình thức: ${aiData.suggested_format}`);
+        }
+        
+        if (aiData.suggested_time && !desiredTime) {
+          setDesiredTime(aiData.suggested_time);
+          filledFields.push(`Thời gian: ${aiData.suggested_time}`);
+        }
+        
+        if (filledFields.length > 0) {
+          Alert.alert('✨ AI Trợ lý', `Dựa vào mô tả của bạn, AI đã tự động điền:\n\n- ${filledFields.join('\n- ')}`);
+        }
+      }
+    } catch (e) {
+      console.log('AI predict error:', e);
+    } finally {
+      setIsPredictingCat(false);
+    }
+  };
 
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -270,11 +332,30 @@ export default function PostScreen() {
 
       <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
 
+        {/* Description */}
+        <Text style={styles.label}>Mô tả chi tiết</Text>
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          placeholder={activeTab === 'needHelp'
+            ? 'Mô tả vấn đề bạn đang gặp phải...\nVD: Tôi đã biết Java cơ bản nhưng chưa biết cách làm đăng nhập JWT.'
+            : 'Mô tả nội dung, phương pháp dạy...\nVD: Biến & kiểu dữ liệu, OOP cơ bản, vòng lặp...'}
+          value={description} onChangeText={setDescription}
+          onBlur={handleDescriptionBlur}
+          multiline numberOfLines={4}
+        />
+
         {/* Category */}
         {loadingCats ? (
           <ActivityIndicator color={Colors.primary} style={{ marginVertical: 12 }} />
         ) : (
-          <PickerRow label="Danh mục" value={category?.name ?? ''} onPress={() => setShowCatModal(true)} />
+          <View>
+            <PickerRow label="Danh mục" value={category?.name ?? ''} onPress={() => setShowCatModal(true)} />
+            {isPredictingCat && (
+               <Text style={{ fontSize: 12, color: Colors.primary, marginTop: 4, fontStyle: 'italic' }}>
+                 🤖 AI đang phân tích danh mục...
+               </Text>
+            )}
+          </View>
         )}
 
         {/* Title */}
@@ -285,16 +366,7 @@ export default function PostScreen() {
           value={title} onChangeText={setTitle}
         />
 
-        {/* Description */}
-        <Text style={styles.label}>Mô tả chi tiết</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
-          placeholder={activeTab === 'needHelp'
-            ? 'Mô tả vấn đề bạn đang gặp phải...\nVD: Tôi đã biết Java cơ bản nhưng chưa biết cách làm đăng nhập JWT.'
-            : 'Mô tả nội dung, phương pháp dạy...\nVD: Biến & kiểu dữ liệu, OOP cơ bản, vòng lặp...'}
-          value={description} onChangeText={setDescription}
-          multiline numberOfLines={4}
-        />
+
 
         {/* Skill-only: Level + FreeTime */}
         {activeTab === 'shareSkill' && (

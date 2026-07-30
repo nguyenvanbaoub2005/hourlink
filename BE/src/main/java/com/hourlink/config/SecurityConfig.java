@@ -70,6 +70,7 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:*",
                 "http://127.0.0.1:*",
+                "http://192.168.*.*:*", // Cho phép mọi IP trong mạng LAN
                 "exp://*"       // Expo Go
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

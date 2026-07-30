@@ -1,6 +1,6 @@
 const ENV = {
 	dev: {
-		API_URL: 'http://192.168.1.6:8080/api', // ← Đã tự động thay IP theo máy của bạn
+		API_URL: 'http://192.168.1.87:8085/api', // ← Đã đổi sang IP mới (192.168.1.87)
 	},
 	prod: {
 		API_URL: 'https://api.hourlink.vn/api',

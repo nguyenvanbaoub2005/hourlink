@@ -1,0 +1,18 @@
+                        precision    recall  f1-score   support
+
+     AI & Data Science       0.99      0.96      0.98       268
+      Gia sư & Học tập       0.96      0.96      0.96       196
+    Lập trình phần mềm       0.96      0.99      0.98       452
+Marketing & Kinh doanh       0.99      0.98      0.98       237
+            Nghệ thuật       0.96      0.97      0.97       158
+             Ngoại ngữ       0.96      0.98      0.97       283
+                Nấu ăn       0.94      0.97      0.96       171
+              Sửa chữa       0.98      0.92      0.95       100
+       Thiết kế đồ họa       0.96      0.97      0.97       193
+              Thể thao       0.98      0.95      0.96       189
+                 UI/UX       0.99      0.94      0.96       156
+               Âm nhạc       0.97      0.99      0.98       221
+
+              accuracy                           0.97      2624
+             macro avg       0.97      0.96      0.97      2624
+          weighted avg       0.97      0.97      0.97      2624
