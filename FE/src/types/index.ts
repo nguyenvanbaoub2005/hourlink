@@ -32,7 +32,8 @@ export type ChatReportReason =
 export type AppointmentStatus = 'PENDING' | 'CONFIRMED' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DISPUTED' | 'RESCHEDULED' | 'pending_confirmation' | 'confirmed' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'disputed';
 export type VerificationMethod = 'QR' | 'OTP' | 'qr' | 'otp';
 export type ExtraCreditStatus = 'NONE' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'none' | 'pending' | 'accepted' | 'rejected';
-export type WalletTxType = 'earn' | 'spend' | 'hold' | 'release' | 'refund' | 'extra_earn' | 'extra_spend' | 'activity_bonus' | 'admin_adjustment';
+export type WalletTxType =
+  | 'EARN' | 'SPEND' | 'HOLD' | 'RELEASE' | 'REFUND' | 'BONUS' | 'ADJUSTMENT';
 export type ReportReason = 'no_show' | 'offensive_behavior' | 'harassment' | 'credit_fraud' | 'wrong_guidance' | 'outside_payment_request' | 'password_otp_request' | 'fake_account' | 'other';
 export type ReportStatus = 'pending' | 'reviewing' | 'resolved' | 'dismissed';
 export type DisputeStatus = 'open' | 'reviewing' | 'resolved';
@@ -334,23 +335,38 @@ export interface AppointmentVerification {
 
 export * from './appointment';
 
+
 // ─── Wallet ──────────────────────────────────────────────────
 
+/** Mirror com.hourlink.wallet.entity.Wallet */
 export interface Wallet {
   id: string;
   userId: string;
+  userFullName: string;
+  /** Số dư có thể dùng ngay */
   balance: number;
+  /** Số đang bị tạm giữ (appointment CONFIRMED) */
   heldAmount: number;
+  /** Tổng đã kiếm từ trước đến nay */
   totalEarned: number;
+  /** Tổng đã sử dụng từ trước đến nay */
   totalUsed: number;
   updatedAt: string;
 }
 
+/** Mirror com.hourlink.wallet.dto.response.WalletTransactionResponse */
 export interface WalletTransaction {
   id: string;
   type: WalletTxType;
+  /** Số lượng Time Credit (luôn dương) */
   amount: number;
+  /** Số dư ví ngay sau giao dịch */
+  balanceAfter: number;
   description?: string;
+  /** UUID lịch hẹn liên quan (nếu có) */
+  relatedAppointmentId?: string;
+  /** Tiêu đề lịch hẹn liên quan (nếu có) */
+  relatedAppointmentTitle?: string;
   createdAt: string;
 }
 
