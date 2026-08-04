@@ -269,6 +269,8 @@ export interface ChatMessage {
   proposedTime?: string;
 
   isRead: boolean;
+  isRecalled?: boolean;
+  recalled?: boolean;
   createdAt: string;
 }
 

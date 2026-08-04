@@ -184,6 +184,10 @@ public class ChatService {
         String email = SecurityUtil.getCurrentUserEmail();
         return conversationRepository.findAllByParticipantEmail(email)
                 .stream()
+                .filter(c -> {
+                    if (c.getUserOne().getEmail().equals(email)) return !c.isHiddenByUserOne();
+                    return !c.isHiddenByUserTwo();
+                })
                 .map(c -> mapToConversationResponse(c, email))
                 .toList();
     }
@@ -205,11 +209,32 @@ public class ChatService {
                 .findAllByConversation_IdOrderByCreatedAtDesc(
                         conv.getId(), PageRequest.of(Math.max(page, 0), safeSize));
 
+        // Lọc bỏ các tin nhắn mà user hiện tại đã chọn "Xóa phía tôi"
+        List<ChatMessageResponse> filteredMessages = result.getContent().stream()
+                .filter(msg -> {
+                    if (msg.getSender() != null && msg.getSender().getEmail().equals(email)) {
+                        return !msg.isHiddenBySender();
+                    } else {
+                        return !msg.isHiddenByReceiver();
+                    }
+                })
+                .map(msg -> {
+                    ChatMessageResponse res = mapToMessageResponse(msg);
+                    if (msg.isRecalled()) {
+                        res.setContent("Tin nhắn đã bị thu hồi");
+                        res.setAttachmentUrl(null);
+                        // Giữ nguyên các type hoặc set về một dạng khác nếu client cần
+                        // FE có thể check flag isRecalled nếu ta map nó vào DTO
+                    }
+                    return res;
+                })
+                .toList();
+
         return PagedResponse.<ChatMessageResponse>builder()
-                .content(result.getContent().stream().map(this::mapToMessageResponse).toList())
+                .content(filteredMessages)
                 .page(result.getNumber())
                 .size(result.getSize())
-                .totalElements(result.getTotalElements())
+                .totalElements(result.getTotalElements()) // Lưu ý: totalElements vẫn tính tin nhắn ẩn, nhưng UI thường không quan tâm pagination chính xác tới từng msg
                 .totalPages(result.getTotalPages())
                 .last(result.isLast())
                 .build();
@@ -536,6 +561,72 @@ public class ChatService {
                 .stream().map(this::mapToBlockedResponse).toList();
     }
 
+    // ─── Xóa / Thu hồi / Ẩn (9.10 nâng cao) ────────────────────────────────
+
+    @Transactional
+    public void recallMessage(UUID messageId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        ChatMessage msg = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_REQUEST, "Tin nhắn không tồn tại"));
+
+        if (msg.getSender() == null || !msg.getSender().getEmail().equals(email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED, "Chỉ người gửi mới có thể thu hồi tin nhắn");
+        }
+        
+        // Chỉ cho thu hồi trong vòng 10 phút
+        if (msg.getCreatedAt().plus(java.time.Duration.ofMinutes(10)).isBefore(Instant.now())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Đã quá thời gian thu hồi tin nhắn (10 phút)");
+        }
+
+        msg.setRecalled(true);
+        // Không xóa content gốc để admin xem lại nếu có dispute, chỉ ẩn ở UI
+        chatMessageRepository.save(msg);
+
+        if (firebaseService.isEnabled()) {
+            mirrorMessage(msg.getConversation(), msg); // Push cập nhật qua Firebase
+        }
+        log.info("Message {} recalled by {}", messageId, email);
+    }
+
+    @Transactional
+    public void deleteMessageForMe(UUID messageId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        ChatMessage msg = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_REQUEST, "Tin nhắn không tồn tại"));
+        
+        // Kiểm tra xem user đang gọi là sender hay receiver
+        if (msg.getSender() != null && msg.getSender().getEmail().equals(email)) {
+            msg.setHiddenBySender(true);
+        } else {
+            // Nếu không phải sender thì kiểm tra receiver (user còn lại trong hội thoại)
+            Conversation conv = msg.getConversation();
+            User otherUser = otherUserOf(conv, msg.getSender() != null ? msg.getSender().getEmail() : "");
+            if (otherUser != null && otherUser.getEmail().equals(email)) {
+                msg.setHiddenByReceiver(true);
+            } else if (isParticipant(conv, email)) {
+                 msg.setHiddenByReceiver(true); // Tin nhắn hệ thống (sender=null)
+            } else {
+                 throw new AppException(ErrorCode.ACCESS_DENIED);
+            }
+        }
+        chatMessageRepository.save(msg);
+        log.info("Message {} hidden by {}", messageId, email);
+    }
+
+    @Transactional
+    public void hideConversation(UUID conversationId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        Conversation conv = requireParticipant(conversationId, email);
+
+        if (conv.getUserOne().getEmail().equals(email)) {
+            conv.setHiddenByUserOne(true);
+        } else {
+            conv.setHiddenByUserTwo(true);
+        }
+        conversationRepository.save(conv);
+        log.info("Conversation {} hidden by {}", conversationId, email);
+    }
+
     // ─── Helper nghiệp vụ ───────────────────────────────────────────────────
 
     /** Sau khi lưu tin nhắn: cập nhật hội thoại, mirror Firestore, tạo thông báo */
@@ -670,6 +761,8 @@ public class ChatService {
         data.put("proposedTime", m.getProposedTime());
         data.put("appointmentId", m.getAppointmentId() != null ? m.getAppointmentId().toString() : null);
         data.put("appointmentData", m.getAppointmentData());
+        data.put("isRecalled", m.isRecalled());
+        data.put("recalled", m.isRecalled());
         data.put("createdAt", m.getCreatedAt() != null
                 ? m.getCreatedAt().toEpochMilli() : Instant.now().toEpochMilli());
 
@@ -697,6 +790,15 @@ public class ChatService {
         User other = otherUserOf(conv, myEmail);
         User me = conv.getUserOne().getEmail().equals(myEmail) ? conv.getUserOne() : conv.getUserTwo();
 
+        // Tìm tin nhắn mới nhất còn hiển thị với user này (không bị ẩn/thu hồi)
+        var lastVisible = chatMessageRepository.findLastVisibleForUser(conv.getId(), myEmail);
+        String preview = lastVisible.map(m -> {
+            if (m.isRecalled()) return "Tin nhắn đã bị thu hồi";
+            return m.getContent() != null ? truncate(m.getContent()) : conv.getLastMessagePreview();
+        }).orElse(null);
+        var lastType = lastVisible.map(ChatMessage::getType).orElse(conv.getLastMessageType());
+        var lastAt = lastVisible.map(ChatMessage::getCreatedAt).orElse(conv.getLastMessageAt());
+
         return ConversationResponse.builder()
                 .id(conv.getId())
                 .invitationId(conv.getInvitation().getId())
@@ -707,9 +809,9 @@ public class ChatService {
                 .otherUserName(other.getFullName())
                 .otherUserAvatarUrl(other.getAvatarUrl())
                 .otherUserReputationScore(other.getReputationScore())
-                .lastMessagePreview(conv.getLastMessagePreview())
-                .lastMessageType(conv.getLastMessageType())
-                .lastMessageAt(conv.getLastMessageAt())
+                .lastMessagePreview(preview)
+                .lastMessageType(lastType)
+                .lastMessageAt(lastAt)
                 .unreadCount(chatMessageRepository.countUnreadInConversation(conv.getId(), myEmail))
                 .isBlockedByMe(userBlockRepository.existsByBlocker_IdAndBlocked_Id(me.getId(), other.getId()))
                 .hasBlockedMe(userBlockRepository.existsByBlocker_IdAndBlocked_Id(other.getId(), me.getId()))
@@ -737,6 +839,7 @@ public class ChatService {
                 .proposedTime(m.getProposedTime())
                 .appointmentId(m.getAppointmentId())
                 .appointmentData(m.getAppointmentData())
+                .isRecalled(m.isRecalled())
                 .isRead(m.getIsRead())
                 .createdAt(m.getCreatedAt())
                 .build();

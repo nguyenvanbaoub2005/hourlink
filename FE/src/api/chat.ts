@@ -58,6 +58,15 @@ const ChatApi = {
   /** Tổng số tin nhắn chưa đọc (badge) */
   getUnreadCount: () => api.get('/chat/unread-count'),
 
+  /** Thu hồi tin nhắn */
+  recallMessage: (messageId: string) => api.put(`/chat/messages/${messageId}/recall`),
+
+  /** Xóa tin nhắn (chỉ ẩn ở phía người gọi) */
+  deleteMessageForMe: (messageId: string) => api.put(`/chat/messages/${messageId}/delete-for-me`),
+
+  /** Ẩn cuộc trò chuyện */
+  hideConversation: (convId: string) => api.put(`/chat/conversations/${convId}/hide`),
+
   // ─── Báo cáo & chặn ──────────────────────────────────────────
   /** Báo cáo một tin nhắn vi phạm */
   reportMessage: (

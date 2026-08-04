@@ -48,7 +48,11 @@ public class ChatMessageResponse {
     /** JSON data snapshot lịch hẹn (APPOINTMENT_CARD) */
     String appointmentData;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("isRecalled")
+    boolean isRecalled;
+
     // ─── Trạng thái ──────────────────────────────────────────────────────────
+    @com.fasterxml.jackson.annotation.JsonProperty("isRead")
     Boolean isRead;
     Instant createdAt;
 }

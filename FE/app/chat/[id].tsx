@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
+import * as Clipboard from 'expo-clipboard';
 import ChatApi from '@api/chat';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
@@ -113,6 +114,14 @@ export default function ChatRoomScreen() {
   const [input, setInput] = useState('');
   const [realtime, setRealtime] = useState(false);
 
+  // Set lưu ID tin nhắn đã xóa / thu hồi local — ngăn Firebase listener restore lại
+  const hiddenMsgIds = useRef<Set<string>>(new Set());
+  const recalledMsgIds = useRef<Set<string>>(new Set());
+  // Ground truth từ REST: IDs hợp lệ + thời điểm fetch
+  // Firebase listener dùng để phân biệt "tin ẩn" vs "tin mới"
+  const restValidIds = useRef<Set<string>>(new Set());
+  const restFetchedAt = useRef<number>(0);
+
   // Modal
   const [menuVisible, setMenuVisible] = useState(false);
   const [reportTarget, setReportTarget] = useState<ChatMessage | null>(null);
@@ -123,6 +132,9 @@ export default function ChatRoomScreen() {
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [meetingVisible, setMeetingVisible] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
+  
+  const [attachSheetVisible, setAttachSheetVisible] = useState(false);
+  const [messageActionMsg, setMessageActionMsg] = useState<ChatMessage | null>(null);
   const [profileVisible, setProfileVisible] = useState(false);
   const [aptDetailsModalVisible, setAptDetailsModalVisible] = useState(false);
   const [selectedAptDetails, setSelectedAptDetails] = useState<any>(null);
@@ -168,7 +180,21 @@ export default function ChatRoomScreen() {
     if (!id) return;
     try {
       const res = await ChatApi.getMessages(id, 0, 50);
-      setMessages(res.data?.data?.content ?? []);
+      const raw: any[] = res.data?.data?.content ?? [];
+      const normalised = raw.map((m: any) => ({
+        ...m,
+        isRecalled: m.isRecalled || m.recalled || false,
+      }));
+      // Ghi lại ground truth từ REST: chỉ những tin này mới hợp lệ
+      // Firebase listener sẽ dùng để lọc bỏ tin đã ẩn
+      restValidIds.current = new Set(normalised.map((m: any) => m.id));
+      restFetchedAt.current = Date.now();
+      // Merge local hidden/recall state vào REST result
+      recalledMsgIds.current.forEach(rid => {
+        const idx = normalised.findIndex((m: any) => m.id === rid);
+        if (idx >= 0) normalised[idx] = { ...normalised[idx], isRecalled: true };
+      });
+      setMessages(normalised.filter((m: any) => !hiddenMsgIds.current.has(m.id)));
     } catch (e) {
       console.log('Lỗi tải tin nhắn:', e);
     } finally {
@@ -210,7 +236,26 @@ export default function ChatRoomScreen() {
       if (isRealtimeReady()) {
         const unsub = listenToMessages(id, (docs) => {
           // Firestore trả về mới nhất trước, đúng thứ tự FlatList inverted
-          setMessages(docs as ChatMessage[]);
+          const normalised = docs
+            .filter((m: any) => {
+              // Bị ẩn trong session này → lọc bỏ
+              if (hiddenMsgIds.current.has(m.id)) return false;
+              // Tin đã có trong REST result → hợp lệ, hiển thị
+              if (restValidIds.current.has(m.id)) return true;
+              // Tin mới hơn thời điểm REST fetch (tin nhắn mới gửi đến) → hiển thị
+              const msgTs = typeof m.createdAt === 'number'
+                ? m.createdAt
+                : new Date(m.createdAt ?? 0).getTime();
+              return msgTs >= restFetchedAt.current - 15000;
+              // Nếu không thuộc 3 trường hợp trên → tin đã bị ẩn/xóa → lọc bỏ
+            })
+            .map((m: any) => ({
+              ...m,
+              isRecalled: m.isRecalled || m.recalled || recalledMsgIds.current.has(m.id) || false,
+            }));
+          // Cập nhật restValidIds với tin mới nhận được
+          normalised.forEach((m: any) => restValidIds.current.add(m.id));
+          setMessages(normalised as ChatMessage[]);
           markRead();
         });
         if (unsub) {
@@ -483,37 +528,12 @@ export default function ChatRoomScreen() {
 
   // ─── Menu đính kèm ──────────────────────────────────────────────────────
   const openAttachMenu = () => {
-    Alert.alert('📎 Đính kèm', 'Chọn nội dung muốn gửi', [
-      { text: '🖼️  Hình ảnh', onPress: sendImage },
-      { text: '📄  Tài liệu', onPress: sendDocument },
-      { text: '📍  Vị trí của tôi', onPress: sendLocation },
-      { text: '🔗  Link họp online', onPress: () => setMeetingVisible(true) },
-      {
-        text: '🗓️  Tạo lịch hẹn mới',
-        onPress: openCreateAppointmentModal,
-      },
-      { text: 'Hủy', style: 'cancel' },
-    ]);
+    setAttachSheetVisible(true);
   };
 
   // ─── Báo cáo & chặn ─────────────────────────────────────────────────────
   const onLongPressMessage = (msg: ChatMessage) => {
-    if (!msg.senderId || msg.senderId === peerId) {
-      // Chỉ báo cáo được tin của người kia
-      if (!msg.senderId) return;
-      Alert.alert('Tin nhắn', undefined, [
-        {
-          text: '🚩 Báo cáo tin nhắn',
-          style: 'destructive',
-          onPress: () => {
-            setReportTarget(msg);
-            setReportReason(null);
-            setReportNote('');
-          },
-        },
-        { text: 'Hủy', style: 'cancel' },
-      ]);
-    }
+    setMessageActionMsg(msg);
   };
 
   const submitReport = async () => {
@@ -573,12 +593,28 @@ export default function ChatRoomScreen() {
     const isMine = item.senderId !== peerId;
 
     // Dải ngày — messages sắp xếp mới nhất trước nên so với phần tử kế tiếp
-    const next = messages[index + 1];
+    const next = messages[index + 1]; // Tin nhắn cũ hơn
+    const prev = messages[index - 1]; // Tin nhắn mới hơn
+    
     const showDate =
       !next ||
       new Date(item.createdAt).toDateString() !== new Date(next.createdAt).toDateString();
 
-    const bubbleBody = (
+    const isNextSame = next && next.senderId === item.senderId && next.type !== 'SYSTEM';
+    const isPrevSame = prev && prev.senderId === item.senderId && prev.type !== 'SYSTEM';
+
+    const isRecalled = item.isRecalled || item.recalled;
+    
+    const bubbleBody = isRecalled ? (
+      <>
+       <Text style={[styles.msgText, { fontStyle: 'italic', color: '#64748B' }]}>
+         Tin nhắn đã bị thu hồi
+       </Text>
+       <Text style={[styles.msgTime, { color: '#94A3B8' }]}>
+         {formatTime(item.createdAt)}
+       </Text>
+      </>
+    ) : (
       <>
         {item.type === 'TEXT' && (
           <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{item.content}</Text>
@@ -785,13 +821,17 @@ export default function ChatRoomScreen() {
 
         <View style={[styles.msgRow, isMine ? styles.msgRowMine : styles.msgRowTheirs]}>
           {!isMine && (
-            <TouchableOpacity onPress={() => setProfileVisible(true)} activeOpacity={0.7}>
-              <Avatar
-                uri={item.senderAvatarUrl || peerAvatar}
-                name={item.senderName || peerName}
-                size={28}
-              />
-            </TouchableOpacity>
+            <View style={{ width: 28 }}>
+              {!isPrevSame && (
+                <TouchableOpacity onPress={() => setProfileVisible(true)} activeOpacity={0.7}>
+                  <Avatar
+                    uri={item.senderAvatarUrl || peerAvatar}
+                    name={item.senderName || peerName}
+                    size={28}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
           <TouchableOpacity
@@ -800,16 +840,16 @@ export default function ChatRoomScreen() {
             style={{ maxWidth: '78%' }}
           >
             {isMine ? (
-              (item.type === 'IMAGE' && !item.content) || item.type === 'APPOINTMENT_CARD' ? (
+              (!isRecalled && ((item.type === 'IMAGE' && !item.content) || item.type === 'APPOINTMENT_CARD')) ? (
                 <View style={[styles.bubble, styles.bubbleMine, { paddingHorizontal: 0, paddingVertical: 0, backgroundColor: 'transparent' }]}>
                   {bubbleBody}
                 </View>
               ) : (
                 <LinearGradient
-                  colors={[Colors.secondary, Colors.primary]}
+                  colors={isRecalled ? ['#F1F5F9', '#F1F5F9'] : [Colors.secondary, Colors.primary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.bubble, styles.bubbleMine]}
+                  style={[styles.bubble, { borderTopRightRadius: isNextSame ? 4 : 18, borderBottomRightRadius: isPrevSame ? 4 : 18 }]}
                 >
                   {bubbleBody}
                 </LinearGradient>
@@ -818,7 +858,8 @@ export default function ChatRoomScreen() {
               <View style={[
                 styles.bubble, 
                 styles.bubbleTheirs, 
-                ((item.type === 'IMAGE' && !item.content) || item.type === 'APPOINTMENT_CARD') ? { paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' } : {}
+                (!isRecalled && ((item.type === 'IMAGE' && !item.content) || item.type === 'APPOINTMENT_CARD')) ? { paddingHorizontal: 0, paddingVertical: 0, borderWidth: 0, backgroundColor: 'transparent' } : {},
+                { borderTopLeftRadius: isNextSame ? 4 : 18, borderBottomLeftRadius: isPrevSame ? 4 : 18 }
               ]}>
                 {bubbleBody}
               </View>
@@ -1151,7 +1192,120 @@ export default function ChatRoomScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Bottom sheet: link họp online ──────────────────────── */}
+      {/* ── Bottom sheet: Đính kèm (Messenger style) ─────────────────────── */}
+      <Modal visible={attachSheetVisible} transparent animationType="slide">
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setAttachSheetVisible(false)}
+        >
+          <View style={styles.sheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.sheetTitle}>📎 Thêm nội dung</Text>
+            
+            <View style={{ marginTop: 20, flexDirection: 'row', flexWrap: 'wrap', gap: 20, justifyContent: 'center' }}>
+              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); sendImage(); }}>
+                <View style={[styles.attachOptionIcon, { backgroundColor: '#E0F2FE' }]}>
+                  <Ionicons name="image" size={26} color="#0284C7" />
+                </View>
+                <Text style={styles.attachOptionText}>Hình ảnh</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); sendDocument(); }}>
+                <View style={[styles.attachOptionIcon, { backgroundColor: '#F3E8FF' }]}>
+                  <Ionicons name="document-text" size={26} color="#9333EA" />
+                </View>
+                <Text style={styles.attachOptionText}>Tài liệu</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); sendLocation(); }}>
+                <View style={[styles.attachOptionIcon, { backgroundColor: '#DCFCE7' }]}>
+                  <Ionicons name="location" size={26} color="#16A34A" />
+                </View>
+                <Text style={styles.attachOptionText}>Vị trí</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); setMeetingVisible(true); }}>
+                <View style={[styles.attachOptionIcon, { backgroundColor: '#FFEDD5' }]}>
+                  <Ionicons name="videocam" size={26} color="#EA580C" />
+                </View>
+                <Text style={styles.attachOptionText}>Phòng họp</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); openCreateAppointmentModal(); }}>
+                <View style={[styles.attachOptionIcon, { backgroundColor: '#FEF9C3' }]}>
+                  <Ionicons name="calendar" size={26} color="#CA8A04" />
+                </View>
+                <Text style={styles.attachOptionText}>Lịch hẹn</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Modal Tùy chỉnh tin nhắn (Xóa, Thu hồi, Copy) ─────────────────── */}
+      <Modal visible={!!messageActionMsg} transparent animationType="fade">
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setMessageActionMsg(null)}>
+          <View style={styles.menuSheet}>
+            <View style={styles.modalHandle} />
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                if (messageActionMsg?.content) {
+                  Clipboard.setString(messageActionMsg.content);
+                  Alert.alert('Đã sao chép');
+                }
+                setMessageActionMsg(null);
+              }}
+            >
+              <Ionicons name="copy-outline" size={22} color={Colors.textPrimary} />
+              <Text style={styles.menuText}>Sao chép nội dung</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={async () => {
+                const msgId = messageActionMsg?.id;
+                setMessageActionMsg(null);
+                if (!msgId) return;
+                try {
+                  await ChatApi.deleteMessageForMe(msgId);
+                  hiddenMsgIds.current.add(msgId); // Lưu local — Firebase listener sẽ lọc bỏ
+                  setMessages(prev => prev.filter(m => m.id !== msgId));
+                } catch (e) {
+                  Alert.alert('Lỗi', 'Không thể xóa tin nhắn.');
+                }
+              }}
+            >
+              <Ionicons name="trash-bin-outline" size={22} color={Colors.textPrimary} />
+              <Text style={styles.menuText}>Xóa ở phía tôi</Text>
+            </TouchableOpacity>
+
+            {messageActionMsg?.senderId === user?.id && !(messageActionMsg?.isRecalled || messageActionMsg?.recalled) && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={async () => {
+                  const msgId = messageActionMsg?.id;
+                  setMessageActionMsg(null);
+                  if (!msgId) return;
+                  try {
+                    await ChatApi.recallMessage(msgId);
+                    recalledMsgIds.current.add(msgId); // Lưu local — Firebase listener sẽ áp dụng
+                    setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isRecalled: true, content: 'Tin nhắn đã bị thu hồi' } : m));
+                  } catch (e: any) {
+                    Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể thu hồi tin nhắn.');
+                  }
+                }}
+              >
+                <Ionicons name="arrow-undo-outline" size={22} color={Colors.danger} />
+                <Text style={[styles.menuText, { color: Colors.danger }]}>Thu hồi tin nhắn</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Modal Đặt lịch (Appointment Modal) ───────────────────────────────── */}
       <Modal visible={meetingVisible} transparent animationType="slide">
         <KeyboardAvoidingView
           style={styles.overlay}
@@ -1578,4 +1732,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageClose: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
+
+  // Attachment Bottom Sheet
+  attachOption: { alignItems: 'center', width: 70 },
+  attachOptionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  attachOptionText: { fontSize: 12, color: '#334155', fontWeight: '500' }
 });

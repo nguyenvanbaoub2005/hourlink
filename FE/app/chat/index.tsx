@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -95,6 +96,27 @@ export default function ConversationListScreen() {
         style={styles.row}
         activeOpacity={0.7}
         onPress={() => openConversation(item)}
+        onLongPress={() => {
+          Alert.alert(
+            'Tùy chọn trò chuyện',
+            `Bạn có muốn ẩn trò chuyện với ${item.otherUserName}?`,
+            [
+              { text: 'Hủy', style: 'cancel' },
+              {
+                text: 'Ẩn',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await ChatApi.hideConversation(item.id);
+                    fetchConversations();
+                  } catch (e) {
+                    Alert.alert('Lỗi', 'Không thể ẩn cuộc trò chuyện');
+                  }
+                }
+              }
+            ]
+          );
+        }}
       >
         {/* Ảnh đại diện thật, không có thì rơi về avatar chữ */}
         <Avatar

@@ -58,6 +58,18 @@ public class Conversation extends BaseEntity {
     @Column(name = "last_message_at")
     Instant lastMessageAt;
 
+    // ─── Các cờ Ẩn / Lưu trữ (Hide/Archive) ─────────────────────────────────
+
+    /** Cờ đánh dấu userOne đã ẩn cuộc trò chuyện này */
+    @Column(name = "hidden_by_user_one", nullable = false)
+    @Builder.Default
+    boolean hiddenByUserOne = false;
+
+    /** Cờ đánh dấu userTwo đã ẩn cuộc trò chuyện này */
+    @Column(name = "hidden_by_user_two", nullable = false)
+    @Builder.Default
+    boolean hiddenByUserTwo = false;
+
     /** Cuộc trò chuyện còn hoạt động hay không */
     @Column(name = "is_active", nullable = false)
     @Builder.Default
