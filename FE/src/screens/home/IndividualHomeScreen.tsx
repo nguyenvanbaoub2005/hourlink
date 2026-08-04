@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import { useChatStore } from '@store/chatStore';
+import { useWalletStore } from '@store/walletStore';
 import ChatApi from '@api/chat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -42,12 +43,14 @@ export default function IndividualHomeScreen() {
   const [myRequests, setMyRequests] = useState<HelpRequestItem[]>([]);
   const [firstName, setFirstName] = useState<string>('Bạn');
   const [refreshing, setRefreshing] = useState(false);
+  const { wallet, fetchWallet } = useWalletStore();
 
   const fetchData = async () => {
     try {
       const [reqRes, profileRes] = await Promise.all([
         HelpRequestApi.getMyRequests(),
-        UserApi.getMyProfile()
+        UserApi.getMyProfile(),
+        fetchWallet()
       ]);
       setMyRequests(reqRes.data.data ?? []);
       
@@ -138,10 +141,13 @@ export default function IndividualHomeScreen() {
           <View>
             <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
             <Text style={styles.balanceValue}>
-              0 <Text style={styles.balanceUnit}>Time Credit</Text>
+              {wallet?.balance?.toFixed(1) ?? '0.0'} <Text style={styles.balanceUnit}>Time Credit</Text>
             </Text>
           </View>
-          <TouchableOpacity style={styles.walletBtn}>
+          <TouchableOpacity 
+            style={styles.walletBtn}
+            onPress={() => router.push('/(tabs)/wallet' as any)}
+          >
             <Text style={styles.walletBtnText}>Ví tiền</Text>
             <Ionicons name="chevron-forward" size={16} color="#fff" />
           </TouchableOpacity>
@@ -149,9 +155,9 @@ export default function IndividualHomeScreen() {
 
         <View style={styles.stats}>
           {[
-            { label: 'Đã cho', icon: 'arrow-up-outline', val: '0h' },
-            { label: 'Đã nhận', icon: 'arrow-down-outline', val: '0h' },
-            { label: 'Đang giữ', icon: 'hourglass-outline', val: '0h' },
+            { label: 'Đã cho', icon: 'arrow-up-outline', val: `${wallet?.totalUsed?.toFixed(1) ?? '0.0'}h` },
+            { label: 'Đã nhận', icon: 'arrow-down-outline', val: `${wallet?.totalEarned?.toFixed(1) ?? '0.0'}h` },
+            { label: 'Đang giữ', icon: 'hourglass-outline', val: `${wallet?.heldAmount?.toFixed(1) ?? '0.0'}h` },
           ].map(s => (
             <View key={s.label} style={styles.statBox}>
               <Text style={styles.statLabel}>{s.label}</Text>

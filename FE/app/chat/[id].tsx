@@ -718,7 +718,7 @@ export default function ChatRoomScreen() {
                     onPress={async () => {
                       try {
                         await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CONFIRM' });
-                        if (!realtime) await fetchMessages();
+                        await fetchMessages();
                         Alert.alert('✅ Đã xác nhận', 'Lịch hẹn đã được xác nhận thành công!');
                       } catch (e: any) {
                         Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
@@ -735,7 +735,7 @@ export default function ChatRoomScreen() {
                         { text: 'Từ chối', style: 'destructive', onPress: async () => {
                           try {
                             await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CANCEL', reason: 'Từ chối lịch hẹn' });
-                            if (!realtime) await fetchMessages();
+                            await fetchMessages();
                           } catch (e: any) {
                             Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể từ chối lịch hẹn.');
                           }

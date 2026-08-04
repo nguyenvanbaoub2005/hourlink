@@ -52,4 +52,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
             """)
     int markAllReadInConversation(@Param("conversationId") UUID conversationId,
                                   @Param("email") String email);
+
+    /** Cập nhật nội dung thẻ lịch hẹn trong tin nhắn (khi lịch thay đổi trạng thái) */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE ChatMessage m SET m.appointmentData = :appointmentData
+            WHERE m.appointmentId = :appointmentId
+            """)
+    int updateAppointmentData(@Param("appointmentId") UUID appointmentId, 
+                              @Param("appointmentData") String appointmentData);
 }

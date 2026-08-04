@@ -244,7 +244,13 @@ public class AppointmentService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
-        return AppointmentResponse.fromEntity(appointmentRepository.save(appointment));
+        Appointment saved = appointmentRepository.save(appointment);
+        try {
+            chatService.updateAppointmentCardData(saved.getId(), buildAppointmentCardData(saved));
+        } catch (Exception e) {
+            log.warn("Failed to update chat appointment card for apt {}", saved.getId(), e);
+        }
+        return AppointmentResponse.fromEntity(saved);
     }
 
     // ─── 4. Xác nhận bằng QR hoặc OTP (9.14) ────────────────────────────────
