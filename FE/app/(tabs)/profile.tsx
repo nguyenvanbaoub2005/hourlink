@@ -13,6 +13,7 @@ import HelpRequestApi from '@api/helprequest';
 import NotificationApi from '@api/notification';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
+import { useWalletStore } from '@store/walletStore';
 import type { UserResponse } from '@types';
 
 type SkillItem = { id: string; name: string; status: string };
@@ -22,6 +23,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { logout } = useAuthStore();
   const { unreadCount, setUnreadCount } = useNotificationStore();
+  const { wallet, fetchWallet } = useWalletStore();
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
@@ -63,6 +65,7 @@ export default function ProfileScreen() {
         UserApi.getMyProfile(),
         SkillApi.getMySkills(),
         HelpRequestApi.getMyRequests(),
+        fetchWallet(), // Lấy thông tin ví
       ]);
       setProfile(profileRes.data.data);
       setSkills(skillsRes.data.data ?? []);
@@ -185,9 +188,9 @@ export default function ProfileScreen() {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Số dư',   value: '-',                         color: Colors.primary },
-            { label: 'Đã cho',  value: '-',                         color: '#3B82F6' },
-            { label: 'Đã nhận', value: '-',                         color: '#F59E0B' },
+            { label: 'Số dư',   value: wallet?.balance?.toFixed(1) ?? '-', color: Colors.primary },
+            { label: 'Đã cho',  value: wallet?.totalEarned?.toFixed(1) ?? '-', color: '#3B82F6' },
+            { label: 'Đã nhận', value: wallet?.totalUsed?.toFixed(1) ?? '-', color: '#F59E0B' },
             { label: 'Buổi học', value: String(profile.completedSessions ?? 0), color: '#8B5CF6' },
           ].map((stat, i, arr) => (
             <React.Fragment key={stat.label}>

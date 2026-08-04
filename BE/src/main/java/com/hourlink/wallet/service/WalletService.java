@@ -187,10 +187,14 @@ public class WalletService {
 
     // ─── 4. Internal helpers ──────────────────────────────────────────────────
 
-    /** Tìm ví theo user; ném WALLET_NOT_FOUND nếu chưa có. */
+    /** Tìm ví theo user; nếu chưa có (user cũ), tự động tạo mới (lazy init). */
+    @Transactional
     public Wallet getWalletByUser(User user) {
         return walletRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new AppException(ErrorCode.WALLET_NOT_FOUND));
+                .orElseGet(() -> {
+                    log.info("Lazy initializing wallet for existing user [{}]", user.getId());
+                    return initWallet(user);
+                });
     }
 
     /** Ghi bản ghi WalletTransaction. Gọi bên trong @Transactional của caller. */
