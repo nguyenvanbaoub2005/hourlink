@@ -7,6 +7,7 @@ import com.hourlink.appointment.enums.AppointmentStatus;
 import com.hourlink.appointment.enums.VerificationMethod;
 import com.hourlink.appointment.repository.*;
 import com.hourlink.chat.service.ChatService;
+import com.hourlink.wallet.service.WalletService;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
@@ -50,6 +51,7 @@ public class AppointmentService {
     private final SkillRepository skillRepository;
     private final NotificationService notificationService;
     private final ChatService chatService;
+    private final WalletService walletService;
 
     // ─── 1. Tạo lịch hẹn (9.11) ──────────────────────────────────────────────
 
@@ -207,7 +209,8 @@ public class AppointmentService {
                 }
             }
             appointment.setStatus(AppointmentStatus.CONFIRMED);
-            // TODO (Wallet Hook): Tạo lệnh hold Time Credit của receiver khi chốt lịch
+            // Wallet Hook: Tạm giữ Time Credit của receiver khi xác nhận lịch
+            walletService.holdCredit(appointment.getReceiver(), appointment.getTimeCreditAmount(), appointment);
             notificationService.createNotification(targetUser, currentUser, NotificationType.APPOINTMENT_CONFIRMED,
                     "Lịch hẹn đã được xác nhận",
                     currentUser.getFullName() + " đã xác nhận lịch hẹn: " + appointment.getTitle(),
@@ -216,9 +219,16 @@ public class AppointmentService {
             if (appointment.getStatus() == AppointmentStatus.COMPLETED) {
                 throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
             }
+            AppointmentStatus previousStatus = appointment.getStatus();
             appointment.setStatus(AppointmentStatus.CANCELLED);
             appointment.setCancelReason(req.getReason());
-            // TODO (Wallet Hook): Hoàn lại Time Credit tạm giữ nếu có
+            // Wallet Hook: Hoàn trả Time Credit nếu trước đó đã CONFIRMED/UPCOMING/IN_PROGRESS (đã hold)
+            if (previousStatus == AppointmentStatus.CONFIRMED
+                    || previousStatus == AppointmentStatus.UPCOMING
+                    || previousStatus == AppointmentStatus.IN_PROGRESS) {
+                walletService.releaseCredit(appointment);
+            }
+
             notificationService.createNotification(targetUser, currentUser, NotificationType.APPOINTMENT_CANCELLED,
                     "Lịch hẹn đã bị hủy",
                     currentUser.getFullName() + " đã hủy lịch hẹn. Lý do: " + (req.getReason() != null ? req.getReason() : "Không có"),
@@ -234,7 +244,13 @@ public class AppointmentService {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
-        return AppointmentResponse.fromEntity(appointmentRepository.save(appointment));
+        Appointment saved = appointmentRepository.save(appointment);
+        try {
+            chatService.updateAppointmentCardData(saved.getId(), buildAppointmentCardData(saved));
+        } catch (Exception e) {
+            log.warn("Failed to update chat appointment card for apt {}", saved.getId(), e);
+        }
+        return AppointmentResponse.fromEntity(saved);
     }
 
     // ─── 4. Xác nhận bằng QR hoặc OTP (9.14) ────────────────────────────────
@@ -337,7 +353,8 @@ public class AppointmentService {
         } else if (allCompletions.size() >= 2) {
             // Cả hai bên đều đã xác nhận hoàn thành không có vấn đề
             appointment.setStatus(AppointmentStatus.COMPLETED);
-            // TODO (Wallet Hook): Trừ Time Credit ở ví receiver và cộng vào ví provider
+            // Wallet Hook: Chuyển Time Credit từ Receiver sang Provider
+            walletService.transferCredit(appointment);
             notificationService.createNotification(appointment.getProvider(), null, NotificationType.APPOINTMENT_COMPLETED,
                     "Buổi hỗ trợ hoàn thành!",
                     "Cả hai bên đã xác nhận hoàn thành buổi hẹn: " + appointment.getTitle() + ". Time Credit đã được chuyển.",

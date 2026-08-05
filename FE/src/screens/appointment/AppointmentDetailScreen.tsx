@@ -345,7 +345,7 @@ export default function AppointmentDetailScreen() {
           )}
 
           {statusStr === 'IN_PROGRESS' && (
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#9333EA' }]} onPress={() => setShowModal(true)}>
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.primary }]} onPress={() => setShowModal(true)}>
               <Ionicons name="checkmark-done-circle" size={18} color="#FFF" style={{ marginRight: 8 }} />
               <Text style={styles.btnTextWhite}>Xác Nhận Hoàn Thành Buổi Hỗ Trợ</Text>
             </TouchableOpacity>
@@ -404,7 +404,7 @@ export default function AppointmentDetailScreen() {
                 <Text style={{ color: Colors.textPrimary, fontWeight: '600' }}>Hủy</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: hasIssue ? '#DC2626' : '#9333EA' }]}
+                style={[styles.modalBtn, { backgroundColor: hasIssue ? '#DC2626' : Colors.primary }]}
                 onPress={submitCompletion}
                 disabled={actionLoading}
               >

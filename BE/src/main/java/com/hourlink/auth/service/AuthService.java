@@ -26,6 +26,7 @@ import com.hourlink.user.entity.UserRole;
 import com.hourlink.user.repository.RoleRepository;
 import com.hourlink.user.repository.UserRepository;
 import com.hourlink.user.repository.UserRoleRepository;
+import com.hourlink.wallet.service.WalletService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -52,6 +53,7 @@ public class AuthService {
     PasswordEncoder passwordEncoder;
     RoleRepository roleRepository;
     UserRoleRepository userRoleRepository;
+    WalletService walletService;
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -113,6 +115,9 @@ public class AuthService {
         userRoleRepository.save(userRole);
         
         user.setUserRoles(java.util.List.of(userRole));
+
+        // Khởi tạo ví Time Credit với balance = 5.0 (credit khởi đầu)
+        walletService.initWallet(user);
 
         return AuthResponse.builder()
                 .token(generateToken(user, "access", VALID_DURATION))

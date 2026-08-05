@@ -14,11 +14,16 @@ const queryClient = new QueryClient({
   },
 });
 
+import { setUnauthorizedHandler } from '@api/axiosInstance';
+
 export default function RootLayout() {
-  const { loadStoredAuth } = useAuthStore();
+  const { loadStoredAuth, logout } = useAuthStore();
 
   useEffect(() => {
     loadStoredAuth();
+    setUnauthorizedHandler(() => {
+      logout();
+    });
   }, []);
 
   return (

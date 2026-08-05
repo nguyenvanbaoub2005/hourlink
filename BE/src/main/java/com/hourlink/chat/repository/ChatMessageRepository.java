@@ -52,4 +52,33 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
             """)
     int markAllReadInConversation(@Param("conversationId") UUID conversationId,
                                   @Param("email") String email);
+
+    /** Cập nhật nội dung thẻ lịch hẹn trong tin nhắn (khi lịch thay đổi trạng thái) */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE ChatMessage m SET m.appointmentData = :appointmentData
+            WHERE m.appointmentId = :appointmentId
+            """)
+    int updateAppointmentData(@Param("appointmentId") UUID appointmentId, 
+                              @Param("appointmentData") String appointmentData);
+
+    /**
+     * Lấy tin nhắn mới nhất còn hiển thị với một user cụ thể trong hội thoại.
+     * Dùng để cập nhật lastMessagePreview khi user xóa tin nhắn phía mình.
+     */
+    @Query("""
+            SELECT m FROM ChatMessage m
+            WHERE m.conversation.id = :conversationId
+              AND m.isRecalled = false
+              AND (
+                (m.sender IS NOT NULL AND m.sender.email = :email AND m.hiddenBySender = false)
+                OR
+                (m.sender IS NULL OR m.sender.email <> :email) AND m.hiddenByReceiver = false
+              )
+            ORDER BY m.createdAt DESC
+            LIMIT 1
+            """)
+    java.util.Optional<ChatMessage> findLastVisibleForUser(
+            @Param("conversationId") UUID conversationId,
+            @Param("email") String email);
 }

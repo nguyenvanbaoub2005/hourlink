@@ -148,10 +148,33 @@ public class ChatController {
     }
 
     @Operation(summary = "Bỏ chặn một người dùng")
-    @DeleteMapping("/block/{userId}")
-    public ApiResponse<Void> unblockUser(@PathVariable UUID userId) {
-        chatService.unblockUser(userId);
+    @DeleteMapping("/block/{blockedUserId}")
+    public ApiResponse<Void> unblockUser(@PathVariable UUID blockedUserId) {
+        chatService.unblockUser(blockedUserId);
         return ApiResponse.noContent("Đã bỏ chặn người dùng");
+    }
+
+    // ─── Nâng cao (Thu hồi, Xóa, Ẩn) ────────────────────────────────────────
+
+    @Operation(summary = "Thu hồi tin nhắn (chỉ người gửi, trong vòng 10 phút)")
+    @PutMapping("/messages/{messageId}/recall")
+    public ApiResponse<Void> recallMessage(@PathVariable UUID messageId) {
+        chatService.recallMessage(messageId);
+        return ApiResponse.noContent("Đã thu hồi tin nhắn");
+    }
+
+    @Operation(summary = "Xóa tin nhắn ở phía tôi (ẩn trên giao diện của mình)")
+    @PutMapping("/messages/{messageId}/delete-for-me")
+    public ApiResponse<Void> deleteMessageForMe(@PathVariable UUID messageId) {
+        chatService.deleteMessageForMe(messageId);
+        return ApiResponse.noContent("Đã xóa tin nhắn khỏi máy bạn");
+    }
+
+    @Operation(summary = "Ẩn cuộc trò chuyện khỏi danh sách")
+    @PutMapping("/conversations/{id}/hide")
+    public ApiResponse<Void> hideConversation(@PathVariable UUID id) {
+        chatService.hideConversation(id);
+        return ApiResponse.noContent("Đã ẩn cuộc trò chuyện");
     }
 
     @Operation(summary = "Danh sách người dùng tôi đã chặn")

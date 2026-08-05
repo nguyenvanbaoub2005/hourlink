@@ -97,11 +97,28 @@ public class ChatMessage extends BaseEntity {
 
     // ─── Lịch hẹn (APPOINTMENT_CARD) ────────────────────────────────────────
 
-    /** ID lịch hẹn được nhúng vào card chat */
+    /** ID của cuộc hẹn đính kèm (nếu type = APPOINTMENT_CARD) */
     @Column(name = "appointment_id")
     UUID appointmentId;
 
-    /** JSON snapshot thông tin lịch hẹn (để hiển thị ngay mà không cần query) */
+    /** Trạng thái lịch hẹn dạng JSON snapshot để hiển thị ở client */
     @Column(name = "appointment_data", columnDefinition = "TEXT")
     String appointmentData;
+
+    // ─── Các cờ (Flags) ─────────────────────────────────────────────────────
+
+    /** Cờ đánh dấu tin nhắn bị thu hồi */
+    @Column(name = "is_recalled", nullable = false)
+    @Builder.Default
+    boolean isRecalled = false;
+
+    /** Cờ ẩn tin nhắn phía người gửi */
+    @Column(name = "hidden_by_sender", nullable = false)
+    @Builder.Default
+    boolean hiddenBySender = false;
+
+    /** Cờ ẩn tin nhắn phía người nhận */
+    @Column(name = "hidden_by_receiver", nullable = false)
+    @Builder.Default
+    boolean hiddenByReceiver = false;
 }
