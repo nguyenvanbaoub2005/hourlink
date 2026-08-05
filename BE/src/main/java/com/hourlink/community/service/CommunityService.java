@@ -4,6 +4,7 @@ import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
 import com.hourlink.community.dto.request.ActivityRequest;
+import com.hourlink.community.dto.request.ActivityUpdateRequest;
 import com.hourlink.community.dto.request.ParticipantConfirmRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
@@ -72,12 +73,16 @@ public class CommunityService {
     }
 
     @Transactional
-    public ActivityResponse updateActivity(UUID activityId, ActivityRequest request) {
+    public ActivityResponse updateActivity(UUID activityId, ActivityUpdateRequest request) {
         User currentUser = getCurrentUser();
         CommunityActivity activity = getActivityAndCheckOwner(activityId, currentUser);
 
         if (activity.getStatus() != ActivityStatus.OPEN) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Chỉ có thể sửa hoạt động khi đang mở đăng ký");
+        }
+
+        if (request.getEndTime().isBefore(request.getStartTime())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Thời gian kết thúc phải sau thời gian bắt đầu");
         }
 
         activity.setTitle(request.getTitle());
@@ -165,7 +170,7 @@ public class CommunityService {
         }
 
         participantRepository.save(participant);
-        activityRepository.save(activity);
+        // Không cần activityRepository.save() thừa — CascadeType.ALL tự xử lý khi participant mới
         
         log.info("User {} registered for activity {}", currentUser.getEmail(), activityId);
         return ParticipantResponse.fromEntity(participant);
@@ -177,8 +182,12 @@ public class CommunityService {
         ActivityParticipant participant = participantRepository.findByActivityIdAndUserId(activityId, currentUser.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_REQUEST, "Bạn chưa đăng ký hoạt động này"));
 
+        if (participant.getStatus() == ParticipantStatus.CANCELLED) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Bạn đã hủy đăng ký hoạt động này rồi");
+        }
+
         if (participant.getStatus() == ParticipantStatus.CONFIRMED) {
-            throw new AppException(ErrorCode.INVALID_REQUEST, "Không thể hủy khi đã được xác nhận");
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Không thể hủy khi đã được tổ chức xác nhận");
         }
 
         participant.setStatus(ParticipantStatus.CANCELLED);

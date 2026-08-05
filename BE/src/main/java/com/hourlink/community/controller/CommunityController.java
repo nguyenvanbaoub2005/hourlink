@@ -2,6 +2,7 @@ package com.hourlink.community.controller;
 
 import com.hourlink.common.response.ApiResponse;
 import com.hourlink.community.dto.request.ActivityRequest;
+import com.hourlink.community.dto.request.ActivityUpdateRequest;
 import com.hourlink.community.dto.request.ParticipantConfirmRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
@@ -61,14 +62,14 @@ public class CommunityController {
     @PutMapping("/activities/{id}")
     public ApiResponse<ActivityResponse> updateActivity(
             @PathVariable UUID id,
-            @Valid @RequestBody ActivityRequest request) {
+            @Valid @RequestBody ActivityUpdateRequest request) {
         return ApiResponse.success(communityService.updateActivity(id, request));
     }
 
     @DeleteMapping("/activities/{id}")
-    public ApiResponse<Void> deleteActivity(@PathVariable UUID id) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteActivity(@PathVariable UUID id) {
         communityService.deleteActivity(id);
-        return ApiResponse.success(null);
     }
 
     @GetMapping("/activities/{id}/participants")
