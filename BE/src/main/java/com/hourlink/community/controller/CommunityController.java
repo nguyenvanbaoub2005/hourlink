@@ -58,6 +58,19 @@ public class CommunityController {
         return ApiResponse.success(communityService.updateActivityStatus(id, status));
     }
 
+    @PutMapping("/activities/{id}")
+    public ApiResponse<ActivityResponse> updateActivity(
+            @PathVariable UUID id,
+            @Valid @RequestBody ActivityRequest request) {
+        return ApiResponse.success(communityService.updateActivity(id, request));
+    }
+
+    @DeleteMapping("/activities/{id}")
+    public ApiResponse<Void> deleteActivity(@PathVariable UUID id) {
+        communityService.deleteActivity(id);
+        return ApiResponse.success(null);
+    }
+
     @GetMapping("/activities/{id}/participants")
     public ApiResponse<List<ParticipantResponse>> getActivityParticipants(@PathVariable UUID id) {
         return ApiResponse.success(communityService.getActivityParticipants(id));

@@ -69,6 +69,12 @@ export const communityApi = {
     
   updateActivityStatus: (id: string, status: ActivityStatus) => 
     apiClient.patch<ActivityResponse>(`/community/activities/${id}/status`, null, { params: { status } }).then(res => res.data),
+
+  updateActivity: (id: string, data: ActivityRequest) => 
+    apiClient.put<ActivityResponse>(`/community/activities/${id}`, data).then(res => res.data),
+
+  deleteActivity: (id: string) => 
+    apiClient.delete<void>(`/community/activities/${id}`).then(res => res.data),
     
   getActivityParticipants: (id: string) => 
     apiClient.get<ParticipantResponse[]>(`/community/activities/${id}/participants`).then(res => res.data),

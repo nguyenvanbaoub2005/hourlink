@@ -71,6 +71,41 @@ public class CommunityService {
         return ActivityResponse.fromEntity(activity);
     }
 
+    @Transactional
+    public ActivityResponse updateActivity(UUID activityId, ActivityRequest request) {
+        User currentUser = getCurrentUser();
+        CommunityActivity activity = getActivityAndCheckOwner(activityId, currentUser);
+
+        if (activity.getStatus() != ActivityStatus.OPEN) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Chỉ có thể sửa hoạt động khi đang mở đăng ký");
+        }
+
+        activity.setTitle(request.getTitle());
+        activity.setDescription(request.getDescription());
+        activity.setLocation(request.getLocation());
+        activity.setStartTime(request.getStartTime());
+        activity.setEndTime(request.getEndTime());
+        activity.setCreditReward(request.getCreditReward());
+        activity.setMaxParticipants(request.getMaxParticipants());
+
+        activity = activityRepository.save(activity);
+        log.info("User {} updated community activity: {}", currentUser.getEmail(), activity.getId());
+        return ActivityResponse.fromEntity(activity);
+    }
+
+    @Transactional
+    public void deleteActivity(UUID activityId) {
+        User currentUser = getCurrentUser();
+        CommunityActivity activity = getActivityAndCheckOwner(activityId, currentUser);
+
+        if (activity.getStatus() == ActivityStatus.IN_PROGRESS || activity.getStatus() == ActivityStatus.CLOSED) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Không thể xóa hoạt động đã diễn ra hoặc đã đóng");
+        }
+
+        activityRepository.delete(activity);
+        log.info("User {} deleted community activity: {}", currentUser.getEmail(), activityId);
+    }
+
     public List<ActivityResponse> getAllActivities() {
         return activityRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
