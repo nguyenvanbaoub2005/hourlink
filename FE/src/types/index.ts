@@ -374,11 +374,15 @@ export interface WalletTransaction {
 
 // ─── Rating ──────────────────────────────────────────────────
 
-export interface Rating {
+/** Mirror com.hourlink.rating.dto.response.RatingResponse */
+export interface RatingResponse {
   id: string;
   appointmentId: string;
-  rater: UserResponse;
-  rated: UserResponse;
+  reviewerId: string;
+  reviewerName: string;
+  reviewerAvatarUrl?: string;
+  revieweeId: string;
+  revieweeName: string;
   punctualityScore?: number;
   attitudeScore?: number;
   communicationScore?: number;
@@ -386,6 +390,19 @@ export interface Rating {
   overallStars: number;
   comment?: string;
   createdAt: string;
+}
+
+/** Alias tương thích ngược */
+export type Rating = RatingResponse;
+
+/** Mirror com.hourlink.rating.dto.response.BadgeResponse */
+export interface BadgeResponse {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  iconUrl?: string;
+  awardedAt?: string;
 }
 
 // ─── Report & Dispute ─────────────────────────────────────────

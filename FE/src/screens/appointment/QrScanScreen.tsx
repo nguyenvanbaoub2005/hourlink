@@ -55,7 +55,16 @@ export default function QrScanScreen() {
       setVerifying(true);
       await AppointmentApi.verifyCode(id, { code: codeToVerify.trim() });
       Alert.alert('Thành công', 'Xác thực buổi hỗ trợ thành công! Trạng thái chuyển thành Đang diễn ra.', [
-        { text: 'Đồng ý', onPress: () => router.back() }
+        { 
+          text: 'Đồng ý', 
+          onPress: () => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(tabs)/appointments' as any);
+            }
+          } 
+        }
       ]);
     } catch (err: any) {
       setScanned(false);
@@ -79,7 +88,10 @@ export default function QrScanScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+        <TouchableOpacity 
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/appointments' as any)} 
+          style={styles.headerBack}
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Xác Thực Buổi Hỗ Trợ (QR)</Text>

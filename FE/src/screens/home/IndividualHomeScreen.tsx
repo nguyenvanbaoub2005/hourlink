@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import HelpRequestApi from '@api/helprequest';
 import UserApi from '@api/user';
+import AppointmentApi from '@api/appointment';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 type HelpRequestItem = {
@@ -41,18 +42,21 @@ export default function IndividualHomeScreen() {
   const { unreadCount } = useNotificationStore();
   const { totalUnread: chatUnread, setTotalUnread: setChatUnread } = useChatStore();
   const [myRequests, setMyRequests] = useState<HelpRequestItem[]>([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
   const [firstName, setFirstName] = useState<string>('Bạn');
   const [refreshing, setRefreshing] = useState(false);
   const { wallet, fetchWallet } = useWalletStore();
 
   const fetchData = async () => {
     try {
-      const [reqRes, profileRes] = await Promise.all([
+      const [reqRes, profileRes, aptRes] = await Promise.all([
         HelpRequestApi.getMyRequests(),
         UserApi.getMyProfile(),
+        AppointmentApi.getMyAppointments('UPCOMING', 0, 1),
         fetchWallet()
       ]);
       setMyRequests(reqRes.data.data ?? []);
+      setUpcomingAppointments(aptRes.data.data?.content ?? []);
       
       if (profileRes.data.data?.fullName) {
         setFirstName(profileRes.data.data.fullName.split(' ').pop() ?? 'Bạn');
@@ -61,6 +65,7 @@ export default function IndividualHomeScreen() {
       }
     } catch {
       setMyRequests([]);
+      setUpcomingAppointments([]);
     }
 
     // Badge tin nhắn chưa đọc — tách riêng để lỗi chat không làm hỏng màn hình
@@ -203,10 +208,45 @@ export default function IndividualHomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.emptyBox}>
-        <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
-        <Text style={styles.emptyText}>Chưa có lịch hẹn nào</Text>
-      </View>
+      {upcomingAppointments.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
+          <Text style={styles.emptyText}>Chưa có lịch hẹn nào</Text>
+        </View>
+      ) : (
+        upcomingAppointments.map((apt: any) => (
+          <TouchableOpacity 
+            key={apt.id} 
+            style={styles.requestCard}
+            onPress={() => router.push(`/(tabs)/appointments/${apt.id}` as any)}
+          >
+            <View style={styles.requestTopRow}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={[styles.badge, { backgroundColor: '#DBEAFE' }]}>
+                  <Ionicons name="calendar-outline" size={14} color="#1D4ED8" style={{ marginRight: 4 }} />
+                  <Text style={[styles.badgeText, { color: '#1D4ED8' }]}>
+                    {apt.appointmentDate} • {apt.startTime?.slice(0, 5)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.requestTitle}>{apt.title || 'Lịch hẹn'}</Text>
+            {apt.skillName ? (
+              <Text style={styles.requestDesc} numberOfLines={1}>
+                Kỹ năng: {apt.skillName}
+              </Text>
+            ) : null}
+            <View style={styles.cardDivider} />
+            <View style={styles.requestBottomRow}>
+              <Text style={styles.requestBottomText}>
+                {apt.providerName && apt.receiverName ? 
+                  `Giữa ${apt.providerName} & ${apt.receiverName}` : 
+                  'Với người dùng khác'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
 
       {/* ── Yêu cầu đang hoạt động ───────────────────────────────────────── */}
       <View style={styles.sectionRow}>
