@@ -353,6 +353,16 @@ public class AppointmentService {
         } else if (allCompletions.size() >= 2) {
             // Cả hai bên đều đã xác nhận hoàn thành không có vấn đề
             appointment.setStatus(AppointmentStatus.COMPLETED);
+            
+            // Cập nhật số buổi hỗ trợ (hoàn thành) cho cả 2 user
+            User provider = appointment.getProvider();
+            provider.setCompletedSessions(provider.getCompletedSessions() + 1);
+            userRepository.save(provider);
+            
+            User receiver = appointment.getReceiver();
+            receiver.setCompletedSessions(receiver.getCompletedSessions() + 1);
+            userRepository.save(receiver);
+
             // Wallet Hook: Chuyển Time Credit từ Receiver sang Provider
             walletService.transferCredit(appointment);
             notificationService.createNotification(appointment.getProvider(), null, NotificationType.APPOINTMENT_COMPLETED,
