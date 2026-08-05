@@ -11,10 +11,11 @@ import UserApi from '@api/user';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
 import NotificationApi from '@api/notification';
+import RatingApi from '@api/rating';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import { useWalletStore } from '@store/walletStore';
-import type { UserResponse } from '@types';
+import type { UserResponse, BadgeResponse } from '@types';
 
 type SkillItem = { id: string; name: string; status: string };
 type RequestItem = { id: string; title: string; categoryName?: string; status: string };
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [requests, setRequests] = useState<RequestItem[]>([]);
+  const [badges, setBadges] = useState<BadgeResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { wallet, fetchWallet } = useWalletStore();
@@ -56,20 +58,27 @@ export default function ProfileScreen() {
       router.push('/profile/invitations' as any);
       return;
     }
+    if (label === 'Đánh giá & Uy tín') {
+      router.push('/profile/reputation' as any);
+      return;
+    }
     Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
   };
 
   const fetchAll = async () => {
     try {
-      const [profileRes, skillsRes, requestsRes] = await Promise.all([
+      const { user } = useAuthStore.getState();
+      const [profileRes, skillsRes, requestsRes, badgesRes] = await Promise.all([
         UserApi.getMyProfile(),
         SkillApi.getMySkills(),
         HelpRequestApi.getMyRequests(),
+        user?.id ? RatingApi.getUserBadges(user.id) : Promise.resolve({ data: { data: [] } }),
         fetchWallet(),
       ]);
       setProfile(profileRes.data.data);
       setSkills(skillsRes.data.data ?? []);
       setRequests(requestsRes.data.data ?? []);
+      setBadges(badgesRes.data?.data ?? []);
     } catch (e) {
       console.log('Lỗi tải hồ sơ:', e);
     } finally {
@@ -251,16 +260,16 @@ export default function ProfileScreen() {
           {/* Huy hiệu */}
           <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Huy hiệu</Text>
           <View style={styles.badgeRow}>
-            {[
-              { emoji: '⭐', label: 'Người mới\nxuất sắc' },
-              { emoji: '🤝', label: 'Người\nchia sẻ' },
-              { emoji: '💎', label: 'Uy tín cao' },
-            ].map(b => (
-              <View key={b.label} style={styles.badgeCard}>
-                <Text style={styles.badgeEmoji}>{b.emoji}</Text>
-                <Text style={styles.badgeLabel}>{b.label}</Text>
-              </View>
-            ))}
+            {badges.length > 0 ? (
+              badges.slice(0, 3).map(b => (
+                <View key={b.id} style={styles.badgeCard}>
+                  <Text style={styles.badgeEmoji}>{b.iconUrl || '🏆'}</Text>
+                  <Text style={styles.badgeLabel} numberOfLines={2}>{b.name}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyHint}>Chưa có huy hiệu nào</Text>
+            )}
           </View>
         </View>
 

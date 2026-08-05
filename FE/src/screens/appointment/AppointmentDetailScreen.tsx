@@ -8,8 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
+import RatingApi from '@api/rating';
 import Avatar from '@components/Avatar';
-import type { AppointmentItem } from '@types';
+import { useAuthStore } from '@store/authStore';
+import type { AppointmentItem, RatingResponse } from '@types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   PENDING:     { label: 'Chờ xác nhận', color: '#D97706', bg: '#FEF3C7', icon: 'time-outline' },
@@ -29,12 +31,17 @@ export default function AppointmentDetailScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
+  // Thông tin người dùng hiện tại (để xác định reviewee khi điều hướng Rating)
+  const currentUser = useAuthStore((s) => s.user);
+
   // Modal hoàn thành
   const [showModal, setShowModal] = useState<boolean>(false);
   const [actualDuration, setActualDuration] = useState<string>('60');
   const [contentCompleted, setContentCompleted] = useState<string>('');
   const [hasIssue, setHasIssue] = useState<boolean>(false);
   const [issueDescription, setIssueDescription] = useState<string>('');
+  // Thông tin đánh giá
+  const [myRating, setMyRating] = useState<RatingResponse | null>(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -42,7 +49,21 @@ export default function AppointmentDetailScreen() {
     try {
       const res = await AppointmentApi.getById(id);
       if (res.data?.data) {
-        setAppointment(res.data.data);
+        const appt = res.data.data;
+        setAppointment(appt);
+        
+        // Nếu đã hoàn thành, thử tải đánh giá của mình
+        if (appt.status === 'COMPLETED') {
+          try {
+            const ratingRes = await RatingApi.getRatingForAppointment(id);
+            if (ratingRes.data?.data) {
+              setMyRating(ratingRes.data.data);
+            }
+          } catch (e) {
+            // Chưa đánh giá hoặc lỗi lấy đánh giá
+            console.log('No rating found');
+          }
+        }
       }
     } catch (err: any) {
       console.error('Error fetching appointment detail:', err);
@@ -172,7 +193,7 @@ export default function AppointmentDetailScreen() {
   const tcAmount = appointment.timeCreditAmount || (appointment as any).timeCredit || 1;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
@@ -313,10 +334,56 @@ export default function AppointmentDetailScreen() {
             )}
           </View>
         )}
+
+        {/* Thông tin đánh giá của tôi */}
+        {myRating && (
+          <View style={[styles.sectionCard, { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={[styles.sectionHeader, { marginBottom: 0, color: Colors.primary }]}>
+                Đánh giá của bạn
+              </Text>
+              <View style={{ flexDirection: 'row' }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons 
+                    key={star} 
+                    name={myRating.overallStars >= star ? 'star' : 'star-outline'} 
+                    size={16} 
+                    color={myRating.overallStars >= star ? Colors.warning : Colors.border} 
+                  />
+                ))}
+              </View>
+            </View>
+            
+            {myRating.comment ? (
+              <Text style={{ fontSize: 14, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 }}>
+                "{myRating.comment}"
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 14, color: Colors.textMuted, fontStyle: 'italic', marginBottom: 12 }}>
+                Không có nhận xét.
+              </Text>
+            )}
+            
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              {myRating.punctualityScore && (
+                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text>
+              )}
+              {myRating.attitudeScore && (
+                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text>
+              )}
+              {myRating.communicationScore && (
+                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text>
+              )}
+              {myRating.qualityScore && (
+                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text>
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* Footer Actions */}
-      {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED' || statusStr === 'UPCOMING' || statusStr === 'IN_PROGRESS') && (
+      {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED' || statusStr === 'UPCOMING' || statusStr === 'IN_PROGRESS' || statusStr === 'COMPLETED') && (
         <View style={styles.footer}>
           {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && (
             <View style={styles.footerRow}>
@@ -338,18 +405,52 @@ export default function AppointmentDetailScreen() {
           )}
 
           {(statusStr === 'UPCOMING') && (
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#0D9488' }]} onPress={handleVerify}>
-              <Ionicons name={isOffline ? 'qr-code' : 'keypad'} size={18} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={styles.btnTextWhite}>Bắt Đầu / Xác Thực {isOffline ? 'QR Code' : 'OTP'}</Text>
-            </TouchableOpacity>
+            <View style={styles.footerRow}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#0D9488' }]} onPress={handleVerify}>
+                <Ionicons name={isOffline ? 'qr-code' : 'keypad'} size={18} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.btnTextWhite}>Bắt Đầu / Xác Thực {isOffline ? 'QR Code' : 'OTP'}</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {statusStr === 'IN_PROGRESS' && (
-            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.primary }]} onPress={() => setShowModal(true)}>
-              <Ionicons name="checkmark-done-circle" size={18} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={styles.btnTextWhite}>Xác Nhận Hoàn Thành Buổi Hỗ Trợ</Text>
-            </TouchableOpacity>
+            <View style={styles.footerRow}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.primary }]} onPress={() => setShowModal(true)}>
+                <Ionicons name="checkmark-done-circle" size={18} color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={styles.btnTextWhite}>Xác Nhận Hoàn Thành</Text>
+              </TouchableOpacity>
+            </View>
           )}
+
+          {/* Nút Đánh giá — chỉ hiện khi COMPLETED và CHƯA đánh giá */}
+          {statusStr === 'COMPLETED' && !myRating && (() => {
+            const isProvider = currentUser?.id === appointment.providerId;
+            const otherUserId   = isProvider ? appointment.receiverId  : appointment.providerId;
+            const otherUserName  = isProvider ? appointment.receiverName : appointment.providerName;
+            const otherUserAvatar = isProvider ? appointment.receiverAvatarUrl : appointment.providerAvatarUrl;
+            return (
+              <View style={styles.footerRow}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: '#7C3AED' }]}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/rating',
+                      params: {
+                        appointmentId: appointment.id,
+                        revieweeId: otherUserId ?? '',
+                        revieweeName: otherUserName ?? '',
+                        revieweeAvatar: otherUserAvatar ?? '',
+                        appointmentTitle: titleStr,
+                      },
+                    } as any)
+                  }
+                >
+                  <Ionicons name="star" size={18} color="#FFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.btnTextWhite}>Đánh giá {otherUserName ?? 'người dùng'}</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
       )}
 
