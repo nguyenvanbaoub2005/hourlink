@@ -38,7 +38,7 @@
 
         <!-- ===== MESSAGES ===== -->
         <!-- 1. User → FE: Bấm gợi ý -->
-        <mxCell id="m1" value="1. Bấm &quot;Gợi ý AI&quot; trên HelpRequest" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m1" value="1. Bấm &quot;Gợi ý AI&quot; trên HelpRequest" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="ll_user" target="ll_fe">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="120" y="140" as="sourcePoint" />
             <mxPoint x="325" y="140" as="targetPoint" />
@@ -46,7 +46,7 @@
         </mxCell>
 
         <!-- 2. FE → Controller: POST /ai-matching/suggest -->
-        <mxCell id="m2" value="2. POST /ai-matching/suggest {helpRequestId}" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m2" value="2. POST /ai-matching/suggest {helpRequestId}" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="ll_fe" target="ll_ctrl">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="325" y="190" as="sourcePoint" />
             <mxPoint x="530" y="190" as="targetPoint" />
@@ -54,7 +54,7 @@
         </mxCell>
 
         <!-- 3. Controller → Service: suggest(helpRequestId) -->
-        <mxCell id="m3" value="3. suggest(helpRequestId)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m3" value="3. suggest(helpRequestId)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="ll_ctrl" target="ll_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="530" y="240" as="sourcePoint" />
             <mxPoint x="730" y="240" as="targetPoint" />
@@ -62,7 +62,7 @@
         </mxCell>
 
         <!-- 4. Service → Repository: findById(helpRequestId) -->
-        <mxCell id="m4" value="4. findById(helpRequestId)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m4" value="4. findById(helpRequestId)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;" edge="1" parent="1" source="ll_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="730" y="290" as="sourcePoint" />
             <mxPoint x="920" y="290" as="targetPoint" />
@@ -70,7 +70,7 @@
         </mxCell>
 
         <!-- 4b. Repository → Service: return HelpRequest -->
-        <mxCell id="m4b" value="HelpRequest" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m4b" value="HelpRequest" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1" source="ll_repo" target="ll_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="320" as="sourcePoint" />
             <mxPoint x="730" y="320" as="targetPoint" />
@@ -78,7 +78,7 @@
         </mxCell>
 
         <!-- 5. Service → Repository: findMatchingSkills() -->
-        <mxCell id="m5" value="5. findSkillsByCategory(category, format, region)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m5" value="5. findSkillsByCategory(category, format, region)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="730" y="370" as="sourcePoint" />
             <mxPoint x="920" y="370" as="targetPoint" />
@@ -86,7 +86,7 @@
         </mxCell>
 
         <!-- 5b. Repository → Service: return List<Skill> -->
-        <mxCell id="m5b" value="List&lt;Skill&gt; + User info" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m5b" value="List&lt;Skill&gt; + User info" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1" source="ll_repo" target="ll_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="400" as="sourcePoint" />
             <mxPoint x="730" y="400" as="targetPoint" />
@@ -94,7 +94,7 @@
         </mxCell>
 
         <!-- 6. Service → Gemini: Gửi prompt -->
-        <mxCell id="m6" value="6. generateContent(prompt)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;strokeColor=#9673a6;" edge="1" parent="1">
+        <mxCell id="m6" value="6. generateContent(prompt)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;strokeColor=#9673a6;" edge="1" parent="1" source="ll_svc" target="ll_ai">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="730" y="460" as="sourcePoint" />
             <mxPoint x="1120" y="460" as="targetPoint" />
@@ -107,7 +107,7 @@
         </mxCell>
 
         <!-- 6b. Gemini → Service: return JSON -->
-        <mxCell id="m6b" value="JSON [{userId, matchScore, reason}, ...]" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;strokeColor=#9673a6;" edge="1" parent="1">
+        <mxCell id="m6b" value="JSON [{userId, matchScore, reason}, ...]" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;strokeColor=#9673a6;" edge="1" parent="1" source="ll_ai" target="ll_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1120" y="580" as="sourcePoint" />
             <mxPoint x="730" y="580" as="targetPoint" />
@@ -115,7 +115,7 @@
         </mxCell>
 
         <!-- 7. Service → Service: parse JSON -->
-        <mxCell id="m7" value="7. parseAiResponse()" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;curved=1;" edge="1" parent="1">
+        <mxCell id="m7" value="7. parseAiResponse()" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=11;curved=1;" edge="1" parent="1" source="ll_svc" target="ll_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="730" y="620" as="sourcePoint" />
             <mxPoint x="730" y="650" as="targetPoint" />
@@ -126,7 +126,7 @@
         </mxCell>
 
         <!-- 8. Service → Controller: return List<MatchResult> -->
-        <mxCell id="m8" value="8. List&lt;MatchResult&gt;" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m8" value="8. List&lt;MatchResult&gt;" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1" source="ll_svc" target="ll_ctrl">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="730" y="680" as="sourcePoint" />
             <mxPoint x="530" y="680" as="targetPoint" />
@@ -134,7 +134,7 @@
         </mxCell>
 
         <!-- 9. Controller → FE: 200 OK ApiResponse -->
-        <mxCell id="m9" value="9. 200 OK AiMatchingResponse" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1">
+        <mxCell id="m9" value="9. 200 OK AiMatchingResponse" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=11;" edge="1" parent="1" source="ll_ctrl" target="ll_fe">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="530" y="720" as="sourcePoint" />
             <mxPoint x="325" y="720" as="targetPoint" />
@@ -142,7 +142,7 @@
         </mxCell>
 
         <!-- 10. FE → User: Hiển thị danh sách -->
-        <mxCell id="m10" value="10. Hiển thị danh sách gợi ý (tên, matchScore%, reason)" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m10" value="10. Hiển thị danh sách gợi ý (tên, matchScore%, reason)" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1" source="ll_fe" target="ll_user">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="325" y="760" as="sourcePoint" />
             <mxPoint x="120" y="760" as="targetPoint" />

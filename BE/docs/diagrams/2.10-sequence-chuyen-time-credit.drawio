@@ -38,7 +38,7 @@
 
         <!-- ===== MESSAGES ===== -->
         <!-- 1. Provider xác nhận hoàn thành -->
-        <mxCell id="m1" value="1. Bấm &quot;Xác nhận hoàn thành&quot;" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m1" value="1. Bấm &quot;Xác nhận hoàn thành&quot;" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_provider" target="ll_fe">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="95" y="140" as="sourcePoint" />
             <mxPoint x="430" y="140" as="targetPoint" />
@@ -46,7 +46,7 @@
         </mxCell>
 
         <!-- 2. Receiver cũng xác nhận -->
-        <mxCell id="m2" value="2. Bấm &quot;Xác nhận hoàn thành&quot;" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m2" value="2. Bấm &quot;Xác nhận hoàn thành&quot;" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_receiver" target="ll_fe">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="260" y="190" as="sourcePoint" />
             <mxPoint x="430" y="190" as="targetPoint" />
@@ -54,7 +54,7 @@
         </mxCell>
 
         <!-- 3. FE → Controller -->
-        <mxCell id="m3" value="3. POST /appointments/{id}/confirm-completion" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m3" value="3. POST /appointments/{id}/confirm-completion" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_fe" target="ll_appt_ctrl">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="430" y="240" as="sourcePoint" />
             <mxPoint x="595" y="240" as="targetPoint" />
@@ -62,7 +62,7 @@
         </mxCell>
 
         <!-- 4. Controller → Service -->
-        <mxCell id="m4" value="4. confirmCompletion(appointmentId)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m4" value="4. confirmCompletion(appointmentId)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_appt_ctrl" target="ll_appt_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="595" y="290" as="sourcePoint" />
             <mxPoint x="755" y="290" as="targetPoint" />
@@ -75,7 +75,7 @@
         </mxCell>
 
         <!-- 6. Service → Repo: cập nhật status -->
-        <mxCell id="m6" value="5. appointment.setStatus(COMPLETED)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m6" value="5. appointment.setStatus(COMPLETED)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_appt_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="755" y="380" as="sourcePoint" />
             <mxPoint x="1090" y="380" as="targetPoint" />
@@ -83,7 +83,7 @@
         </mxCell>
 
         <!-- 6b. return -->
-        <mxCell id="m6b" value="saved" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m6b" value="saved" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1" source="ll_repo" target="ll_appt_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1090" y="410" as="sourcePoint" />
             <mxPoint x="755" y="410" as="targetPoint" />
@@ -91,7 +91,7 @@
         </mxCell>
 
         <!-- 7. Service → WalletService -->
-        <mxCell id="m7" value="6. transferTimeCredit(receiver, provider, amount)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;strokeColor=#b85450;" edge="1" parent="1">
+        <mxCell id="m7" value="6. transferTimeCredit(receiver, provider, amount)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;strokeColor=#b85450;" edge="1" parent="1" source="ll_appt_svc" target="ll_wallet_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="755" y="460" as="sourcePoint" />
             <mxPoint x="920" y="460" as="targetPoint" />
@@ -99,13 +99,13 @@
         </mxCell>
 
         <!-- 8. WalletService → Repo: check balance -->
-        <mxCell id="m8" value="7. wallet.getBalance() ≥ amount?" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m8" value="7. wallet.getBalance() ≥ amount?" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_wallet_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="510" as="sourcePoint" />
             <mxPoint x="1090" y="510" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="m8b" value="balance OK" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m8b" value="balance OK" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1" source="ll_repo" target="ll_wallet_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="1090" y="540" as="sourcePoint" />
             <mxPoint x="920" y="540" as="targetPoint" />
@@ -113,19 +113,19 @@
         </mxCell>
 
         <!-- 9. WalletService trừ receiver, cộng provider -->
-        <mxCell id="m9" value="8. receiver.wallet -= amount" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m9" value="8. receiver.wallet -= amount" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_wallet_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="580" as="sourcePoint" />
             <mxPoint x="1090" y="580" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="m10" value="9. provider.wallet += amount" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m10" value="9. provider.wallet += amount" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_wallet_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="620" as="sourcePoint" />
             <mxPoint x="1090" y="620" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="m10b" value="10. INSERT wallet_transaction x2" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m10b" value="10. INSERT wallet_transaction x2" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_wallet_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="660" as="sourcePoint" />
             <mxPoint x="1090" y="660" as="targetPoint" />
@@ -133,7 +133,7 @@
         </mxCell>
 
         <!-- 11. WalletService → Service: done -->
-        <mxCell id="m11" value="Transfer OK" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;strokeColor=#b85450;" edge="1" parent="1">
+        <mxCell id="m11" value="Transfer OK" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;strokeColor=#b85450;" edge="1" parent="1" source="ll_wallet_svc" target="ll_appt_svc">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="920" y="700" as="sourcePoint" />
             <mxPoint x="755" y="700" as="targetPoint" />
@@ -141,7 +141,7 @@
         </mxCell>
 
         <!-- 12. Service cập nhật completedSessions -->
-        <mxCell id="m12" value="11. user.completedSessions += 1 (cả 2)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m12" value="11. user.completedSessions += 1 (cả 2)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;" edge="1" parent="1" source="ll_appt_svc" target="ll_repo">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="755" y="740" as="sourcePoint" />
             <mxPoint x="1090" y="740" as="targetPoint" />
@@ -149,7 +149,7 @@
         </mxCell>
 
         <!-- 13. Service → NotificationService -->
-        <mxCell id="m13" value="12. createNotification(APPOINTMENT_COMPLETED)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;strokeColor=#9673a6;" edge="1" parent="1">
+        <mxCell id="m13" value="12. createNotification(APPOINTMENT_COMPLETED)" style="html=1;verticalAlign=bottom;endArrow=block;endFill=1;fontSize=10;strokeColor=#9673a6;" edge="1" parent="1" source="ll_appt_svc" target="ll_notif">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="755" y="790" as="sourcePoint" />
             <mxPoint x="1240" y="790" as="targetPoint" />
@@ -157,7 +157,7 @@
         </mxCell>
 
         <!-- 14. Service → Controller: return -->
-        <mxCell id="m14" value="13. AppointmentResponse" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m14" value="13. AppointmentResponse" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1" source="ll_appt_svc" target="ll_appt_ctrl">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="755" y="840" as="sourcePoint" />
             <mxPoint x="595" y="840" as="targetPoint" />
@@ -165,7 +165,7 @@
         </mxCell>
 
         <!-- 15. Controller → FE -->
-        <mxCell id="m15" value="14. 200 OK {status: COMPLETED}" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m15" value="14. 200 OK {status: COMPLETED}" style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1" source="ll_appt_ctrl" target="ll_fe">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="595" y="870" as="sourcePoint" />
             <mxPoint x="430" y="870" as="targetPoint" />
@@ -173,7 +173,7 @@
         </mxCell>
 
         <!-- 16. FE → Users -->
-        <mxCell id="m16" value="15. Thông báo: Buổi hỗ trợ hoàn thành! TC đã được chuyển." style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1">
+        <mxCell id="m16" value="15. Thông báo: Buổi hỗ trợ hoàn thành! TC đã được chuyển." style="html=1;verticalAlign=bottom;endArrow=open;endFill=0;dashed=1;fontSize=10;" edge="1" parent="1" source="ll_fe" target="ll_provider">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="430" y="910" as="sourcePoint" />
             <mxPoint x="95" y="910" as="targetPoint" />
