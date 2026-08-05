@@ -1,8 +1,19 @@
 package com.hourlink.report.enums;
 
 /**
- * ReportReason — TODO: thêm values theo DBML schema.
+ * ReportReason — Lý do báo cáo.
  */
 public enum ReportReason {
-    // TODO
+    /** Nội dung không phù hợp / spam */
+    SPAM,
+    /** Quấy rối, bắt nạt */
+    HARASSMENT,
+    /** Thông tin sai lệch */
+    MISINFORMATION,
+    /** Vi phạm pháp luật */
+    ILLEGAL_CONTENT,
+    /** Gian lận / lừa đảo */
+    FRAUD,
+    /** Lý do khác */
+    OTHER
 }
