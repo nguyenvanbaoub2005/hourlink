@@ -1,0 +1,132 @@
+<mxfile host="app.diagrams.net" agent="HourLink DACN" version="24.0">
+  <diagram id="activity-ai-matching" name="Hình 2.5 - Biểu đồ hoạt động AI Matching">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- SWIMLANES -->
+        <mxCell id="sw_user" value="Người dùng" style="shape=swimlane;startSize=30;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="1150" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_fe" value="Ứng dụng Mobile (FE)" style="shape=swimlane;startSize=30;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="220" width="1150" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_be" value="Server Backend (BE)" style="shape=swimlane;startSize=30;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="420" width="1150" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_ai" value="Gemini AI Service" style="shape=swimlane;startSize=30;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="700" width="1150" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_db" value="Cơ sở dữ liệu" style="shape=swimlane;startSize=30;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;fontColor=#333333;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="930" width="1150" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- NGƯỜI DÙNG LANE -->
+        <mxCell id="n_start" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="75" y="100" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="n_tap" value="Bấm &quot;Gợi ý AI Matching&quot;&#xa;trên HelpRequest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="145" y="90" width="190" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="n_view" value="Xem danh sách gợi ý&#xa;(tên, điểm phù hợp %, lý do)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="870" y="90" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="n_end" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="100" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- FE LANE -->
+        <mxCell id="f_call" value="Gửi POST&#xa;/ai-matching/suggest&#xa;{helpRequestId}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="145" y="285" width="170" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="f_show" value="Hiển thị kết quả:&#xa;tên, matchScore%, reason" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="870" y="290" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- BE LANE -->
+        <mxCell id="b_get_hr" value="Lấy HelpRequest&#xa;theo ID" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="145" y="480" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="b_query_skills" value="Truy vấn Skills phù hợp&#xa;(category, format, region)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="475" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b_build_prompt" value="Xây dựng Prompt AI:&#xa;- Thông tin HelpRequest&#xa;- Danh sách ứng viên&#xa;- Yêu cầu JSON output" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="560" y="460" width="190" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b_parse" value="Parse JSON từ Gemini&#xa;→ List&lt;MatchResult&gt;&#xa;(userId, score, reason)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="670" y="590" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b_return" value="Trả về&#xa;AiMatchingResponse" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="870" y="480" width="170" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- AI LANE -->
+        <mxCell id="ai_recv" value="Nhận prompt từ BE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="760" width="170" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analyze" value="Phân tích mức độ phù hợp:&#xa;kỹ năng, vùng miền,&#xa;uy tín, thời gian rảnh" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="840" width="190" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_return" value="Trả về JSON&#xa;[{userId, matchScore, reason}]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="780" y="845" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- DB LANE -->
+        <mxCell id="db_select" value="SELECT skill, users&#xa;WHERE category, format, region" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="340" y="968" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===== EDGES ===== -->
+        <mxCell id="e0" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_start" target="n_tap" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_tap" target="f_call" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="f_call" target="b_get_hr" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_get_hr" target="b_query_skills" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- BE → DB -->
+        <mxCell id="e_db_call" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_query_skills" target="db_select" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- DB → BE (return) -->
+        <mxCell id="e_db_ret" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="db_select" target="b_build_prompt" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- BE → AI -->
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_build_prompt" target="ai_recv" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="ai_recv" target="ai_analyze" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="ai_analyze" target="ai_return" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- AI → BE (parse) -->
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="ai_return" target="b_parse" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_parse" target="b_return" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- BE → FE → User -->
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_return" target="f_show" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="f_show" target="n_view" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_view" target="n_end" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

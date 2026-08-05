@@ -25,4 +25,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     Page<Appointment> findByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") AppointmentStatus status, Pageable pageable);
 
     Optional<Appointment> findByInvitationId(UUID invitationId);
+
+    /** Đếm tổng số lịch hẹn mà user đã tham gia (cả provider lẫn receiver) */
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE a.provider.id = :providerId OR a.receiver.id = :receiverId")
+    long countByProviderIdOrReceiverId(@Param("providerId") UUID providerId, @Param("receiverId") UUID receiverId);
+
+    /** Đếm số lịch hẹn bị hủy mà user là người hủy */
+    @Query("SELECT COUNT(a) FROM Appointment a WHERE (a.provider.id = :userId OR a.receiver.id = :userId) AND a.status = com.hourlink.appointment.enums.AppointmentStatus.CANCELLED")
+    long countCancelledByUserId(@Param("userId") UUID userId);
 }

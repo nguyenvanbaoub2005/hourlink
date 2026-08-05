@@ -1,0 +1,183 @@
+<mxfile host="app.diagrams.net" agent="HourLink DACN" version="24.0">
+  <diagram id="class-diagram" name="Hình 2.2 - Biểu đồ Class">
+    <mxGraphModel dx="1800" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===== CLASS: User ===== -->
+        <mxCell id="c_user" value="&lt;b&gt;User&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="280" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="c_user_attrs" value="- id: UUID&#xa;- fullName: String&#xa;- email: String&#xa;- phone: String&#xa;- passwordHash: String&#xa;- dob: LocalDate&#xa;- region: String&#xa;- occupation: String&#xa;- userType: UserType&#xa;- avatarUrl: String&#xa;- bio: String&#xa;- languages: String&#xa;- isVerified: boolean&#xa;- isLocked: boolean&#xa;- reputationScore: double&#xa;- completedSessions: int&#xa;- cancelRate: double&#xa;- createdAt: Instant&#xa;- updatedAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_user">
+          <mxGeometry y="26" width="280" height="354" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Role ===== -->
+        <mxCell id="c_role" value="&lt;b&gt;Role&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="480" width="200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="c_role_attrs" value="- roleId: UUID&#xa;- roleCode: String&#xa;- roleName: String&#xa;- description: String" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_role">
+          <mxGeometry y="26" width="200" height="94" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: UserRole ===== -->
+        <mxCell id="c_userrole" value="&lt;b&gt;UserRole&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c_userrole_attrs" value="- id: UUID&#xa;- userId: UUID (FK)&#xa;- roleId: UUID (FK)&#xa;- assignedAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_userrole">
+          <mxGeometry y="26" width="200" height="74" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Skill ===== -->
+        <mxCell id="c_skill" value="&lt;b&gt;Skill&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="40" width="250" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="c_skill_attrs" value="- id: UUID&#xa;- name: String&#xa;- description: String&#xa;- level: SkillLevel&#xa;- format: SessionFormat&#xa;- duration: int&#xa;- region: String&#xa;- freeTime: String&#xa;- status: SkillStatus&#xa;- userId: UUID (FK)&#xa;- categoryId: UUID (FK)&#xa;- createdAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_skill">
+          <mxGeometry y="26" width="250" height="234" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: SkillCategory ===== -->
+        <mxCell id="c_skillcat" value="&lt;b&gt;SkillCategory&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="340" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c_skillcat_attrs" value="- id: UUID&#xa;- name: String&#xa;- description: String" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_skillcat">
+          <mxGeometry y="26" width="200" height="74" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: SkillAttachment ===== -->
+        <mxCell id="c_skillatt" value="&lt;b&gt;SkillAttachment&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="480" width="220" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="c_skillatt_attrs" value="- id: UUID&#xa;- fileUrl: String&#xa;- originalName: String&#xa;- fileType: String&#xa;- fileSize: long&#xa;- skillId: UUID (FK)" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_skillatt">
+          <mxGeometry y="26" width="220" height="114" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: HelpRequest ===== -->
+        <mxCell id="c_helpreq" value="&lt;b&gt;HelpRequest&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="660" width="250" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="c_helpreq_attrs" value="- id: UUID&#xa;- title: String&#xa;- description: String&#xa;- currentLevel: String&#xa;- desiredTime: String&#xa;- duration: int&#xa;- format: SessionFormat&#xa;- region: String&#xa;- status: HelpRequestStatus&#xa;- timeCreditAmount: int&#xa;- responseCount: int&#xa;- requesterId: UUID (FK)&#xa;- categoryId: UUID (FK)" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_helpreq">
+          <mxGeometry y="26" width="250" height="234" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Invitation ===== -->
+        <mxCell id="c_inv" value="&lt;b&gt;Invitation&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="720" y="40" width="260" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="c_inv_attrs" value="- id: UUID&#xa;- content: String&#xa;- message: String&#xa;- proposedTime: String&#xa;- rescheduleTime: String&#xa;- rejectReason: String&#xa;- duration: int&#xa;- format: SessionFormat&#xa;- status: InvitationStatus&#xa;- senderId: UUID (FK)&#xa;- receiverId: UUID (FK)&#xa;- helpRequestId: UUID (FK)&#xa;- skillId: UUID (FK)&#xa;- createdAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_inv">
+          <mxGeometry y="26" width="260" height="254" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Conversation ===== -->
+        <mxCell id="c_conv" value="&lt;b&gt;Conversation&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="720" y="360" width="260" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="c_conv_attrs" value="- id: UUID&#xa;- isActive: boolean&#xa;- lastMessageAt: Instant&#xa;- lastMessagePreview: String&#xa;- lastMessageType: MessageType&#xa;- invitationId: UUID (FK)&#xa;- userOneId: UUID (FK)&#xa;- userTwoId: UUID (FK)&#xa;- createdAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_conv">
+          <mxGeometry y="26" width="260" height="174" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: ChatMessage ===== -->
+        <mxCell id="c_msg" value="&lt;b&gt;ChatMessage&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="720" y="600" width="260" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="c_msg_attrs" value="- id: UUID&#xa;- content: String&#xa;- type: MessageType&#xa;- attachmentUrl: String&#xa;- originalName: String&#xa;- fileSize: long&#xa;- publicId: String&#xa;- latitude: double&#xa;- longitude: double&#xa;- locationLabel: String&#xa;- meetingLink: String&#xa;- proposedTime: String&#xa;- isRead: boolean&#xa;- conversationId: UUID (FK)&#xa;- senderId: UUID (FK)" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_msg">
+          <mxGeometry y="26" width="260" height="254" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Appointment ===== -->
+        <mxCell id="c_appt" value="&lt;b&gt;Appointment&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="40" width="280" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="c_appt_attrs" value="- id: UUID&#xa;- title: String&#xa;- description: String&#xa;- appointmentDate: LocalDate&#xa;- startTime: LocalTime&#xa;- endTime: LocalTime&#xa;- meetingType: SessionFormat&#xa;- locationOrLink: String&#xa;- timeCreditAmount: double&#xa;- notes: String&#xa;- status: AppointmentStatus&#xa;- cancelReason: String&#xa;- rescheduleProposedTime: String&#xa;- extraCreditStatus: ExtraCreditStatus&#xa;- providerId: UUID (FK)&#xa;- receiverId: UUID (FK)&#xa;- invitationId: UUID (FK)&#xa;- skillId: UUID (FK)" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_appt">
+          <mxGeometry y="26" width="280" height="314" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Rating ===== -->
+        <mxCell id="c_rating" value="&lt;b&gt;Rating&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="420" width="230" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="c_rating_attrs" value="- id: UUID&#xa;- score: int (1-5)&#xa;- comment: String&#xa;- appointmentId: UUID (FK)&#xa;- fromUserId: UUID (FK)&#xa;- toUserId: UUID (FK)&#xa;- createdAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_rating">
+          <mxGeometry y="26" width="230" height="134" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: Notification ===== -->
+        <mxCell id="c_notif" value="&lt;b&gt;Notification&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="620" width="240" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="c_notif_attrs" value="- id: UUID&#xa;- title: String&#xa;- body: String&#xa;- type: NotificationType&#xa;- isRead: boolean&#xa;- referenceId: UUID&#xa;- userId: UUID (FK)&#xa;- actorId: UUID (FK)&#xa;- createdAt: Instant" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_notif">
+          <mxGeometry y="26" width="240" height="154" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: ChatReport ===== -->
+        <mxCell id="c_chatreport" value="&lt;b&gt;ChatReport&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="720" y="920" width="250" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="c_chatreport_attrs" value="- id: UUID&#xa;- reason: ChatReportReason&#xa;- description: String&#xa;- messageSnapshot: String&#xa;- status: ChatReportStatus&#xa;- messageId: UUID (FK)&#xa;- reporterId: UUID (FK)&#xa;- reportedUserId: UUID (FK)" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_chatreport">
+          <mxGeometry y="26" width="250" height="134" as="geometry" />
+        </mxCell>
+
+        <!-- ===== CLASS: UserBlock ===== -->
+        <mxCell id="c_userblock" value="&lt;b&gt;UserBlock&lt;/b&gt;" style="swimlane;fontStyle=1;align=center;startSize=26;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="400" y="960" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c_userblock_attrs" value="- id: UUID&#xa;- blockerId: UUID (FK)&#xa;- blockedId: UUID (FK)&#xa;- reason: String" style="text;align=left;verticalAlign=top;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;html=1;fontSize=11;whiteSpace=wrap;" vertex="1" parent="c_userblock">
+          <mxGeometry y="26" width="200" height="74" as="geometry" />
+        </mxCell>
+
+        <!-- ===== RELATIONSHIPS ===== -->
+        <!-- User 1--* Skill -->
+        <mxCell id="r1" value="1" style="endArrow=open;endFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="c_user" target="c_skill" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r1_lbl" value="*" style="text;html=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="390" y="210" width="20" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Skill *--1 SkillCategory -->
+        <mxCell id="r2" style="endArrow=open;endFill=0;" edge="1" source="c_skill" target="c_skillcat" parent="1" />
+
+        <!-- Skill 1--* SkillAttachment -->
+        <mxCell id="r3" style="endArrow=open;endFill=0;" edge="1" source="c_skill" target="c_skillatt" parent="1" />
+
+        <!-- User 1--* HelpRequest -->
+        <mxCell id="r4" style="endArrow=open;endFill=0;" edge="1" source="c_user" target="c_helpreq" parent="1" />
+
+        <!-- User *--* Role via UserRole -->
+        <mxCell id="r5" style="endArrow=open;endFill=0;" edge="1" source="c_user" target="c_userrole" parent="1" />
+        <mxCell id="r6" style="endArrow=open;endFill=0;" edge="1" source="c_role" target="c_userrole" parent="1" />
+
+        <!-- User -- Invitation (sender/receiver) -->
+        <mxCell id="r7" style="endArrow=open;endFill=0;" edge="1" source="c_user" target="c_inv" parent="1" />
+
+        <!-- Invitation 1--1 Conversation -->
+        <mxCell id="r8" style="endArrow=open;endFill=0;" edge="1" source="c_inv" target="c_conv" parent="1" />
+
+        <!-- Conversation 1--* ChatMessage -->
+        <mxCell id="r9" style="endArrow=open;endFill=0;" edge="1" source="c_conv" target="c_msg" parent="1" />
+
+        <!-- Appointment -- User (provider/receiver) -->
+        <mxCell id="r10" style="endArrow=open;endFill=0;" edge="1" source="c_user" target="c_appt" parent="1" />
+
+        <!-- Appointment -- Invitation -->
+        <mxCell id="r11" style="endArrow=open;endFill=0;" edge="1" source="c_inv" target="c_appt" parent="1" />
+
+        <!-- Appointment 1--* Rating -->
+        <mxCell id="r12" style="endArrow=open;endFill=0;" edge="1" source="c_appt" target="c_rating" parent="1" />
+
+        <!-- User -- Notification -->
+        <mxCell id="r13" style="endArrow=open;endFill=0;" edge="1" source="c_user" target="c_notif" parent="1" />
+
+        <!-- ChatMessage -- ChatReport -->
+        <mxCell id="r14" style="endArrow=open;endFill=0;" edge="1" source="c_msg" target="c_chatreport" parent="1" />
+
+        <!-- User -- UserBlock -->
+        <mxCell id="r15" style="endArrow=open;endFill=0;" edge="1" source="c_user" target="c_userblock" parent="1" />
+
+        <!-- HelpRequest -- Invitation -->
+        <mxCell id="r16" style="endArrow=open;endFill=0;dashed=1;" edge="1" source="c_helpreq" target="c_inv" parent="1" />
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

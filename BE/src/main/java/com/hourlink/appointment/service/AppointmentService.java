@@ -223,6 +223,8 @@ public class AppointmentService {
                     "Lịch hẹn đã bị hủy",
                     currentUser.getFullName() + " đã hủy lịch hẹn. Lý do: " + (req.getReason() != null ? req.getReason() : "Không có"),
                     appointment.getId());
+            // Task 33: Cập nhật tỷ lệ hủy của người hủy
+            updateCancelRate(currentUser);
         } else if ("RESCHEDULE".equals(action)) {
             appointment.setStatus(AppointmentStatus.RESCHEDULED);
             appointment.setRescheduleProposedTime(req.getNewTime());
@@ -346,6 +348,9 @@ public class AppointmentService {
                     "Buổi hỗ trợ hoàn thành!",
                     "Cả hai bên đã xác nhận hoàn thành buổi hẹn: " + appointment.getTitle() + ". Time Credit đã được chuyển.",
                     appointment.getId());
+            // Task 33: Tăng số buổi hoàn thành cho cả hai bên
+            incrementCompletedSessions(appointment.getProvider());
+            incrementCompletedSessions(appointment.getReceiver());
         }
 
         return AppointmentResponse.fromEntity(appointmentRepository.save(appointment));
@@ -368,5 +373,30 @@ public class AppointmentService {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
         return currentUser;
+    }
+
+    // ─── Task 33: Cập nhật thống kê người dùng ───────────────────────────────
+
+    /**
+     * Tăng completedSessions sau khi cả hai bên xác nhận hoàn thành.
+     */
+    private void incrementCompletedSessions(User user) {
+        user.setCompletedSessions(user.getCompletedSessions() + 1);
+        userRepository.save(user);
+        log.info("Incremented completedSessions for user [{}] → {}", user.getEmail(), user.getCompletedSessions());
+    }
+
+    /**
+     * Cập nhật cancelRate = số lịch bị hủy / tổng số lịch đã từng tham gia.
+     */
+    private void updateCancelRate(User user) {
+        long totalByUser = appointmentRepository.countByProviderIdOrReceiverId(user.getId(), user.getId());
+        long cancelledByUser = appointmentRepository.countCancelledByUserId(user.getId());
+        if (totalByUser > 0) {
+            double rate = (double) cancelledByUser / totalByUser * 100.0;
+            user.setCancelRate(rate);
+            userRepository.save(user);
+            log.info("Updated cancelRate for user [{}] → {}%", user.getEmail(), rate);
+        }
     }
 }

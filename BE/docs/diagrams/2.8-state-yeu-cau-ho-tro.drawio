@@ -1,0 +1,80 @@
+<mxfile host="app.diagrams.net" agent="HourLink DACN" version="24.0">
+  <diagram id="state-help-request" name="Hình 2.8 - Biểu đồ trạng thái yêu cầu hỗ trợ (HelpRequest)">
+    <mxGraphModel dx="1100" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title -->
+        <mxCell id="title" value="Biểu đồ trạng thái — HelpRequest (Yêu cầu hỗ trợ)" style="text;html=1;fontSize=16;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="250" y="10" width="500" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Initial state -->
+        <mxCell id="init" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="140" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- States -->
+        <mxCell id="s_searching" value="SEARCHING&#xa;(Đang tìm kiếm&#xa;người hỗ trợ)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="150" y="110" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s_assigned" value="ASSIGNED&#xa;(Đã có người nhận&#xa;hỗ trợ)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="110" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s_completed" value="COMPLETED&#xa;(Đã hoàn thành)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="110" width="190" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s_cancelled" value="CANCELLED&#xa;(Đã hủy)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="330" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Final states -->
+        <mxCell id="final1" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="780" y="260" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="final2" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="420" y="440" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Transitions -->
+        <!-- init → SEARCHING -->
+        <mxCell id="t0" value="Người dùng đăng&#xa;yêu cầu hỗ trợ" style="fontSize=10;fontStyle=2;" edge="1" source="init" target="s_searching" parent="1" />
+
+        <!-- SEARCHING → ASSIGNED -->
+        <mxCell id="t1" value="Có người chấp nhận&#xa;lời mời / AI ghép cặp&#xa;thành công" style="fontSize=10;fontStyle=2;" edge="1" source="s_searching" target="s_assigned" parent="1" />
+
+        <!-- SEARCHING → CANCELLED -->
+        <mxCell id="t2" value="Người dùng hủy&#xa;yêu cầu" style="fontSize=10;fontStyle=2;fontColor=#EF4444;" edge="1" source="s_searching" target="s_cancelled" parent="1" />
+
+        <!-- ASSIGNED → COMPLETED -->
+        <mxCell id="t3" value="Buổi hỗ trợ&#xa;hoàn thành" style="fontSize=10;fontStyle=2;fontColor=#10B981;" edge="1" source="s_assigned" target="s_completed" parent="1" />
+
+        <!-- ASSIGNED → CANCELLED -->
+        <mxCell id="t4" value="Hủy bởi&#xa;người dùng" style="fontSize=10;fontStyle=2;fontColor=#EF4444;" edge="1" source="s_assigned" target="s_cancelled" parent="1" />
+
+        <!-- ASSIGNED → SEARCHING (nếu helper rút) -->
+        <mxCell id="t5" value="Người hỗ trợ rút lui&#xa;→ quay lại tìm kiếm" style="fontSize=10;fontStyle=2;fontColor=#9673a6;curved=1;" edge="1" source="s_assigned" target="s_searching" parent="1">
+          <mxGeometry x="-0.3" y="20" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="250" />
+              <mxPoint x="280" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- COMPLETED → final -->
+        <mxCell id="t6" style="" edge="1" source="s_completed" target="final1" parent="1" />
+
+        <!-- CANCELLED → final -->
+        <mxCell id="t7" style="" edge="1" source="s_cancelled" target="final2" parent="1" />
+
+        <!-- Legend -->
+        <mxCell id="legend" value="&lt;b&gt;Ghi chú:&lt;/b&gt;&#xa;Enum: SEARCHING | ASSIGNED | COMPLETED | CANCELLED" style="text;html=1;fontSize=11;align=left;verticalAlign=top;fillColor=#f5f5f5;rounded=1;strokeColor=#CCCCCC;spacingLeft=8;spacingTop=4;" vertex="1" parent="1">
+          <mxGeometry x="60" y="440" width="280" height="50" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

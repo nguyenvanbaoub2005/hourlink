@@ -1,0 +1,172 @@
+<mxfile host="app.diagrams.net" agent="HourLink DACN" version="24.0">
+  <diagram id="activity-login" name="Hình 2.3 - Biểu đồ hoạt động đăng nhập">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===== SWIMLANES (horizontal=0 = lanes xếp dọc, label bên trái) ===== -->
+        <mxCell id="sw_user" value="Người dùng" style="shape=swimlane;startSize=30;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="1150" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_fe" value="Ứng dụng Mobile (FE)" style="shape=swimlane;startSize=30;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="260" width="1150" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_be" value="Server Backend (BE)" style="shape=swimlane;startSize=30;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="520" width="1150" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="sw_db" value="Cơ sở dữ liệu" style="shape=swimlane;startSize=30;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;fontColor=#333333;horizontal=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="780" width="1150" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ===== NGƯỜI DÙNG LANE (y: 20–260) ===== -->
+        <mxCell id="n_start" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="75" y="120" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_open" value="Mở ứng dụng&#xa;HourLink" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="145" y="110" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Decision ở lane Người dùng — ĐÚNG vị trí -->
+        <mxCell id="n_choice" value="Chọn phương&#xa;thức đăng nhập?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="355" y="100" width="160" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_input_email" value="Nhập email&#xa;và mật khẩu" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="60" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_btn_google" value="Bấm&#xa;&quot;Đăng nhập Google&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="170" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_home" value="Vào trang chính&#xa;(HomeScreen)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="940" y="110" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_end" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="120" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ===== FE LANE (y: 260–520) ===== -->
+        <mxCell id="f_send_email" value="Gửi POST /auth/login&#xa;{email, password}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="300" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="f_google_sdk" value="Gọi Google Sign-In SDK&#xa;lấy idToken" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="390" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="f_google_post" value="Gửi POST /auth/google&#xa;{idToken}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="760" y="390" width="170" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="f_save_token" value="Lưu Token vào&#xa;SecureStore" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="940" y="330" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="f_show_err" value="Hiển thị thông báo&#xa;lỗi đăng nhập" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="355" y="415" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===== BE LANE (y: 520–780) ===== -->
+        <mxCell id="b_validate" value="Xác thực thông tin&#xa;(email / JWT Google)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="560" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="b_check" value="Hợp lệ?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="770" y="555" width="110" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="b_jwt" value="Tạo JWT Token&#xa;(Access + Refresh)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="920" y="560" width="170" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="b_401" value="Trả về 401&#xa;Unauthorized" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="770" y="680" width="140" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===== DB LANE (y: 780–910) ===== -->
+        <mxCell id="db_query" value="SELECT FROM users&#xa;WHERE email = ?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="560" y="818" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ===== EDGES ===== -->
+        <!-- Khởi động -->
+        <mxCell id="e_s0" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_start" target="n_open" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_s1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_open" target="n_choice" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Nhánh Email -->
+        <mxCell id="e_email_path" value="Email" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;fontStyle=1;fontColor=#2563EB;" edge="1" source="n_choice" target="n_input_email" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_email_fe" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_input_email" target="f_send_email" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_email_be" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="f_send_email" target="b_validate" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Nhánh Google -->
+        <mxCell id="e_google_path" value="Google" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;fontStyle=1;fontColor=#10B981;" edge="1" source="n_choice" target="n_btn_google" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_google_fe" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_btn_google" target="f_google_sdk" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_google_post" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="f_google_sdk" target="f_google_post" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_google_be" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="f_google_post" target="b_validate" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BE xử lý -->
+        <mxCell id="e_b_db" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_validate" target="db_query" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_db_check" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="db_query" target="b_check" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_check_ok" value="Có" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;fontStyle=1;fontColor=#10B981;" edge="1" source="b_check" target="b_jwt" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_check_fail" value="Không" style="edgeStyle=orthogonalEdgeStyle;fontSize=10;fontStyle=1;fontColor=#EF4444;" edge="1" source="b_check" target="b_401" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Thành công -->
+        <mxCell id="e_jwt_save" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_jwt" target="f_save_token" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_save_home" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="f_save_token" target="n_home" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_home_end" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="n_home" target="n_end" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Thất bại -->
+        <mxCell id="e_401_err" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="b_401" target="f_show_err" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_retry" value="Thử lại" style="edgeStyle=orthogonalEdgeStyle;dashed=1;fontSize=10;fontColor=#9673a6;" edge="1" source="f_show_err" target="n_choice" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="220" y="440" />
+              <mxPoint x="220" y="140" />
+              <mxPoint x="435" y="140" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

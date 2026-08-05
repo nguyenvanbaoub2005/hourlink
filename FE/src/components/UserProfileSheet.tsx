@@ -7,9 +7,11 @@ import {
   ActivityIndicator,
   StyleSheet,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import UserApi from '@api/user';
+import RatingApi, { RatingItem } from '@api/rating';
 import Avatar from '@components/Avatar';
 import { Colors, Radius } from '@constants/Colors';
 
@@ -65,6 +67,7 @@ interface Props {
  */
 export default function UserProfileSheet({ visible, userId, onClose }: Props) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [ratings, setRatings] = useState<RatingItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,9 +78,15 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
     setLoading(true);
     setError(null);
 
-    UserApi.getUserById(userId)
-      .then((res) => {
-        if (!cancelled) setProfile((res.data as any)?.data ?? null);
+    Promise.all([
+      UserApi.getUserById(userId),
+      RatingApi.getRatingsByUser(userId),
+    ])
+      .then(([profileRes, ratingsRes]) => {
+        if (!cancelled) {
+          setProfile((profileRes.data as any)?.data ?? null);
+          setRatings((ratingsRes.data as any)?.data ?? []);
+        }
       })
       .catch((e: any) => {
         if (!cancelled) {
@@ -211,6 +220,45 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
                 )}
               </View>
 
+              {/* ── Đánh giá gần nhất ─────────────────── */}
+              {ratings.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>
+                    Đánh giá ({ratings.length})
+                  </Text>
+                  {ratings.slice(0, 3).map((r) => (
+                    <View key={r.id} style={styles.reviewCard}>
+                      <View style={styles.reviewHeader}>
+                        <Avatar uri={r.fromUserAvatar} name={r.fromUserName} size={32} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.reviewerName} numberOfLines={1}>
+                            {r.fromUserName}
+                          </Text>
+                          <View style={{ flexDirection: 'row', gap: 2 }}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Ionicons
+                                key={s}
+                                name={s <= r.score ? 'star' : 'star-outline'}
+                                size={12}
+                                color="#F59E0B"
+                              />
+                            ))}
+                          </View>
+                        </View>
+                      </View>
+                      {!!r.comment && (
+                        <Text style={styles.reviewComment} numberOfLines={2}>
+                          {r.comment}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                  {ratings.length > 3 && (
+                    <Text style={styles.moreRatings}>+ {ratings.length - 3} đánh giá khác</Text>
+                  )}
+                </View>
+              )}
+
               {!!joinedLabel && <Text style={styles.joined}>{joinedLabel}</Text>}
             </ScrollView>
           )}
@@ -304,4 +352,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
+
+  reviewCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+    marginBottom: 8,
+    gap: 6,
+  },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reviewerName: { fontSize: 13, fontWeight: '600', color: '#0F172A' },
+  reviewComment: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  moreRatings: { fontSize: 12, color: Colors.primary, textAlign: 'center', marginTop: 4 },
 });

@@ -54,6 +54,10 @@ export default function ProfileScreen() {
       router.push('/profile/invitations' as any);
       return;
     }
+    if (label === 'Đánh giá & Uy tín') {
+      router.push('/profile/ratings' as any);
+      return;
+    }
     Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
   };
 

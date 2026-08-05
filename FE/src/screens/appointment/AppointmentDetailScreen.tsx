@@ -10,6 +10,7 @@ import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
 import type { AppointmentItem } from '@types';
+import RatingModal from './RatingModal';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   PENDING:     { label: 'Chờ xác nhận', color: '#D97706', bg: '#FEF3C7', icon: 'time-outline' },
@@ -35,6 +36,11 @@ export default function AppointmentDetailScreen() {
   const [contentCompleted, setContentCompleted] = useState<string>('');
   const [hasIssue, setHasIssue] = useState<boolean>(false);
   const [issueDescription, setIssueDescription] = useState<string>('');
+
+  // Modal đánh giá (Task 32)
+  const [showRatingModal, setShowRatingModal] = useState<boolean>(false);
+  const [ratingTargetId, setRatingTargetId] = useState<string>('');
+  const [ratingTargetName, setRatingTargetName] = useState<string>('');
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -350,6 +356,27 @@ export default function AppointmentDetailScreen() {
               <Text style={styles.btnTextWhite}>Xác Nhận Hoàn Thành Buổi Hỗ Trợ</Text>
             </TouchableOpacity>
           )}
+
+          {/* Task 32: Nút đánh giá sau khi hoàn thành */}
+          {statusStr === 'COMPLETED' && (
+            <View style={{ gap: 10 }}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: '#FBBF24' }]}
+                onPress={() => {
+                  // Đánh giá người kia (provider hoặc receiver)
+                  const other = appointment.providerId
+                    ? { id: appointment.providerId, name: appointment.providerName || 'Người hỗ trợ' }
+                    : { id: appointment.receiverId, name: appointment.receiverName || 'Người nhận' };
+                  setRatingTargetId(other.id || '');
+                  setRatingTargetName(other.name || '');
+                  setShowRatingModal(true);
+                }}
+              >
+                <Ionicons name="star" size={18} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={styles.btnTextWhite}>Đánh Giá Buổi Hỗ Trợ</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
@@ -453,6 +480,16 @@ export default function AppointmentDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Task 32: Rating Modal */}
+      <RatingModal
+        visible={showRatingModal}
+        appointmentId={id || ''}
+        toUserId={ratingTargetId}
+        toUserName={ratingTargetName}
+        onClose={() => setShowRatingModal(false)}
+        onSuccess={() => fetchDetail()}
+      />
 
     </SafeAreaView>
   );
