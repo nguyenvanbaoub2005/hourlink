@@ -110,20 +110,26 @@ public class CommunityService {
             throw new AppException(ErrorCode.ACTIVITY_FULL);
         }
 
-        if (participantRepository.existsByActivityIdAndUserIdAndStatusNot(
-                activityId, currentUser.getId(), ParticipantStatus.CANCELLED)) {
-            throw new AppException(ErrorCode.ALREADY_REGISTERED);
+        ActivityParticipant participant = participantRepository.findByActivityIdAndUserId(activityId, currentUser.getId())
+                .orElse(null);
+
+        if (participant != null) {
+            if (participant.getStatus() != ParticipantStatus.CANCELLED) {
+                throw new AppException(ErrorCode.ALREADY_REGISTERED);
+            }
+            // Đã hủy trước đó -> đăng ký lại
+            participant.setStatus(ParticipantStatus.PENDING);
+        } else {
+            // Đăng ký mới
+            participant = ActivityParticipant.builder()
+                    .activity(activity)
+                    .user(currentUser)
+                    .status(ParticipantStatus.PENDING)
+                    .build();
+            activity.getParticipants().add(participant);
         }
 
-        ActivityParticipant participant = ActivityParticipant.builder()
-                .activity(activity)
-                .user(currentUser)
-                .status(ParticipantStatus.PENDING)
-                .build();
-
-        participant = participantRepository.save(participant);
-        // Add to activity collection to update capacity count immediately if needed
-        activity.getParticipants().add(participant);
+        participantRepository.save(participant);
         activityRepository.save(activity);
         
         log.info("User {} registered for activity {}", currentUser.getEmail(), activityId);

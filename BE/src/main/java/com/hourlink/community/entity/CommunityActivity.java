@@ -62,13 +62,15 @@ public class CommunityActivity extends BaseEntity {
     @Builder.Default
     List<ActivityParticipant> participants = new ArrayList<>();
 
-    /** Số người đã đăng ký hiện tại */
+    /** Số người đã đăng ký hiện tại (không tính người đã hủy) */
     public int getCurrentParticipantCount() {
-        return participants.size();
+        return (int) participants.stream()
+                .filter(p -> p.getStatus() != com.hourlink.community.enums.ParticipantStatus.CANCELLED)
+                .count();
     }
 
     /** Kiểm tra còn chỗ trống không */
     public boolean hasCapacity() {
-        return maxParticipants <= 0 || participants.size() < maxParticipants;
+        return maxParticipants <= 0 || getCurrentParticipantCount() < maxParticipants;
     }
 }
