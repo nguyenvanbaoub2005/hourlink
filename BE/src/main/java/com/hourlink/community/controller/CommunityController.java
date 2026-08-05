@@ -1,6 +1,6 @@
 package com.hourlink.community.controller;
 
-import com.hourlink.common.dto.ApiResponse;
+import com.hourlink.common.response.ApiResponse;
 import com.hourlink.community.dto.request.ActivityRequest;
 import com.hourlink.community.dto.request.ParticipantConfirmRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
