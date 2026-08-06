@@ -1,9 +1,9 @@
 const ENV = {
 	dev: {
-		API_URL: 'http://192.168.1.5:8085/api', // ← Đã đổi sang IP mới (192.168.1.87)
+		API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8085/api',
 	},
 	prod: {
-		API_URL: 'https://api.hourlink.vn/api',
+		API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://api.hourlink.vn/api',
 	},
 };
 

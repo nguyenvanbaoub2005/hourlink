@@ -71,6 +71,7 @@ public class SecurityConfig {
                 "http://localhost:*",
                 "http://127.0.0.1:*",
                 "http://192.168.*.*:*", // Cho phép mọi IP trong mạng LAN
+                "http://172.*.*.*:*",   // Cho phép IP từ mạng phát Wifi (Hotspot)
                 "exp://*"       // Expo Go
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
