@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="HourLink DACN - OpenAI" version="24.0" type="device" compressed="false">
+  <diagram id="state-invitation" name="Hình 2.9 - Biểu đồ trạng thái lời mời">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Tiêu đề -->
+        <mxCell id="title" value="Biểu đồ trạng thái — Invitation (Lời mời hỗ trợ)" style="text;html=1;fontSize=18;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="300" y="30" width="600" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Trạng thái bắt đầu -->
+        <mxCell id="initial" value="" style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="70" y="185" width="30" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Các trạng thái -->
+        <mxCell id="pending" value="PENDING&#xa;(Chờ phản hồi)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="160" width="210" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="accepted" value="ACCEPTED&#xa;(Đã chấp nhận)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="90" width="210" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="rejected" value="REJECTED&#xa;(Đã từ chối)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="230" width="210" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="rescheduled" value="RESCHEDULED&#xa;(Đề xuất thời gian khác)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="390" width="240" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="cancelled" value="CANCELLED&#xa;(Người gửi đã hủy)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="390" width="210" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Các trạng thái kết thúc -->
+        <mxCell id="finalAcceptedOuter" value="" style="ellipse;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="980" y="110" width="34" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="finalAcceptedInner" value="" style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="987" y="117" width="20" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="finalRejectedOuter" value="" style="ellipse;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="980" y="250" width="34" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="finalRejectedInner" value="" style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="987" y="257" width="20" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="finalCancelledOuter" value="" style="ellipse;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="980" y="410" width="34" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="finalCancelledInner" value="" style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="987" y="417" width="20" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Ghi chú bám sát code backend -->
+        <mxCell id="note" value="&lt;b&gt;Ghi chú theo nhánh develop:&lt;/b&gt;&lt;br&gt;Chỉ lời mời PENDING mới được ACCEPT, REJECT hoặc RESCHEDULE. Hiện chưa có API xác nhận lại thời gian mới; lời mời RESCHEDULED chỉ được người gửi hủy." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;verticalAlign=top;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="180" y="570" width="630" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- Chuyển trạng thái: đầu mũi tên block, nét dày và luôn có mxGeometry -->
+        <mxCell id="e0" value="Tạo và gửi lời mời" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;endArrow=block;endFill=1;endSize=12;fontSize=11;fontStyle=2;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="initial" target="pending">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="ACCEPT / tạo cuộc trò chuyện" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;endArrow=block;endFill=1;endSize=12;fontSize=11;fontStyle=2;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="pending" target="accepted">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="200"/>
+              <mxPoint x="500" y="130"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e2" value="REJECT / ghi lý do" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;endSize=12;fontSize=11;fontStyle=2;fontColor=#b85450;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="pending" target="rejected">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="200"/>
+              <mxPoint x="500" y="270"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e3" value="RESCHEDULE / đề xuất giờ mới" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;endArrow=block;endFill=1;endSize=12;fontSize=11;fontStyle=2;fontColor=#6f4d82;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="pending" target="rescheduled">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="285" y="310"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e4" value="Sender hủy khi PENDING" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;endSize=12;fontSize=11;fontStyle=2;fontColor=#b85450;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="pending" target="cancelled">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="470" y="200"/>
+              <mxPoint x="470" y="430"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e5" value="Sender hủy khi RESCHEDULED" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=2;endArrow=block;endFill=1;endSize=12;fontSize=11;fontStyle=2;fontColor=#b85450;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="rescheduled" target="cancelled">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;endArrow=block;endFill=1;endSize=12;" edge="1" parent="1" source="accepted" target="finalAcceptedOuter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;endArrow=block;endFill=1;endSize=12;" edge="1" parent="1" source="rejected" target="finalRejectedOuter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=2;endArrow=block;endFill=1;endSize=12;" edge="1" parent="1" source="cancelled" target="finalCancelledOuter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

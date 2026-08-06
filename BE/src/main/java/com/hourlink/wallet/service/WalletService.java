@@ -211,6 +211,28 @@ public class WalletService {
         return txRepository.save(tx);
     }
 
+    // ─── 5. Community Hook (US-38) ────────────────────────────────────────────
+
+    /**
+     * Cộng Time Credit BONUS vào ví của user sau khi tổ chức xác nhận tham gia hoạt động.
+     * Được gọi từ CommunityService trong cùng @Transactional để đảm bảo toàn vẹn dữ liệu.
+     *
+     * @param user        Người nhận Time Credit
+     * @param amount      Số TC cộng thêm
+     * @param description Mô tả giao dịch
+     */
+    @Transactional
+    public void addTimeCredit(User user, Double amount, String description) {
+        Wallet wallet = getWalletByUser(user);
+        wallet.setBalance(wallet.getBalance() + amount);
+        wallet.setTotalEarned(wallet.getTotalEarned() + amount);
+        walletRepository.save(wallet);
+
+        recordTransaction(wallet, null, WalletTxType.BONUS, amount, wallet.getBalance(), description);
+
+        log.info("COMMUNITY BONUS: +{} TC → user [{}] | reason: {}", amount, user.getId(), description);
+    }
+
     private User getCurrentUser() {
         String email = SecurityUtil.getCurrentUserEmail();
         return userRepository.findByEmail(email)
