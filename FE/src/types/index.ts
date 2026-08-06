@@ -429,30 +429,54 @@ export interface Dispute {
   createdAt: string;
 }
 
-// ─── Community Activity ───────────────────────────────────────
+export type ActivityStatus = 'OPEN' | 'CLOSED' | 'COMPLETED' | 'CANCELLED';
 
-export interface CommunityActivity {
+export interface ActivityResponse {
   id: string;
-  organization: UserResponse;
+  organizerId: string;
+  organizerName: string;
+  organizerAvatarUrl?: string;
   title: string;
   description?: string;
   location?: string;
-  activityTime: string;
-  slotsNeeded?: number;
-  conditionText?: string;
-  timeCredit: number;
-  status: string;
+  startTime: string;
+  endTime: string;
+  maxParticipants?: number;
+  creditReward: number;
+  status: ActivityStatus;
+  registeredCount: number;
+  registered: boolean;
   createdAt: string;
 }
 
-export interface ActivityParticipant {
+export interface ParticipantResponse {
   id: string;
-  activity: CommunityActivity;
-  user: UserResponse;
+  userId: string;
+  userName: string;
+  userAvatarUrl?: string;
   status: ActivityParticipantStatus;
-  confirmedHours?: number;
-  certificateUrl?: string;
-  joinedAt: string;
+  actualHours?: number;
+  confirmNote?: string;
+  creditAwarded?: boolean;
+  createdAt: string;
+}
+
+export interface CreateActivityRequest {
+  title: string;
+  description?: string;
+  location?: string;
+  startTime: string;
+  endTime: string;
+  maxParticipants?: number;
+  creditReward: number;
+}
+
+export interface UpdateActivityRequest extends Partial<CreateActivityRequest> {}
+
+export interface ConfirmParticipantsRequest {
+  participantIds?: string[];
+  actualHours: number;
+  confirmNote?: string;
 }
 
 // ─── Notification ────────────────────────────────────────────

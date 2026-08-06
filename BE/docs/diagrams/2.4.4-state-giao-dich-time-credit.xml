@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="HourLink DACN - OpenAI" version="24.0" type="device" compressed="false">
+  <diagram id="state-time-credit-transaction" name="2.4.4 - Trạng thái giao dịch Time Credit">
+    <mxGraphModel dx="1500" dy="950" grid="1" gridSize="10" guides="1" tooltips="1"
+      connect="1" arrows="1" fold="1" page="1" pageScale="1"
+      pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Tiêu đề -->
+        <mxCell id="title"
+          value="2.4.4 Biểu đồ trạng thái — Giao dịch Time Credit"
+          style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;"
+          vertex="1" parent="1">
+          <mxGeometry x="350" y="25" width="700" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- Bắt đầu -->
+        <mxCell id="initial" value=""
+          style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;"
+          vertex="1" parent="1">
+          <mxGeometry x="55" y="185" width="32" height="32" as="geometry"/>
+        </mxCell>
+
+        <!-- Các trạng thái chính -->
+        <mxCell id="bonus"
+          value="BONUS&#xa;(Khởi tạo / tặng thưởng)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="140" y="155" width="220" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="available"
+          value="AVAILABLE&#xa;(Số dư khả dụng)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="440" y="155" width="220" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="hold"
+          value="HOLD&#xa;(Time Credit tạm giữ)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="760" y="155" width="220" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="release"
+          value="RELEASE&#xa;(Hoàn lại số tiền tạm giữ)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1050" y="60" width="235" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="failed"
+          value="FAILED&#xa;(Không đủ Time Credit)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="440" y="345" width="220" height="85" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="disputed"
+          value="DISPUTED&#xa;(Chờ xử lý tranh chấp)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="760" y="420" width="220" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- Fork / Join cho giao dịch đồng thời SPEND + EARN -->
+        <mxCell id="forkTransfer" value=""
+          style="shape=rectangle;html=1;fillColor=#000000;strokeColor=#000000;rounded=0;"
+          vertex="1" parent="1">
+          <mxGeometry x="1020" y="245" width="10" height="170" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="spend"
+          value="SPEND&#xa;(Receiver bị trừ)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1070" y="230" width="210" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="earn"
+          value="EARN&#xa;(Provider được cộng)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="1070" y="355" width="210" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="joinTransfer" value=""
+          style="shape=rectangle;html=1;fillColor=#000000;strokeColor=#000000;rounded=0;"
+          vertex="1" parent="1">
+          <mxGeometry x="1310" y="245" width="10" height="170" as="geometry"/>
+        </mxCell>
+
+        <!-- Các trạng thái đã khai báo nhưng chưa có service xử lý -->
+        <mxCell id="refund"
+          value="REFUND&#xa;(Admin hoàn tiền)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;strokeWidth=2;dashed=1;dashPattern=8 8;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="760" y="590" width="220" height="85" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="adjustment"
+          value="ADJUSTMENT&#xa;(Admin điều chỉnh)"
+          style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;strokeWidth=2;dashed=1;dashPattern=8 8;fontSize=14;fontStyle=1;"
+          vertex="1" parent="1">
+          <mxGeometry x="440" y="590" width="220" height="85" as="geometry"/>
+        </mxCell>
+
+        <!-- Kết thúc lỗi -->
+        <mxCell id="finalFailedOuter" value=""
+          style="ellipse;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=3;"
+          vertex="1" parent="1">
+          <mxGeometry x="705" y="370" width="34" height="34" as="geometry"/>
+        </mxCell>
+        <mxCell id="finalFailedInner" value=""
+          style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;"
+          vertex="1" parent="1">
+          <mxGeometry x="712" y="377" width="20" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Kết thúc chuyển tiền -->
+        <mxCell id="finalTransferOuter" value=""
+          style="ellipse;html=1;aspect=fixed;fillColor=#ffffff;strokeColor=#000000;strokeWidth=3;"
+          vertex="1" parent="1">
+          <mxGeometry x="1350" y="313" width="36" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="finalTransferInner" value=""
+          style="ellipse;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;"
+          vertex="1" parent="1">
+          <mxGeometry x="1358" y="321" width="20" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Ghi chú -->
+        <mxCell id="note"
+          value="&lt;b&gt;Ghi chú theo nhánh develop:&lt;/b&gt;&lt;br&gt;WalletService hiện ghi nhận BONUS, HOLD, RELEASE, SPEND và EARN. REFUND và ADJUSTMENT có trong WalletTxType nhưng chưa có phương thức xử lý tương ứng trong WalletService, nên được biểu diễn bằng nét đứt."
+          style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;verticalAlign=top;spacing=10;"
+          vertex="1" parent="1">
+          <mxGeometry x="140" y="730" width="1140" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- Các đường chuyển trạng thái -->
+        <mxCell id="e0" value="Đăng ký tài khoản / nhận thưởng"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="initial" target="bonus">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" value="Cộng Time Credit"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="bonus" target="available">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e2" value="Xác nhận lịch hẹn [balance ≥ amount]"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#6f4d82;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="available" target="hold">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e3" value="[balance &lt; amount]"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#b85450;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="available" target="failed">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e4" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;"
+          edge="1" parent="1" source="failed" target="finalFailedOuter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e5" value="Lịch hẹn bị hủy"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#4f7f3f;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="hold" target="release">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1010" y="200"/>
+              <mxPoint x="1010" y="105"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e6" value="Trả lại balance"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#4f7f3f;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="release" target="available">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1165" y="20"/>
+              <mxPoint x="550" y="20"/>
+              <mxPoint x="550" y="145"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e7" value="Cả hai bên xác nhận hoàn thành"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="hold" target="forkTransfer">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="200"/>
+              <mxPoint x="1000" y="330"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e8" value="Receiver"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#b85450;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="forkTransfer" target="spend">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1045" y="270"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e9" value="Provider"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#4f7f3f;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="forkTransfer" target="earn">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1045" y="395"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e10" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;"
+          edge="1" parent="1" source="spend" target="joinTransfer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e11" value=""
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;"
+          edge="1" parent="1" source="earn" target="joinTransfer">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e12" value="Ghi lịch sử giao dịch"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="joinTransfer" target="finalTransferOuter">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e13" value="Có vấn đề khi xác nhận kết thúc"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=3;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#b85450;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="hold" target="disputed">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e14" value="Admin xử lý hoàn tiền"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=3;dashed=1;dashPattern=8 8;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#6f4d82;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="disputed" target="refund">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e15" value="Cộng lại số dư"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=3;dashed=1;dashPattern=8 8;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#6f4d82;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="refund" target="available">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="632"/>
+              <mxPoint x="700" y="540"/>
+              <mxPoint x="550" y="540"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e16" value="Admin tăng / giảm thủ công"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=3;dashed=1;dashPattern=8 8;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#6f4d82;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="available" target="adjustment">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e17" value="Cập nhật balance"
+          style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=3;dashed=1;dashPattern=8 8;endArrow=block;endFill=1;endSize=14;fontSize=11;fontStyle=2;fontColor=#6f4d82;labelBackgroundColor=#ffffff;"
+          edge="1" parent="1" source="adjustment" target="available">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="632"/>
+              <mxPoint x="400" y="200"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
