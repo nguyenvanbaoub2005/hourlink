@@ -92,12 +92,7 @@ export default function MyReportsScreen() {
           <Text style={styles.backText}>Quay lại</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Báo Cáo Của Tôi</Text>
-        <TouchableOpacity 
-          style={styles.backBtn} 
-          onPress={() => router.push({ pathname: '/report/create', params: { targetId: 'test-id-123', targetType: 'USER' } })}
-        >
-          <Text style={[styles.backText, { textAlign: 'right' }]}>+ Tạo</Text>
-        </TouchableOpacity>
+        <View style={styles.backBtn} />
       </View>
 
       {loading ? (
