@@ -9,7 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import SkillApi from '@api/skill';
+import RatingApi from '@api/rating';
 import { openChatWithUser } from '@utils/chatNav';
+import type { RatingResponse } from '@types';
+import Avatar from '@components/Avatar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -51,6 +54,27 @@ export default function ExploreScreen() {
   const [selectedSkill, setSelectedSkill] = useState<SkillItem | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [modalTab, setModalTab] = useState<'intro' | 'skills' | 'reviews'>('intro');
+
+  const [tutorRatings, setTutorRatings] = useState<RatingResponse[]>([]);
+  const [loadingRatings, setLoadingRatings] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (selectedSkill && modalVisible && modalTab === 'reviews') {
+      fetchTutorRatings(selectedSkill.userId);
+    }
+  }, [selectedSkill, modalVisible, modalTab]);
+
+  const fetchTutorRatings = async (userId: string) => {
+    try {
+      setLoadingRatings(true);
+      const res = await RatingApi.getRatingsReceived(userId, 0, 10);
+      setTutorRatings(res.data?.data?.content || []);
+    } catch (error) {
+      console.error("Error fetching tutor ratings", error);
+    } finally {
+      setLoadingRatings(false);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -398,7 +422,7 @@ export default function ExploreScreen() {
         )}
       </ScrollView>
 
-      {/* ── Modal Chi tiết Người hỗ trợ (Tham khảo giao diện mới) ────────── */}
+      {/* ── Modal Chi tiết Người hỗ trợ ────────── */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -488,11 +512,6 @@ export default function ExploreScreen() {
                         <Text style={styles.modalLocText}>
                           {selectedSkill.userRegion || selectedSkill.region || 'Chưa cập nhật'}
                         </Text>
-                        {selectedSkill.userCompletedSessions ? (
-                          <Text style={styles.modalTcText}>
-                            ⏱️ {selectedSkill.userCompletedSessions} TC hoàn thành
-                          </Text>
-                        ) : null}
                       </View>
                     </View>
                   </View>
@@ -608,12 +627,36 @@ export default function ExploreScreen() {
                         <Text style={styles.reviewSummaryCount}>Dựa trên {selectedSkill.userCompletedSessions || 0} buổi hỗ trợ</Text>
                       </View>
 
-                      <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: '#fff', borderRadius: Radius.lg, borderWidth: 1, borderColor: '#F1F5F9' }}>
-                        <Ionicons name="chatbubbles-outline" size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
-                        <Text style={{ color: '#64748B', fontStyle: 'italic', fontSize: 13 }}>
-                          Chưa có bài đánh giá chi tiết nào.
-                        </Text>
-                      </View>
+                      {loadingRatings ? (
+                        <ActivityIndicator style={{ marginTop: 24 }} color={Colors.primary} />
+                      ) : tutorRatings.length > 0 ? (
+                        tutorRatings.map(rating => (
+                          <View key={rating.id} style={styles.reviewCard}>
+                            <View style={styles.reviewHeader}>
+                              <Avatar uri={rating.reviewerAvatarUrl} name={rating.reviewerName} size={36} />
+                              <View style={styles.reviewInfo}>
+                                <Text style={styles.reviewerName}>{rating.reviewerName}</Text>
+                                <Text style={styles.reviewDate}>{new Date(rating.createdAt).toLocaleDateString('vi-VN')}</Text>
+                              </View>
+                              <View style={{ flexDirection: 'row' }}>
+                                {[1, 2, 3, 4, 5].map(s => (
+                                  <Ionicons key={s} name={s <= rating.overallStars ? 'star' : 'star-outline'} size={14} color="#F59E0B" />
+                                ))}
+                              </View>
+                            </View>
+                            {rating.comment ? (
+                              <Text style={styles.reviewComment}>{rating.comment}</Text>
+                            ) : null}
+                          </View>
+                        ))
+                      ) : (
+                        <View style={{ paddingVertical: 24, alignItems: 'center', backgroundColor: '#fff', borderRadius: Radius.lg, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                          <Ionicons name="chatbubbles-outline" size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+                          <Text style={{ color: '#64748B', fontStyle: 'italic', fontSize: 13 }}>
+                            Chưa có bài đánh giá chi tiết nào.
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 </ScrollView>
@@ -800,15 +843,12 @@ const styles = StyleSheet.create({
 
   modalNameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   modalTutorName: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', flex: 1, marginRight: 8 },
-  matchBadge: { backgroundColor: '#2563EB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  matchBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
   modalOccupation: { fontSize: 13, color: '#64748B', marginBottom: 6 },
   modalRatingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   modalScoreText: { fontSize: 13, fontWeight: 'bold', color: '#0F172A', marginRight: 4 },
   modalSessionsText: { fontSize: 12, color: '#64748B' },
   modalLocRow: { flexDirection: 'row', alignItems: 'center' },
   modalLocText: { fontSize: 12, color: '#64748B' },
-  modalTcText: { fontSize: 12, color: '#0D9488', fontWeight: '600', marginLeft: 10 },
 
   summaryCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: Radius.lg, paddingVertical: 14, marginVertical: 14, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 3, elevation: 1 },
   summaryCol: { flex: 1, alignItems: 'center' },
@@ -840,17 +880,25 @@ const styles = StyleSheet.create({
   reviewSummaryBox: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
   reviewSummaryScore: { fontSize: 24, fontWeight: 'bold', color: '#0F172A' },
   reviewSummaryCount: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  reviewItemCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#F1F5F9' },
-  reviewItemHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  reviewAvatarCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' },
-  reviewAvatarText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
-  reviewerName: { fontSize: 13, fontWeight: 'bold', color: '#0F172A' },
-  reviewDate: { fontSize: 11, color: '#94A3B8' },
-  reviewComment: { fontSize: 13, color: '#334155', lineHeight: 19 },
 
   modalBottomBar: { flexDirection: 'row', gap: 12, paddingTop: 12, paddingBottom: 4, borderTopWidth: 1, borderTopColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
   btnChat: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: Radius.lg, backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#0D9488' },
   btnChatText: { fontSize: 15, fontWeight: 'bold', color: '#0D9488' },
   btnInvite: { flex: 1.2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: Radius.lg, backgroundColor: '#2563EB' },
-  btnInviteText: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
+  btnInviteText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  
+  // Review items
+  reviewCard: {
+    backgroundColor: '#fff',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.sm,
+  },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  reviewInfo: { flex: 1, marginLeft: 10 },
+  reviewerName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  reviewDate: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  reviewComment: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18, marginTop: 4 },
 });

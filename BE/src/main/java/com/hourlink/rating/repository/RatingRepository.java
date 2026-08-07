@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +17,9 @@ public interface RatingRepository extends JpaRepository<Rating, UUID> {
 
     /** Kiểm tra reviewer đã đánh giá cho appointment này chưa */
     boolean existsByAppointmentIdAndReviewerId(UUID appointmentId, UUID reviewerId);
+
+    /** Lấy tất cả đánh giá của một lịch hẹn (tối đa 2 cái) */
+    List<Rating> findByAppointmentId(UUID appointmentId);
 
     /** Lấy đánh giá theo appointment + reviewer */
     Optional<Rating> findByAppointmentIdAndReviewerId(UUID appointmentId, UUID reviewerId);
