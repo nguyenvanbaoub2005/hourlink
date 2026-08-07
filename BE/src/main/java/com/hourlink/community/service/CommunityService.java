@@ -187,7 +187,7 @@ public class CommunityService {
 
         // Kiểm tra số lượng tối đa
         if (activity.getMaxParticipants() != null) {
-            long count = activityRepo.countActiveParticipants(activityId);
+            long count = participantRepo.countByActivityIdAndStatus(activityId, ActivityParticipantStatus.REGISTERED);
             if (count >= activity.getMaxParticipants()) {
                 throw new AppException(ErrorCode.ACTIVITY_FULL);
             }
@@ -330,7 +330,7 @@ public class CommunityService {
     }
 
     private ActivityResponse toResponse(CommunityActivity activity, User currentUser) {
-        long count = activityRepo.countActiveParticipants(activity.getId());
+        long count = participantRepo.countByActivityIdAndStatus(activity.getId(), ActivityParticipantStatus.REGISTERED);
         boolean registered = currentUser != null && participantRepo.existsByActivityIdAndUserIdAndStatus(
                 activity.getId(), currentUser.getId(), ActivityParticipantStatus.REGISTERED);
         return ActivityResponse.fromEntity(activity, count, registered);

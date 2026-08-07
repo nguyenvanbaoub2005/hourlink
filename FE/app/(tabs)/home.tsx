@@ -10,7 +10,7 @@ import AdminHomeScreen from '../../src/screens/home/AdminHomeScreen';
 import CommunityHomeScreen from '../../src/screens/home/CommunityHomeScreen';
 
 export default function HomeScreen() {
-  const { role } = useAuthStore();
+  const { role, user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'individual' | 'community'>('individual');
 
   const renderHomeContent = () => {
@@ -18,10 +18,10 @@ export default function HomeScreen() {
       return <CommunityHomeScreen />;
     }
 
-    if (role?.includes('ROLE_ADMIN')) {
+    if (role?.includes('ROLE_ADMIN') || user?.userType === 'admin') {
       return <AdminHomeScreen />;
     }
-    if (role?.includes('ROLE_ORGANIZATION')) {
+    if (role?.includes('ROLE_ORGANIZATION') || user?.userType === 'organization') {
       return <OrganizationHomeScreen />;
     }
     return <IndividualHomeScreen />;
