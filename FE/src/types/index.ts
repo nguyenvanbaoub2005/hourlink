@@ -34,8 +34,9 @@ export type VerificationMethod = 'QR' | 'OTP' | 'qr' | 'otp';
 export type ExtraCreditStatus = 'NONE' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'none' | 'pending' | 'accepted' | 'rejected';
 export type WalletTxType =
   | 'EARN' | 'SPEND' | 'HOLD' | 'RELEASE' | 'REFUND' | 'BONUS' | 'ADJUSTMENT';
-export type ReportReason = 'no_show' | 'offensive_behavior' | 'harassment' | 'credit_fraud' | 'wrong_guidance' | 'outside_payment_request' | 'password_otp_request' | 'fake_account' | 'other';
-export type ReportStatus = 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+export type ReportReason = 'SPAM' | 'HARASSMENT' | 'MISINFORMATION' | 'ILLEGAL_CONTENT' | 'FRAUD' | 'OTHER';
+export type ReportStatus = 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED';
+export type ReportTargetType = 'USER' | 'MESSAGE' | 'CONTENT';
 export type DisputeStatus = 'open' | 'reviewing' | 'resolved';
 export type ActivityParticipantStatus = 'registered' | 'confirmed' | 'completed' | 'cancelled';
 export type NotificationType = 'invitation' | 'appointment' | 'wallet' | 'rating' | 'report' | 'community_activity' | 'system';
@@ -409,12 +410,13 @@ export interface BadgeResponse {
 
 export interface Report {
   id: string;
-  reporter: UserResponse;
-  reported: UserResponse;
+  targetId: string;
+  targetType: ReportTargetType;
   reason: ReportReason;
   description?: string;
-  evidenceUrl?: string;
+  evidenceUrls?: string;
   status: ReportStatus;
+  adminNote?: string;
   createdAt: string;
 }
 

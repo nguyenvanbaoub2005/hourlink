@@ -1085,6 +1085,16 @@ export default function ChatRoomScreen() {
               <Ionicons name="ban-outline" size={22} color={Colors.danger} />
               <Text style={[styles.menuText, { color: Colors.danger }]}>Chặn người dùng</Text>
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => {
+                setMenuVisible(false);
+                router.push({ pathname: '/report/create', params: { targetId: peerId, targetType: 'USER' } });
+              }}
+            >
+              <Ionicons name="alert-circle-outline" size={22} color={Colors.danger} />
+              <Text style={[styles.menuText, { color: Colors.danger }]}>Báo cáo người dùng</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>

@@ -62,6 +62,10 @@ export default function ProfileScreen() {
       router.push('/profile/reputation' as any);
       return;
     }
+    if (label === 'Báo cáo của tôi') {
+      router.push('/report/my-reports' as any);
+      return;
+    }
     Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
   };
 
@@ -342,6 +346,7 @@ export default function ProfileScreen() {
           {[
             { icon: 'help-circle-outline', color: '#10B981', bg: '#D1FAE5', label: 'Trợ giúp & FAQ' },
             { icon: 'document-text-outline', color: '#64748B', bg: '#F1F5F9', label: 'Điều khoản dịch vụ' },
+            { icon: 'alert-circle-outline', color: '#DC2626', bg: '#FEE2E2', label: 'Báo cáo của tôi' },
           ].map(item => (
             <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
               <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>

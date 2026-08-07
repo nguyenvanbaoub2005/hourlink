@@ -200,9 +200,20 @@ export default function AppointmentDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi Tiết Lịch Hẹn</Text>
-        <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
-          <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.headerBack}
+          onPress={() => {
+            const isProvider = currentUser?.id === appointment?.providerId;
+            const peerId = isProvider ? appointment?.receiverId : appointment?.providerId;
+            router.push({ pathname: '/report/create', params: { targetId: peerId || appointment?.id, targetType: 'USER' } } as any);
+          }}
+        >
+          <Ionicons name="alert-circle-outline" size={24} color={Colors.danger} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg, alignSelf: 'center', marginBottom: Spacing.md }]}>
+        <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
