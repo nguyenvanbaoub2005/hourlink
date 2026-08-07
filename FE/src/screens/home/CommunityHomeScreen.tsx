@@ -9,13 +9,13 @@ import { useAuthStore } from '@store/authStore';
 
 export default function CommunityHomeScreen() {
   const router = useRouter();
-  const { role } = useAuthStore();
+  const { role, user } = useAuthStore();
   const [activities, setActivities] = useState<ActivityResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Chỉ Organization hoặc Admin mới được phép tạo hoạt động cộng đồng (theo thiết kế)
-  const canCreate = role?.includes('ROLE_ORGANIZATION') || role?.includes('ROLE_ADMIN');
+  const canCreate = role?.includes('ROLE_ORGANIZATION') || role?.includes('ROLE_ADMIN') || user?.userType === 'organization' || user?.userType === 'admin';
 
   const fetchActivities = async () => {
     try {

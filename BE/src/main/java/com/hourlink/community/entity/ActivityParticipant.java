@@ -36,7 +36,7 @@ public class ActivityParticipant extends BaseEntity {
     User user;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     @Builder.Default
     ActivityParticipantStatus status = ActivityParticipantStatus.REGISTERED;
 

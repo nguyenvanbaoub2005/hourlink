@@ -21,8 +21,4 @@ public interface CommunityActivityRepository extends JpaRepository<CommunityActi
     /** Lấy tất cả hoạt động (bất kể trạng thái), phân trang */
     @Query("SELECT a FROM CommunityActivity a ORDER BY a.createdAt DESC")
     Page<CommunityActivity> findAllPaged(Pageable pageable);
-
-    /** Đếm số lượng người đã đăng ký (status = REGISTERED) cho 1 hoạt động */
-    @Query("SELECT COUNT(p) FROM ActivityParticipant p WHERE p.activity.id = :activityId AND p.status = 'REGISTERED'")
-    long countActiveParticipants(@Param("activityId") UUID activityId);
 }

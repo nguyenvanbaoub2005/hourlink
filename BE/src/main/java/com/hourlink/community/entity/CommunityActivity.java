@@ -60,7 +60,7 @@ public class CommunityActivity extends BaseEntity {
     Double creditReward;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     @Builder.Default
     ActivityStatus status = ActivityStatus.OPEN;
 

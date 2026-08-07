@@ -32,4 +32,7 @@ public interface ActivityParticipantRepository extends JpaRepository<ActivityPar
 
     /** Lấy danh sách người đăng ký để xác nhận hàng loạt */
     List<ActivityParticipant> findByActivityIdAndStatus(UUID activityId, ActivityParticipantStatus status);
+
+    /** Đếm số lượng người đã đăng ký (status = REGISTERED) cho 1 hoạt động */
+    long countByActivityIdAndStatus(UUID activityId, ActivityParticipantStatus status);
 }
