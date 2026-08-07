@@ -13,6 +13,7 @@ import { useFocusEffect } from 'expo-router';
 import HelpRequestApi from '@api/helprequest';
 import UserApi from '@api/user';
 import AppointmentApi from '@api/appointment';
+import Logo from '@components/Logo';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 type HelpRequestItem = {
@@ -100,7 +101,7 @@ export default function IndividualHomeScreen() {
       {/* ── Top Bar ─────────────────────────────────────────────────────── */}
       <View style={styles.topBar}>
         <View style={styles.logo}>
-          <View style={styles.logoIcon}><Text style={styles.logoLetter}>H</Text></View>
+          <Logo size={32} style={{ marginRight: 8 }} />
           <Text style={styles.brandName}>HourLink</Text>
         </View>
         <View style={styles.topRight}>

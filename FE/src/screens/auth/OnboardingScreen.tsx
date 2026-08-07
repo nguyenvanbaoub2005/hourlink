@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius } from '@constants/Colors';
+import Logo from '@components/Logo';
 import { StatusBar } from 'expo-status-bar';
 
 const { width, height } = Dimensions.get('window');
@@ -55,12 +56,9 @@ export default function OnboardingScreen() {
 
   const renderItem = ({ item }: { item: typeof SLIDES[0] }) => {
     return (
-      <View style={styles.slide}>
-        <View style={[styles.card, { backgroundColor: item.bgCard }]}>
-          {/* Vùng này ban đầu chứa các Icon hình ảnh (mình đã loại bỏ theo yêu cầu của bạn) */}
-          <Text style={styles.placeholderText}>HourLink</Text>
-        </View>
-        <View style={styles.textContainer}>
+        <View style={styles.slide}>
+          <Logo size={100} style={{ marginBottom: 40 }} />
+          <View style={styles.textContainer}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={[
             styles.subtitle, 
