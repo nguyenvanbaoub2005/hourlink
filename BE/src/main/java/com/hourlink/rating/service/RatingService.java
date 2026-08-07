@@ -48,10 +48,12 @@ public class RatingService {
     private final UserBadgeRepository userBadgeRepository;
 
     // ─── Badge codes — phải khớp với dữ liệu seed trong bảng badge ───────────
+    private static final String BADGE_SESSION_1       = "SESSION_1";        // Hoàn thành >= 1 buổi
+    private static final String BADGE_SESSION_5       = "SESSION_5";        // Hoàn thành >= 5 buổi
     private static final String BADGE_SESSION_10      = "SESSION_10";       // Hoàn thành >= 10 buổi
+    private static final String BADGE_SESSION_25      = "SESSION_25";       // Hoàn thành >= 25 buổi
     private static final String BADGE_SESSION_50      = "SESSION_50";       // Hoàn thành >= 50 buổi
     private static final String BADGE_TOP_RATED       = "TOP_RATED";        // AvgScore >= 4.5 && >= 5 đánh giá
-    private static final String BADGE_ACTIVE_SUPPORTER = "ACTIVE_SUPPORTER"; // completedSessions >= 5
 
     // ─── Submit Rating ─────────────────────────────────────────────────────────
 
@@ -132,15 +134,13 @@ public class RatingService {
 
     // ─── Lấy thông tin ─────────────────────────────────────────────────────────
 
-    /** Lấy đánh giá của người dùng hiện tại (reviewer) cho một buổi hẹn cụ thể */
+    /** Lấy tất cả đánh giá cho một buổi hẹn cụ thể (tối đa 2 cái) */
     @Transactional(readOnly = true)
-    public RatingResponse getRatingForAppointment(String currentUserEmail, UUID appointmentId) {
-        User reviewer = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
-
-        return ratingRepository.findByAppointmentIdAndReviewerId(appointmentId, reviewer.getId())
+    public List<RatingResponse> getRatingsForAppointment(UUID appointmentId) {
+        return ratingRepository.findByAppointmentId(appointmentId)
+                .stream()
                 .map(this::toResponse)
-                .orElse(null); // Trả về null nếu chưa đánh giá thay vì ném exception
+                .collect(Collectors.toList());
     }
 
     /** Lấy các đánh giá mà người dùng nhận được (reviewee), phân trang */
@@ -162,15 +162,30 @@ public class RatingService {
     /** Lấy tất cả huy hiệu của người dùng */
     @Transactional(readOnly = true)
     public List<BadgeResponse> getUserBadges(UUID userId) {
-        return userBadgeRepository.findByUserIdOrderByAwardedAtDesc(userId)
-                .stream()
+        return userBadgeRepository.findByUserIdOrderByAwardedAtDesc(userId).stream()
                 .map(ub -> BadgeResponse.builder()
                         .id(ub.getBadge().getId().toString())
                         .code(ub.getBadge().getCode())
+                        .category(ub.getBadge().getCategory())
+                        .level(ub.getBadge().getLevel())
                         .name(ub.getBadge().getName())
                         .description(ub.getBadge().getDescription())
                         .iconUrl(ub.getBadge().getIconUrl())
                         .awardedAt(ub.getAwardedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    public List<BadgeResponse> getAllSystemBadges() {
+        return badgeRepository.findAll().stream()
+                .map(b -> BadgeResponse.builder()
+                        .id(b.getId().toString())
+                        .code(b.getCode())
+                        .category(b.getCategory())
+                        .level(b.getLevel())
+                        .name(b.getName())
+                        .description(b.getDescription())
+                        .iconUrl(b.getIconUrl())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -193,42 +208,69 @@ public class RatingService {
 
     /**
      * Kiểm tra điều kiện và trao Badge cho user nếu đủ điều kiện.
+     * Sử dụng cấu trúc if-else từ cao xuống thấp để chỉ trao huy hiệu cấp cao nhất.
      */
-    private void checkAndAwardBadges(User user) {
+    public void checkAndAwardBadges(User user) {
         int sessions = user.getCompletedSessions();
         double score = user.getReputationScore();
         long totalRatings = ratingRepository.countByRevieweeId(user.getId());
 
-        // Badge: Người hỗ trợ tích cực (>= 5 buổi)
-        if (sessions >= 5) {
-            awardBadgeIfNotExists(user, BADGE_ACTIVE_SUPPORTER);
-        }
-        // Badge: Hoàn thành >= 10 buổi
-        if (sessions >= 10) {
-            awardBadgeIfNotExists(user, BADGE_SESSION_10);
-        }
-        // Badge: Hoàn thành >= 50 buổi
+        // Dòng huy hiệu cống hiến (Session Count)
         if (sessions >= 50) {
-            awardBadgeIfNotExists(user, BADGE_SESSION_50);
+            awardOrUpgradeBadge(user, BADGE_SESSION_50);
+        } else if (sessions >= 25) {
+            awardOrUpgradeBadge(user, BADGE_SESSION_25);
+        } else if (sessions >= 10) {
+            awardOrUpgradeBadge(user, BADGE_SESSION_10);
+        } else if (sessions >= 5) {
+            awardOrUpgradeBadge(user, BADGE_SESSION_5);
+        } else if (sessions >= 1) {
+            awardOrUpgradeBadge(user, BADGE_SESSION_1);
         }
+
         // Badge: Được đánh giá cao (avg >= 4.5 và >= 5 đánh giá)
         if (score >= 4.5 && totalRatings >= 5) {
-            awardBadgeIfNotExists(user, BADGE_TOP_RATED);
+            awardOrUpgradeBadge(user, BADGE_TOP_RATED);
         }
     }
 
-    /** Trao badge cho user nếu chưa có. Bỏ qua nếu badge code không tồn tại trong DB. */
-    private void awardBadgeIfNotExists(User user, String badgeCode) {
+    /** Trao badge hoặc nâng cấp nếu badge mới có level cao hơn badge cũ cùng category */
+    private void awardOrUpgradeBadge(User user, String badgeCode) {
         badgeRepository.findByCode(badgeCode).ifPresent(badge -> {
             if (!userBadgeRepository.existsByUserIdAndBadgeId(user.getId(), badge.getId())) {
+                
+                // Thu hồi huy hiệu cũ cùng category nhưng level thấp hơn
+                if (badge.getCategory() != null && !badge.getCategory().isEmpty()) {
+                    List<UserBadge> oldBadges = userBadgeRepository.findByUserIdAndBadgeCategory(user.getId(), badge.getCategory());
+                    for (UserBadge ob : oldBadges) {
+                        if (ob.getBadge().getLevel() != null && badge.getLevel() != null 
+                            && ob.getBadge().getLevel() < badge.getLevel()) {
+                            userBadgeRepository.delete(ob);
+                            log.info("Removed lower level badge '{}' from user={}", ob.getBadge().getCode(), user.getId());
+                        }
+                    }
+                }
+
                 UserBadge ub = UserBadge.builder()
                         .user(user)
                         .badge(badge)
                         .build();
                 userBadgeRepository.save(ub);
-                log.info("Awarded badge '{}' to user={}", badgeCode, user.getId());
+                log.info("Awarded/Upgraded badge '{}' to user={}", badgeCode, user.getId());
             }
         });
+    }
+
+    /**
+     * Hàm dùng để chạy retro-active (quét và cấp lại huy hiệu) cho toàn bộ user hiện có trong hệ thống.
+     */
+    @Transactional
+    public void retroactiveAwardBadgesForAllUsers() {
+        List<User> allUsers = userRepository.findAll();
+        for (User u : allUsers) {
+            checkAndAwardBadges(u);
+        }
+        log.info("Completed retroactive badge award for {} users.", allUsers.size());
     }
 
     /** Map Rating entity → RatingResponse DTO */
@@ -236,6 +278,7 @@ public class RatingService {
         return RatingResponse.builder()
                 .id(r.getId().toString())
                 .appointmentId(r.getAppointment().getId().toString())
+                .appointmentTitle(r.getAppointment().getTitle())
                 .reviewerId(r.getReviewer().getId().toString())
                 .reviewerName(r.getReviewer().getFullName())
                 .reviewerAvatarUrl(r.getReviewer().getAvatarUrl())

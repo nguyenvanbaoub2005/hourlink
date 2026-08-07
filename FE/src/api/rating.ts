@@ -17,9 +17,9 @@ export interface SubmitRatingRequest {
  * Base URL: /ratings
  */
 const RatingApi = {
-  /** Kiểm tra xem user hiện tại đã đánh giá lịch hẹn này chưa, trả về RatingResponse hoặc null */
-  getRatingForAppointment: (appointmentId: string) =>
-    api.get<ApiResponse<RatingResponse | null>>(`/ratings/appointment/${appointmentId}`),
+  /** Kiểm tra lấy tất cả đánh giá của 1 lịch hẹn */
+  getRatingsForAppointment: (appointmentId: string) =>
+    api.get<ApiResponse<RatingResponse[]>>(`/ratings/appointment/${appointmentId}`),
 
   /** Gửi đánh giá sau buổi hẹn hoàn thành */
   submitRating: (data: SubmitRatingRequest) =>
@@ -37,7 +37,11 @@ const RatingApi = {
       params: { page, size },
     }),
 
-  /** Lấy danh sách huy hiệu của userId */
+  /** Lấy danh sách tất cả huy hiệu hệ thống */
+  getAllSystemBadges: () =>
+    api.get<ApiResponse<BadgeResponse[]>>(`/ratings/badges/all`),
+
+  /** Lấy danh sách huy hiệu của user */
   getUserBadges: (userId: string) =>
     api.get<ApiResponse<BadgeResponse[]>>(`/ratings/badges/${userId}`),
 };

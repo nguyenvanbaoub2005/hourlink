@@ -13,6 +13,7 @@ import java.time.Instant;
 public class RatingResponse {
     private String id;
     private String appointmentId;
+    private String appointmentTitle;
 
     // Thông tin người đánh giá
     private String reviewerId;

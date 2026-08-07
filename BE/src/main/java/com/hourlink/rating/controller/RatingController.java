@@ -46,13 +46,12 @@ public class RatingController {
                 .body(ApiResponse.created("Đánh giá đã được ghi nhận", response));
     }
 
-    @Operation(summary = "Kiểm tra và lấy đánh giá của mình cho một lịch hẹn")
+    @Operation(summary = "Lấy danh sách đánh giá cho một lịch hẹn (cả 2 bên)")
     @GetMapping("/appointment/{appointmentId}")
-    public ResponseEntity<ApiResponse<RatingResponse>> getRatingForAppointment(
+    public ResponseEntity<ApiResponse<List<RatingResponse>>> getRatingsForAppointment(
             @PathVariable String appointmentId) {
 
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        RatingResponse response = ratingService.getRatingForAppointment(email, UUID.fromString(appointmentId));
+        List<RatingResponse> response = ratingService.getRatingsForAppointment(UUID.fromString(appointmentId));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -79,6 +78,13 @@ public class RatingController {
     }
 
     // ─── Badge ────────────────────────────────────────────────────────────────
+
+    @Operation(summary = "Lấy danh mục tất cả huy hiệu hệ thống")
+    @GetMapping("/badges/all")
+    public ResponseEntity<ApiResponse<List<BadgeResponse>>> getAllSystemBadges() {
+        List<BadgeResponse> badges = ratingService.getAllSystemBadges();
+        return ResponseEntity.ok(ApiResponse.success(badges));
+    }
 
     @Operation(summary = "Lấy danh sách huy hiệu của người dùng")
     @GetMapping("/badges/{userId}")
