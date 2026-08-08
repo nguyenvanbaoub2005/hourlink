@@ -34,6 +34,12 @@ export function notificationTarget(
     return { pathname: '/(tabs)/appointments' };
   }
 
+  if (['COMMUNITY_CREDIT_AWARDED', 'COMMUNITY_PARTICIPANT_ABSENT', 'COMMUNITY_ACTIVITY_CANCELLED', 'COMMUNITY_NEW_ACTIVITY'].includes(type)) {
+    return referenceId
+      ? { pathname: '/community/[id]', params: { id: referenceId } }
+      : { pathname: '/community/registrations' };
+  }
+
   // Loại chưa hỗ trợ điều hướng riêng → về danh sách thông báo
   return { pathname: '/notifications' };
 }

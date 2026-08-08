@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
   btnChatText: { fontSize: 15, fontWeight: 'bold', color: '#0D9488' },
   btnInvite: { flex: 1.2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: Radius.lg, backgroundColor: '#2563EB' },
   btnInviteText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  
+
   // Review items
   reviewCard: {
     backgroundColor: '#fff',

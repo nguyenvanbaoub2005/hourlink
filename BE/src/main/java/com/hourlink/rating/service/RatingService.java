@@ -238,12 +238,12 @@ public class RatingService {
     private void awardOrUpgradeBadge(User user, String badgeCode) {
         badgeRepository.findByCode(badgeCode).ifPresent(badge -> {
             if (!userBadgeRepository.existsByUserIdAndBadgeId(user.getId(), badge.getId())) {
-                
+
                 // Thu hồi huy hiệu cũ cùng category nhưng level thấp hơn
                 if (badge.getCategory() != null && !badge.getCategory().isEmpty()) {
                     List<UserBadge> oldBadges = userBadgeRepository.findByUserIdAndBadgeCategory(user.getId(), badge.getCategory());
                     for (UserBadge ob : oldBadges) {
-                        if (ob.getBadge().getLevel() != null && badge.getLevel() != null 
+                        if (ob.getBadge().getLevel() != null && badge.getLevel() != null
                             && ob.getBadge().getLevel() < badge.getLevel()) {
                             userBadgeRepository.delete(ob);
                             log.info("Removed lower level badge '{}' from user={}", ob.getBadge().getCode(), user.getId());

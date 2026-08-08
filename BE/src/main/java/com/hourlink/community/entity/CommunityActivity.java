@@ -52,10 +52,7 @@ public class CommunityActivity extends BaseEntity {
     @Column(name = "max_participants")
     Integer maxParticipants;
 
-    /**
-     * Số Time Credit người dùng nhận được sau khi tổ chức xác nhận (US-38).
-     * Ví dụ: 1.0 TC cho 60 phút tham gia.
-     */
+    /** Số giờ/Time Credit dự kiến để hiển thị; thực nhận lấy theo actualHours xác nhận. */
     @Column(name = "credit_reward", nullable = false)
     Double creditReward;
 

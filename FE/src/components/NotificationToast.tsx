@@ -33,6 +33,10 @@ const TYPE_ICON: Record<string, { icon: string; color: string; bg: string }> = {
   NEW_RATING:               { icon: 'star-outline',             color: '#9333EA', bg: '#F3E8FF' },
   NEW_MESSAGE:              { icon: 'chatbubble-ellipses',      color: '#0D9488', bg: '#CCFBF1' },
   CHAT_RESCHEDULE_PROPOSED: { icon: 'calendar-outline',         color: '#D97706', bg: '#FEF3C7' },
+  COMMUNITY_CREDIT_AWARDED: { icon: 'leaf-outline',             color: '#059669', bg: '#D1FAE5' },
+  COMMUNITY_PARTICIPANT_ABSENT:{ icon: 'close-circle-outline',   color: '#DC2626', bg: '#FEE2E2' },
+  COMMUNITY_ACTIVITY_CANCELLED:{ icon: 'ban-outline',            color: '#64748B', bg: '#F1F5F9' },
+  COMMUNITY_NEW_ACTIVITY:      { icon: 'megaphone-outline',       color: '#0D9488', bg: '#CCFBF1' },
 };
 
 /** Huy hiệu nhỏ gắn ở góc avatar, cho biết loại thông báo — giống Facebook */
@@ -44,6 +48,10 @@ const TYPE_BADGE: Record<string, { icon: string; color: string }> = {
   INVITATION_REJECTED:      { icon: 'close',      color: '#DC2626' },
   INVITATION_RESCHEDULED:   { icon: 'calendar',   color: '#2563EB' },
   INVITATION_CANCELLED:     { icon: 'ban',        color: '#64748B' },
+  COMMUNITY_CREDIT_AWARDED: { icon: 'leaf',       color: '#059669' },
+  COMMUNITY_PARTICIPANT_ABSENT:{ icon: 'close',   color: '#DC2626' },
+  COMMUNITY_ACTIVITY_CANCELLED:{ icon: 'ban',     color: '#64748B' },
+  COMMUNITY_NEW_ACTIVITY:      { icon: 'megaphone', color: '#0D9488' },
 };
 
 /**

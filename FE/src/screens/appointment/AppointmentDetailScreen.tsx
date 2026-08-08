@@ -51,7 +51,7 @@ export default function AppointmentDetailScreen() {
       if (res.data?.data) {
         const appt = res.data.data;
         setAppointment(appt);
-        
+
         // Nếu đã hoàn thành, thử tải danh sách đánh giá
         if (appt.status === 'COMPLETED') {
           try {
@@ -85,7 +85,7 @@ export default function AppointmentDetailScreen() {
   const handleRespond = async (action: 'CONFIRM' | 'CANCEL', link?: string) => {
     if (!id || !appointment) return;
     const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
-    
+
     // Nếu là xác nhận và là Online, kiểm tra link
     if (action === 'CONFIRM' && (appointment.meetingType?.toUpperCase() === 'ONLINE' || (appointment as any).format === 'online')) {
       const existingLink = appointment.locationOrLink || (appointment as any).meetingLink;
@@ -106,8 +106,8 @@ export default function AppointmentDetailScreen() {
           onPress: async () => {
             try {
               setActionLoading(true);
-              await AppointmentApi.respond(id, { 
-                action, 
+              await AppointmentApi.respond(id, {
+                action,
                 reason: action === 'CANCEL' ? 'Người dùng hủy từ màn chi tiết' : undefined,
                 locationOrLink: link
               });
@@ -200,9 +200,20 @@ export default function AppointmentDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi Tiết Lịch Hẹn</Text>
-        <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
-          <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.headerBack}
+          onPress={() => {
+            const isProvider = currentUser?.id === appointment?.providerId;
+            const peerId = isProvider ? appointment?.receiverId : appointment?.providerId;
+            router.push({ pathname: '/report/create', params: { targetId: peerId || appointment?.id, targetType: 'USER' } } as any);
+          }}
+        >
+          <Ionicons name="alert-circle-outline" size={24} color={Colors.danger} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg, alignSelf: 'center', marginBottom: Spacing.md }]}>
+        <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -233,7 +244,7 @@ export default function AppointmentDetailScreen() {
         {/* Schedule & Location */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>Thời Gian & Địa Điểm</Text>
-          
+
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
@@ -350,16 +361,16 @@ export default function AppointmentDetailScreen() {
                 </View>
                 <View style={{ flexDirection: 'row' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star} 
-                      name={partnerRating.overallStars >= star ? 'star' : 'star-outline'} 
-                      size={16} 
-                      color={partnerRating.overallStars >= star ? Colors.warning : Colors.border} 
+                    <Ionicons
+                      key={star}
+                      name={partnerRating.overallStars >= star ? 'star' : 'star-outline'}
+                      size={16}
+                      color={partnerRating.overallStars >= star ? Colors.warning : Colors.border}
                     />
                   ))}
                 </View>
               </View>
-              
+
               {partnerRating.comment ? (
                 <Text style={{ fontSize: 14, color: '#166534', fontStyle: 'italic', marginBottom: 12 }}>
                   "{partnerRating.comment}"
@@ -403,16 +414,16 @@ export default function AppointmentDetailScreen() {
                 </View>
                 <View style={{ flexDirection: 'row' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star} 
-                      name={myRating.overallStars >= star ? 'star' : 'star-outline'} 
-                      size={16} 
-                      color={myRating.overallStars >= star ? Colors.warning : Colors.border} 
+                    <Ionicons
+                      key={star}
+                      name={myRating.overallStars >= star ? 'star' : 'star-outline'}
+                      size={16}
+                      color={myRating.overallStars >= star ? Colors.warning : Colors.border}
                     />
                   ))}
                 </View>
               </View>
-              
+
               {myRating.comment ? (
                 <Text style={{ fontSize: 14, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 }}>
                   "{myRating.comment}"
@@ -422,7 +433,7 @@ export default function AppointmentDetailScreen() {
                   Không có nhận xét.
                 </Text>
               )}
-              
+
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 {myRating.punctualityScore !== undefined && myRating.punctualityScore !== null && (
                   <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text>
@@ -582,7 +593,7 @@ export default function AppointmentDetailScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Cung Cấp Link Họp</Text>
             <Text style={styles.modalSub}>Vì đây là buổi hỗ trợ Online, bạn cần cung cấp link Google Meet, Zoom... để người nhận tham gia.</Text>
-            
+
             <Text style={styles.inputLabel}>Link họp / Phòng học *</Text>
             <TextInput
               style={styles.input}

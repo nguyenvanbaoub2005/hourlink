@@ -38,7 +38,7 @@ public class Notification extends BaseEntity {
 
     /** Loại thông báo */
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", length = 60, nullable = false)
+    @Column(name = "type", nullable = false, length = 60, columnDefinition = "VARCHAR(60)")
     NotificationType type;
 
     /** Tiêu đề ngắn */

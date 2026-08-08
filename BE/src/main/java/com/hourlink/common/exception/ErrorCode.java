@@ -79,11 +79,28 @@ public enum ErrorCode {
     REPORT_NOT_FOUND(7003,         "Không tìm thấy báo cáo",                    HttpStatus.NOT_FOUND),
     DISPUTE_NOT_FOUND(7004,        "Không tìm thấy tranh chấp",                 HttpStatus.NOT_FOUND),
     DISPUTE_ALREADY_RESOLVED(7005, "Tranh chấp đã được giải quyết",             HttpStatus.BAD_REQUEST),
+    REPORT_ALREADY_SUBMITTED(7006, "Bạn đã báo cáo nội dung này rồi",            HttpStatus.BAD_REQUEST),
+    CANNOT_REPORT_SELF(7007,       "Không thể báo cáo nội dung của chính bạn",   HttpStatus.BAD_REQUEST),
+    REPORT_TARGET_NOT_FOUND(7008,  "Không tìm thấy đối tượng cần báo cáo",       HttpStatus.NOT_FOUND),
 
     // ─── Community (8xxx) ────────────────────────────────────────────
     ACTIVITY_NOT_FOUND(8001,       "Không tìm thấy hoạt động cộng đồng",       HttpStatus.NOT_FOUND),
     ACTIVITY_FULL(8002,            "Hoạt động đã đủ người tham gia",            HttpStatus.BAD_REQUEST),
-    ALREADY_REGISTERED(8003,       "Bạn đã đăng ký hoạt động này rồi",         HttpStatus.BAD_REQUEST);
+    ALREADY_REGISTERED(8003,       "Bạn đã đăng ký hoạt động này rồi",         HttpStatus.BAD_REQUEST),
+    ACTIVITY_TIME_INVALID(8004,    "Thời gian hoạt động không hợp lệ",          HttpStatus.BAD_REQUEST),
+    ACTIVITY_ALREADY_STARTED(8005, "Hoạt động đã bắt đầu, không thể thay đổi",  HttpStatus.BAD_REQUEST),
+    ORGANIZER_CANNOT_REGISTER(8006,"Người tổ chức không thể đăng ký hoạt động của mình", HttpStatus.BAD_REQUEST),
+    ACTIVITY_HAS_PARTICIPANTS(8007,"Không thể xóa hoạt động đang có người đăng ký", HttpStatus.BAD_REQUEST),
+    ACTIVITY_NOT_ENDED(8008,       "Chỉ có thể xác nhận sau khi hoạt động kết thúc", HttpStatus.BAD_REQUEST),
+    PARTICIPANT_NOT_REGISTERED(8009,"Người tham gia không ở trạng thái chờ xác nhận", HttpStatus.BAD_REQUEST),
+    NO_PARTICIPANTS_TO_CONFIRM(8010,"Không có người tham gia cần xác nhận",      HttpStatus.BAD_REQUEST),
+    EVIDENCE_REQUIRED(8011,       "Vui lòng chọn ít nhất một ảnh minh chứng",    HttpStatus.BAD_REQUEST),
+    EVIDENCE_LIMIT_EXCEEDED(8012, "Chỉ được gửi tối đa 5 ảnh minh chứng",        HttpStatus.BAD_REQUEST),
+    EVIDENCE_NOT_ALLOWED(8013,    "Không thể gửi minh chứng ở trạng thái hiện tại", HttpStatus.BAD_REQUEST),
+    ACTIVITY_CANNOT_CANCEL(8014,  "Không thể hủy hoạt động ở trạng thái hiện tại", HttpStatus.BAD_REQUEST),
+    ACTUAL_HOURS_INVALID(8015,    "Số giờ xác nhận không hợp lệ",                 HttpStatus.BAD_REQUEST),
+    ORGANIZATION_NOT_FOLLOWABLE(8016, "Không thể theo dõi tổ chức này",           HttpStatus.BAD_REQUEST),
+    COMMUNITY_CHAT_NOT_ALLOWED(8017, "Chỉ người đã đăng ký hoạt động mới có thể nhắn tin với tổ chức", HttpStatus.FORBIDDEN);
 
     // ─── Fields ──────────────────────────────────────────────────────
     private final int code;

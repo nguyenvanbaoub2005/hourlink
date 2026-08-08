@@ -22,6 +22,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     /** Đã tồn tại cuộc trò chuyện cho lời mời này chưa */
     boolean existsByInvitation_Id(UUID invitationId);
 
+    /** Một người tham gia chỉ có một hội thoại trong mỗi hoạt động. */
+    Optional<Conversation> findByCommunityActivity_IdAndUserTwo_Id(
+            UUID communityActivityId, UUID participantUserId);
+
     /**
      * Danh sách cuộc trò chuyện của một người dùng, mới nhất trước.
      * Dùng JPQL vì derived query cho điều kiện OR trên hai quan hệ rất dài dòng.

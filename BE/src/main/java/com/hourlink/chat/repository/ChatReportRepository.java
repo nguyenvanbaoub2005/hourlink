@@ -18,4 +18,7 @@ public interface ChatReportRepository extends JpaRepository<ChatReport, UUID> {
 
     /** Danh sách báo cáo tôi đã gửi */
     List<ChatReport> findAllByReporter_EmailOrderByCreatedAtDesc(String reporterEmail);
+    List<ChatReport> findAllByOrderByCreatedAtDesc();
+
+    java.util.Optional<ChatReport> findByIdAndReporter_Email(UUID id, String reporterEmail);
 }

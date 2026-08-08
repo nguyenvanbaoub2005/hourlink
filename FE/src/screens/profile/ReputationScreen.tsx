@@ -16,12 +16,12 @@ import Avatar from '@components/Avatar';
 export default function ReputationScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-  
+
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [ratings, setRatings] = useState<RatingResponse[]>([]);
   const [badges, setBadges] = useState<BadgeResponse[]>([]);
   const [systemBadges, setSystemBadges] = useState<BadgeResponse[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'RATINGS' | 'BADGES'>('RATINGS');
@@ -38,7 +38,7 @@ export default function ReputationScreen() {
       setProfile(profRes.data?.data || null);
       setRatings(ratRes.data?.data?.content || []);
       setBadges(badgRes.data?.data || []);
-      
+
       const sortedSys = (sysBadgRes.data?.data || []).sort((a, b) => {
         if (a.category !== b.category) return (a.category || '').localeCompare(b.category || '');
         return (a.level || 0) - (b.level || 0);
@@ -70,7 +70,7 @@ export default function ReputationScreen() {
   }
 
   const renderRating = ({ item }: { item: RatingResponse }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.ratingCard}
       onPress={() => router.push(`/appointment/${item.appointmentId}` as any)}
       activeOpacity={0.7}
@@ -188,9 +188,11 @@ export default function ReputationScreen() {
       </View>
 
       <FlatList
-        data={activeTab === 'RATINGS' ? ratings : systemBadges}
+        data={(activeTab === 'RATINGS' ? ratings : systemBadges) as Array<RatingResponse | BadgeResponse>}
         keyExtractor={item => item.id}
-        renderItem={activeTab === 'RATINGS' ? (renderRating as any) : (renderBadge as any)}
+        renderItem={({ item }) => activeTab === 'RATINGS'
+          ? renderRating({ item: item as RatingResponse })
+          : renderBadge({ item: item as BadgeResponse })}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

@@ -7,6 +7,7 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import CommunityApi from '@api/community';
 import type { ActivityResponse } from '@types';
 import { useAuthStore } from '@store/authStore';
+import { openCommunityChat } from '@utils/chatNav';
 
 export default function ActivityDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -15,6 +16,7 @@ export default function ActivityDetailScreen() {
   const [activity, setActivity] = useState<ActivityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const fetchDetail = async () => {
     try {
@@ -63,6 +65,25 @@ export default function ActivityDetailScreen() {
     ]);
   };
 
+  const handleToggleFollow = async () => {
+    if (!activity || followLoading) return;
+    try {
+      setFollowLoading(true);
+      if (activity.organizerFollowed) {
+        await CommunityApi.unfollowOrganization(activity.organizerId);
+      } else {
+        await CommunityApi.followOrganization(activity.organizerId);
+      }
+      setActivity(current => current
+        ? { ...current, organizerFollowed: !current.organizerFollowed }
+        : current);
+    } catch (error: any) {
+      Alert.alert('Lỗi', error?.response?.data?.message || 'Không thể cập nhật theo dõi.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const isOrganizer = user?.id === activity?.organizerId;
 
   if (loading || !activity) {
@@ -87,10 +108,50 @@ export default function ActivityDetailScreen() {
         <Text style={styles.title}>{activity.title}</Text>
         
         <View style={styles.orgRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLetter}>{activity.organizerName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <Text style={styles.orgName}>{activity.organizerName}</Text>
+          <TouchableOpacity
+            style={styles.orgChat}
+            onPress={() => activity.registered
+              ? openCommunityChat(router, activity.id)
+              : Alert.alert('Chưa thể nhắn tin', 'Bạn cần đăng ký hoạt động trước khi nhắn tin với tổ chức.')}
+            disabled={isOrganizer}
+            accessibilityRole="button"
+            accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarLetter}>{activity.organizerName.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.orgText}>
+              <Text style={styles.orgName}>{activity.organizerName}</Text>
+              {!isOrganizer && (
+                <Text style={styles.chatLabel}>
+                  {activity.registered ? 'Nhấn để nhắn tin' : 'Đăng ký để nhắn tin'}
+                </Text>
+              )}
+            </View>
+            {!isOrganizer && activity.registered && (
+              <Ionicons name="chatbubble-ellipses-outline" size={21} color={Colors.primary} />
+            )}
+          </TouchableOpacity>
+          {!isOrganizer && (
+            <TouchableOpacity
+              style={[styles.followButton, activity.organizerFollowed && styles.followButtonActive]}
+              onPress={handleToggleFollow}
+              disabled={followLoading}
+              accessibilityRole="button"
+              accessibilityLabel={activity.organizerFollowed ? 'Bỏ theo dõi tổ chức' : 'Theo dõi tổ chức'}
+            >
+              {followLoading
+                ? <ActivityIndicator size="small" color={Colors.primary} />
+                : <>
+                    <Ionicons
+                      name={activity.organizerFollowed ? 'checkmark' : 'person-add-outline'}
+                      size={17}
+                      color={Colors.primary}
+                    />
+                    <Text style={styles.followText}>{activity.organizerFollowed ? 'Đang theo dõi' : 'Theo dõi'}</Text>
+                  </>}
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.infoBox}>
@@ -121,8 +182,9 @@ export default function ActivityDetailScreen() {
           <View style={styles.infoRow}>
             <Ionicons name="gift-outline" size={20} color="#D97706" style={styles.infoIcon} />
             <View>
-              <Text style={styles.infoLabel}>Phần thưởng</Text>
-              <Text style={[styles.infoVal, { color: '#D97706', fontWeight: 'bold' }]}>{activity.creditReward} Time Credit</Text>
+              <Text style={styles.infoLabel}>Credit dự kiến</Text>
+              <Text style={[styles.infoVal, { color: '#D97706', fontWeight: 'bold' }]}>{activity.creditReward} TC dự kiến</Text>
+              <Text style={styles.creditHelper}>Thực nhận theo quy đổi 1 giờ xác nhận = 1 TC</Text>
             </View>
           </View>
         </View>
@@ -135,20 +197,31 @@ export default function ActivityDetailScreen() {
 
       <View style={styles.bottomBar}>
         {isOrganizer ? (
-          <TouchableOpacity 
-            style={styles.actionBtn}
-            onPress={() => router.push(`/community/manage-${activity.id}` as any)}
-          >
-            <Text style={styles.actionBtnText}>Quản lý người tham gia</Text>
-          </TouchableOpacity>
+          <View style={styles.organizerActions}>
+            <TouchableOpacity style={[styles.actionBtn, styles.flexBtn]} onPress={() => router.push(`/community/manage/${activity.id}` as any)}>
+              <Text style={styles.actionBtnText}>Người tham gia</Text>
+            </TouchableOpacity>
+            {activity.status === 'OPEN' && <TouchableOpacity style={[styles.editBtn, styles.flexBtn]} onPress={() => router.push({ pathname: '/community/create', params: { editId: activity.id } } as any)}>
+              <Text style={styles.editBtnText}>Sửa hoạt động</Text>
+            </TouchableOpacity>}
+          </View>
         ) : (
           activity.registered ? (
             <TouchableOpacity 
-              style={[styles.actionBtn, { backgroundColor: '#EF4444' }]}
-              onPress={handleCancel}
+              style={[styles.actionBtn, new Date(activity.endTime) <= new Date() ? styles.evidenceBtn : { backgroundColor: '#EF4444' }]}
+              onPress={new Date(activity.endTime) <= new Date()
+                ? () => router.push(`/community/evidence/${activity.id}` as any)
+                : handleCancel}
               disabled={actionLoading}
             >
-              {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionBtnText}>Hủy đăng ký</Text>}
+              {actionLoading ? <ActivityIndicator color="#fff" /> : (
+                <View style={styles.buttonContent}>
+                  {new Date(activity.endTime) <= new Date() && <Ionicons name="camera-outline" size={19} color="#FFFFFF" />}
+                  <Text style={styles.actionBtnText}>
+                    {new Date(activity.endTime) <= new Date() ? 'Gửi / cập nhật minh chứng' : 'Hủy đăng ký'}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
@@ -159,6 +232,18 @@ export default function ActivityDetailScreen() {
               {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionBtnText}>Đăng ký tham gia</Text>}
             </TouchableOpacity>
           )
+        )}
+        {!isOrganizer && (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => router.push({
+              pathname: '/report/create',
+              params: { targetId: activity.id, targetType: 'CONTENT' },
+            } as any)}
+          >
+            <Ionicons name="flag-outline" size={18} color={Colors.danger} />
+            <Text style={styles.reportBtnText}>Báo cáo nội dung</Text>
+          </TouchableOpacity>
         )}
       </View>
     </SafeAreaView>
@@ -175,21 +260,36 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.md },
   title: { fontSize: 22, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 16 },
   
-  orgRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  orgRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
+  orgChat: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   avatarLetter: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  orgText: { flex: 1 },
   orgName: { fontSize: 16, fontWeight: '500', color: Colors.textPrimary },
+  chatLabel: { color: Colors.primary, fontSize: 12, marginTop: 3 },
+  followButton: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, backgroundColor: '#FFFFFF' },
+  followButtonActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  followText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
   
   infoBox: { backgroundColor: '#fff', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   infoIcon: { marginRight: 12, width: 24, textAlign: 'center' },
   infoLabel: { fontSize: 12, color: Colors.textMuted, marginBottom: 2 },
   infoVal: { fontSize: 15, fontWeight: '500', color: Colors.textPrimary },
+  creditHelper: { color: Colors.textMuted, fontSize: 12, marginTop: 3 },
   
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
   desc: { fontSize: 15, color: Colors.textSecondary, lineHeight: 24 },
 
   bottomBar: { padding: Spacing.md, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: Colors.border },
   actionBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
-  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  evidenceBtn: { backgroundColor: '#0D9488' },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reportBtn: { marginTop: 10, padding: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  reportBtnText: { color: Colors.danger, fontSize: 14, fontWeight: '600' },
+  organizerActions: { flexDirection: 'row', gap: 10 },
+  flexBtn: { flex: 1 },
+  editBtn: { borderWidth: 1, borderColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
+  editBtnText: { color: Colors.primary, fontSize: 15, fontWeight: 'bold' }
 });

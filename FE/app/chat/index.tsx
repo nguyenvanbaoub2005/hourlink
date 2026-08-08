@@ -70,6 +70,7 @@ export default function ConversationListScreen() {
       (c) =>
         c.otherUserName?.toLowerCase().includes(keyword) ||
         c.skillName?.toLowerCase().includes(keyword) ||
+        c.communityActivityTitle?.toLowerCase().includes(keyword) ||
         c.lastMessagePreview?.toLowerCase().includes(keyword)
     );
   }, [conversations, search]);
@@ -82,7 +83,8 @@ export default function ConversationListScreen() {
         otherName: item.otherUserName,
         otherUserId: item.otherUserId,
         otherAvatarUrl: item.otherUserAvatarUrl ?? '',
-        skillName: item.skillName ?? '',
+        skillName: item.communityActivityTitle ?? item.skillName ?? '',
+        sourceType: item.sourceType,
       },
     });
   };
@@ -131,9 +133,10 @@ export default function ConversationListScreen() {
           <Text style={styles.name} numberOfLines={1}>
             {item.otherUserName}
           </Text>
-          {!!item.skillName && (
+          {!!(item.communityActivityTitle ?? item.skillName) && (
             <Text style={styles.skill} numberOfLines={1}>
-              {item.skillName}
+              {item.sourceType === 'COMMUNITY_ACTIVITY' ? 'Hoạt động: ' : ''}
+              {item.communityActivityTitle ?? item.skillName}
             </Text>
           )}
           <Text

@@ -7,6 +7,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * ActivityParticipant — Bản ghi đăng ký tham gia hoạt động (US-36, US-37).
  *
@@ -48,8 +52,23 @@ public class ActivityParticipant extends BaseEntity {
     @Column(name = "confirm_note", length = 500)
     String confirmNote;
 
+    @Column(name = "confirmed_at")
+    java.time.Instant confirmedAt;
+
     /** Đánh dấu đã nhận Time Credit chưa (tránh cộng 2 lần) */
     @Column(name = "credit_awarded", nullable = false)
     @Builder.Default
     Boolean creditAwarded = false;
+
+    /** Ghi chú do người tham gia gửi kèm ảnh minh chứng. */
+    @Column(name = "evidence_note", length = 500)
+    String evidenceNote;
+
+    @Column(name = "evidence_submitted_at")
+    Instant evidenceSubmittedAt;
+
+    @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC")
+    @Builder.Default
+    List<ActivityEvidence> evidence = new ArrayList<>();
 }

@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import CommunityApi from '@api/community';
 import type { ActivityResponse } from '@types';
 import { useAuthStore } from '@store/authStore';
+import { openCommunityChat } from '@utils/chatNav';
 
 export default function CommunityHomeScreen() {
   const router = useRouter();
@@ -13,13 +14,14 @@ export default function CommunityHomeScreen() {
   const [activities, setActivities] = useState<ActivityResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [followLoadingId, setFollowLoadingId] = useState<string>();
 
   // Chỉ Organization hoặc Admin mới được phép tạo hoạt động cộng đồng (theo thiết kế)
   const canCreate = role?.includes('ROLE_ORGANIZATION') || role?.includes('ROLE_ADMIN') || user?.userType === 'organization' || user?.userType === 'admin';
 
   const fetchActivities = async () => {
     try {
-      const res = await CommunityApi.getOpenActivities(0, 20);
+      const res = await CommunityApi.getCommunityFeed(0, 50);
       setActivities(res.data?.data?.content || []);
     } catch (e) {
       console.error('Lỗi tải hoạt động cộng đồng:', e);
@@ -40,20 +42,89 @@ export default function CommunityHomeScreen() {
     setRefreshing(false);
   };
 
+  const toggleFollow = async (item: ActivityResponse) => {
+    if (followLoadingId) return;
+    try {
+      setFollowLoadingId(item.organizerId);
+      if (item.organizerFollowed) {
+        await CommunityApi.unfollowOrganization(item.organizerId);
+      } else {
+        await CommunityApi.followOrganization(item.organizerId);
+      }
+      setActivities(current => current.map(activity =>
+        activity.organizerId === item.organizerId
+          ? { ...activity, organizerFollowed: !item.organizerFollowed }
+          : activity
+      ));
+    } catch (error: any) {
+      Alert.alert('Lỗi', error?.response?.data?.message || 'Không thể cập nhật theo dõi.');
+    } finally {
+      setFollowLoadingId(undefined);
+    }
+  };
+
   const renderItem = ({ item }: { item: ActivityResponse }) => (
     <TouchableOpacity 
       style={styles.card}
-      onPress={() => router.push(`/community/${item.id}` as any)}
+      onPress={() => router.push(
+        item.registered
+          ? `/community/evidence/${item.id}` as any
+          : `/community/${item.id}` as any
+      )}
+      accessibilityRole="button"
+      accessibilityLabel={item.registered
+        ? `Mở minh chứng cho hoạt động ${item.title}`
+        : `Xem hoạt động ${item.title}`}
     >
       <View style={styles.cardHeader}>
-        <View style={styles.orgInfo}>
+        <TouchableOpacity
+          style={styles.orgInfo}
+          disabled={!user?.id || user.id === item.organizerId}
+          onPress={(event) => {
+            event.stopPropagation();
+            if (item.registered) {
+              openCommunityChat(router, item.id);
+            } else {
+              Alert.alert('Chưa thể nhắn tin', 'Bạn cần đăng ký hoạt động trước khi nhắn tin với tổ chức.');
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Nhắn tin với ${item.organizerName}`}
+        >
           <View style={styles.avatar}>
             <Text style={styles.avatarLetter}>{item.organizerName.charAt(0).toUpperCase()}</Text>
           </View>
           <Text style={styles.orgName}>{item.organizerName}</Text>
-        </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>+{item.creditReward} TC</Text>
+          {!!user?.id && user.id !== item.organizerId && item.registered && (
+            <Ionicons name="chatbubble-ellipses-outline" size={17} color={Colors.primary} style={styles.chatIcon} />
+          )}
+        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {!!user?.id && user.id !== item.organizerId && (
+            <TouchableOpacity
+              style={[styles.followIconButton, item.organizerFollowed && styles.followIconButtonActive]}
+              onPress={(event) => {
+                event.stopPropagation();
+                toggleFollow(item);
+              }}
+              disabled={followLoadingId === item.organizerId}
+              accessibilityRole="button"
+              accessibilityLabel={item.organizerFollowed
+                ? `Bỏ theo dõi ${item.organizerName}`
+                : `Theo dõi ${item.organizerName}`}
+            >
+              {followLoadingId === item.organizerId
+                ? <ActivityIndicator size="small" color={Colors.primary} />
+                : <Ionicons
+                    name={item.organizerFollowed ? 'checkmark-circle' : 'person-add-outline'}
+                    size={18}
+                    color={Colors.primary}
+                  />}
+            </TouchableOpacity>
+          )}
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>~{item.creditReward} TC</Text>
+          </View>
         </View>
       </View>
       
@@ -84,6 +155,17 @@ export default function CommunityHomeScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.shortcutRow}>
+        <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/following' as any)}>
+          <Ionicons name="people-circle-outline" size={18} color={Colors.primary} />
+          <Text style={styles.shortcutText}>Đang theo dõi</Text>
+        </TouchableOpacity>
+        {canCreate && (
+          <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/mine' as any)}>
+            <Ionicons name="settings-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Quản lý</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       {canCreate && (
         <TouchableOpacity 
           style={styles.createBtn}
@@ -142,6 +224,10 @@ const styles = StyleSheet.create({
   avatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   avatarLetter: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   orgName: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  chatIcon: { marginLeft: 7 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  followIconButton: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border, borderRadius: 15, backgroundColor: '#FFFFFF' },
+  followIconButtonActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
   badge: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   badgeText: { color: '#D97706', fontSize: 12, fontWeight: 'bold' },
   
@@ -156,5 +242,8 @@ const styles = StyleSheet.create({
   registeredText: { color: '#059669', fontSize: 12, fontWeight: 'bold' },
 
   emptyBox: { alignItems: 'center', marginTop: 60, padding: 20 },
-  emptyText: { color: Colors.textMuted, marginTop: 12, textAlign: 'center' }
+  emptyText: { color: Colors.textMuted, marginTop: 12, textAlign: 'center' },
+  shortcutRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingHorizontal: Spacing.md, paddingTop: 10 },
+  shortcut: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 7, borderRadius: Radius.md },
+  shortcutText: { color: Colors.primary, fontWeight: '600', fontSize: 13 }
 });

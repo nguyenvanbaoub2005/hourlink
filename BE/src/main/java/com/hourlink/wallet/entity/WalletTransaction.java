@@ -23,7 +23,10 @@ import lombok.experimental.FieldDefaults;
 @Table(name = "wallet_transaction", indexes = {
         @Index(name = "idx_wallet_tx_wallet",      columnList = "wallet_id"),
         @Index(name = "idx_wallet_tx_type",        columnList = "type"),
-        @Index(name = "idx_wallet_tx_appointment", columnList = "appointment_id")
+        @Index(name = "idx_wallet_tx_appointment", columnList = "appointment_id"),
+        @Index(name = "idx_wallet_tx_reference",   columnList = "reference_type,reference_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uq_wallet_tx_idempotency", columnNames = "idempotency_key")
 })
 @Getter @Setter @Builder @AllArgsConstructor @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -60,4 +63,15 @@ public class WalletTransaction extends BaseEntity {
     /** Mô tả ngắn gọn hiển thị cho người dùng */
     @Column(name = "description", columnDefinition = "TEXT")
     String description;
+
+    /** Nguồn nghiệp vụ ngoài Appointment, ví dụ COMMUNITY_ACTIVITY. */
+    @Column(name = "reference_type", length = 50)
+    String referenceType;
+
+    @Column(name = "reference_id")
+    java.util.UUID referenceId;
+
+    /** Khóa chống ghi thưởng hai lần; nullable cho các giao dịch cũ. */
+    @Column(name = "idempotency_key", length = 150)
+    String idempotencyKey;
 }
