@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput, Image, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ export default function ManageParticipantsScreen() {
   const [confirmNote, setConfirmNote] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string>();
+  const [previewImage, setPreviewImage] = useState<string>();
 
   const fetchParticipants = async () => {
     try {
@@ -152,6 +153,28 @@ export default function ManageParticipantsScreen() {
             />
           )}
         </View>
+
+        {!!item.evidence?.length && (
+          <View style={styles.evidenceSection}>
+            <View style={styles.evidenceHeader}>
+              <Ionicons name="camera-outline" size={17} color="#0D9488" />
+              <Text style={styles.evidenceTitle}>Minh chứng ({item.evidence.length} ảnh)</Text>
+              {!!item.evidenceSubmittedAt && (
+                <Text style={styles.evidenceDate}>
+                  {new Date(item.evidenceSubmittedAt).toLocaleDateString('vi-VN')}
+                </Text>
+              )}
+            </View>
+            <View style={styles.evidenceImages}>
+              {item.evidence.map(evidence => (
+                <TouchableOpacity key={evidence.id} onPress={() => setPreviewImage(evidence.fileUrl)}>
+                  <Image source={{ uri: evidence.fileUrl }} style={styles.evidenceThumbnail} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            {!!item.evidenceNote && <Text style={styles.evidenceNote}>{item.evidenceNote}</Text>}
+          </View>
+        )}
       </View>
     );
   };
@@ -222,6 +245,15 @@ export default function ManageParticipantsScreen() {
             userId={profileUserId}
             onClose={() => setProfileUserId(undefined)}
           />
+
+          <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(undefined)}>
+            <View style={styles.previewOverlay}>
+              <TouchableOpacity style={styles.previewClose} onPress={() => setPreviewImage(undefined)}>
+                <Ionicons name="close" size={30} color="#FFFFFF" />
+              </TouchableOpacity>
+              {!!previewImage && <Image source={{ uri: previewImage }} style={styles.previewImage} resizeMode="contain" />}
+            </View>
+          </Modal>
         </>
       )}
     </SafeAreaView>
@@ -246,6 +278,13 @@ const styles = StyleSheet.create({
   selectButton: { paddingVertical: 8, paddingRight: 12 },
   profileButton: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   userInfo: { flex: 1, minWidth: 0 },
+  evidenceSection: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  evidenceHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  evidenceTitle: { color: '#0D9488', fontWeight: '700', fontSize: 13 },
+  evidenceDate: { marginLeft: 'auto', color: Colors.textMuted, fontSize: 11 },
+  evidenceImages: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 9 },
+  evidenceThumbnail: { width: 64, height: 64, borderRadius: Radius.sm, backgroundColor: '#E2E8F0' },
+  evidenceNote: { color: Colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 8 },
   
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   avatarLetter: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
@@ -265,5 +304,8 @@ const styles = StyleSheet.create({
   notice: { marginHorizontal: Spacing.md, marginTop: 10, padding: 10, backgroundColor: '#FEF3C7', borderRadius: Radius.md },
   noticeText: { color: '#92400E', fontSize: 13 },
   confirmBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
-  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', alignItems: 'center', justifyContent: 'center' },
+  previewClose: { position: 'absolute', right: 18, top: 50, zIndex: 2, padding: 8 },
+  previewImage: { width: '95%', height: '82%' },
 });

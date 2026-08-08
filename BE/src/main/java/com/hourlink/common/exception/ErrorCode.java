@@ -93,7 +93,10 @@ public enum ErrorCode {
     ACTIVITY_HAS_PARTICIPANTS(8007,"Không thể xóa hoạt động đang có người đăng ký", HttpStatus.BAD_REQUEST),
     ACTIVITY_NOT_ENDED(8008,       "Chỉ có thể xác nhận sau khi hoạt động kết thúc", HttpStatus.BAD_REQUEST),
     PARTICIPANT_NOT_REGISTERED(8009,"Người tham gia không ở trạng thái chờ xác nhận", HttpStatus.BAD_REQUEST),
-    NO_PARTICIPANTS_TO_CONFIRM(8010,"Không có người tham gia cần xác nhận",      HttpStatus.BAD_REQUEST);
+    NO_PARTICIPANTS_TO_CONFIRM(8010,"Không có người tham gia cần xác nhận",      HttpStatus.BAD_REQUEST),
+    EVIDENCE_REQUIRED(8011,       "Vui lòng chọn ít nhất một ảnh minh chứng",    HttpStatus.BAD_REQUEST),
+    EVIDENCE_LIMIT_EXCEEDED(8012, "Chỉ được gửi tối đa 5 ảnh minh chứng",        HttpStatus.BAD_REQUEST),
+    EVIDENCE_NOT_ALLOWED(8013,    "Không thể gửi minh chứng ở trạng thái hiện tại", HttpStatus.BAD_REQUEST);
 
     // ─── Fields ──────────────────────────────────────────────────────
     private final int code;

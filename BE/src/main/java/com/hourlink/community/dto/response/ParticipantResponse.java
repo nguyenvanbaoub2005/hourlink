@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 /**
  * Response thông tin người tham gia hoạt động (US-37).
@@ -24,6 +25,9 @@ public class ParticipantResponse {
     private String confirmNote;
     private Boolean creditAwarded;
     private Instant confirmedAt;
+    private String evidenceNote;
+    private Instant evidenceSubmittedAt;
+    private List<ActivityEvidenceResponse> evidence;
     private UUID activityId;
     private String activityTitle;
     private String activityLocation;
@@ -43,6 +47,9 @@ public class ParticipantResponse {
                 .confirmNote(p.getConfirmNote())
                 .creditAwarded(p.getCreditAwarded())
                 .confirmedAt(p.getConfirmedAt())
+                .evidenceNote(p.getEvidenceNote())
+                .evidenceSubmittedAt(p.getEvidenceSubmittedAt())
+                .evidence(p.getEvidence().stream().map(ActivityEvidenceResponse::fromEntity).toList())
                 .activityId(p.getActivity().getId())
                 .activityTitle(p.getActivity().getTitle())
                 .activityLocation(p.getActivity().getLocation())

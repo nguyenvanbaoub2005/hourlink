@@ -15,8 +15,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -135,6 +137,22 @@ public class CommunityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponse.success(communityService.getMyRegistrations(page, size)));
+    }
+
+    @Operation(summary = "Xem đăng ký của tôi trong một hoạt động")
+    @GetMapping("/activities/{id}/my-participation")
+    public ResponseEntity<ApiResponse<ParticipantResponse>> getMyParticipation(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(communityService.getMyParticipation(id)));
+    }
+
+    @Operation(summary = "Gửi hoặc cập nhật ảnh minh chứng tham gia hoạt động")
+    @PostMapping(value = "/activities/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ParticipantResponse>> submitEvidence(
+            @PathVariable UUID id,
+            @RequestPart(name = "files", required = false) List<MultipartFile> files,
+            @RequestParam(name = "note", required = false) String note) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã gửi minh chứng tham gia", communityService.submitEvidence(id, files, note)));
     }
 
     // ─── US-37 + US-38: Xác nhận người tham gia ──────────────────────────────

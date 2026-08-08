@@ -3,12 +3,14 @@ package com.hourlink.community.service;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
+import com.hourlink.common.service.CloudinaryService;
 import com.hourlink.community.dto.request.ConfirmParticipantsRequest;
 import com.hourlink.community.dto.request.CreateActivityRequest;
 import com.hourlink.community.dto.request.UpdateActivityRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
 import com.hourlink.community.entity.ActivityParticipant;
+import com.hourlink.community.entity.ActivityEvidence;
 import com.hourlink.community.entity.CommunityActivity;
 import com.hourlink.community.enums.ActivityParticipantStatus;
 import com.hourlink.community.enums.ActivityStatus;
@@ -27,9 +29,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.time.Instant;
 
@@ -52,6 +57,14 @@ public class CommunityService {
     private final UserRepository userRepository;
     private final WalletService walletService;
     private final NotificationService notificationService;
+    private final CloudinaryService cloudinaryService;
+
+    private static final String EVIDENCE_FOLDER = "community_evidence";
+    private static final int MAX_EVIDENCE_FILES = 5;
+    private static final long MAX_EVIDENCE_FILE_SIZE = 5 * 1024 * 1024L;
+    private static final List<String> ALLOWED_EVIDENCE_TYPES = List.of(
+            "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"
+    );
 
     // ─── US-35: CRUD Hoạt động cộng đồng ────────────────────────────────────
 
@@ -346,6 +359,62 @@ public class CommunityService {
                 .map(ParticipantResponse::fromEntity);
     }
 
+    /** Lấy bản ghi tham gia của người dùng hiện tại trong một hoạt động. */
+    public ParticipantResponse getMyParticipation(UUID activityId) {
+        User currentUser = getCurrentUser();
+        ActivityParticipant participant = participantRepo
+                .findByActivityIdAndUserId(activityId, currentUser.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        return ParticipantResponse.fromEntity(participant);
+    }
+
+    /**
+     * Gửi mới hoặc thay toàn bộ ảnh minh chứng. Người dùng chỉ được gửi sau khi
+     * hoạt động kết thúc và trước khi tổ chức xác nhận.
+     */
+    @Transactional
+    public ParticipantResponse submitEvidence(UUID activityId, List<MultipartFile> files, String note) {
+        User currentUser = getCurrentUser();
+        ActivityParticipant participant = participantRepo
+                .findByActivityIdAndUserId(activityId, currentUser.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+        if (participant.getStatus() != ActivityParticipantStatus.REGISTERED ||
+                Instant.now().isBefore(participant.getActivity().getEndTime())) {
+            throw new AppException(ErrorCode.EVIDENCE_NOT_ALLOWED);
+        }
+
+        List<MultipartFile> selectedFiles = files == null
+                ? List.of()
+                : files.stream().filter(file -> file != null && !file.isEmpty()).toList();
+        if (selectedFiles.isEmpty() && participant.getEvidence().isEmpty()) {
+            throw new AppException(ErrorCode.EVIDENCE_REQUIRED);
+        }
+        if (selectedFiles.size() > MAX_EVIDENCE_FILES) {
+            throw new AppException(ErrorCode.EVIDENCE_LIMIT_EXCEEDED);
+        }
+        if (note != null && note.trim().length() > 500) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        selectedFiles.forEach(this::validateEvidenceFile);
+
+        if (!selectedFiles.isEmpty()) {
+            List<ActivityEvidence> uploaded = uploadEvidenceFiles(participant, selectedFiles);
+            List<ActivityEvidence> previous = new ArrayList<>(participant.getEvidence());
+            participant.getEvidence().clear();
+            participant.getEvidence().addAll(uploaded);
+            participantRepo.saveAndFlush(participant);
+            previous.forEach(item -> cloudinaryService.deleteFile(item.getPublicId(), true));
+        }
+
+        participant.setEvidenceNote(note == null || note.isBlank() ? null : note.trim());
+        participant.setEvidenceSubmittedAt(Instant.now());
+        participant = participantRepo.saveAndFlush(participant);
+        log.info("User [{}] submitted {} evidence images for activity [{}]",
+                currentUser.getId(), participant.getEvidence().size(), activityId);
+        return ParticipantResponse.fromEntity(participant);
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private CommunityActivity getActivityOrThrow(UUID id) {
@@ -366,6 +435,39 @@ public class CommunityService {
         }
         if (!Instant.now().isBefore(activity.getStartTime())) {
             throw new AppException(ErrorCode.ACTIVITY_ALREADY_STARTED);
+        }
+    }
+
+    private void validateEvidenceFile(MultipartFile file) {
+        if (file.getSize() > MAX_EVIDENCE_FILE_SIZE) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        if (!ALLOWED_EVIDENCE_TYPES.contains(contentType)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private List<ActivityEvidence> uploadEvidenceFiles(ActivityParticipant participant,
+                                                        List<MultipartFile> files) {
+        List<ActivityEvidence> uploaded = new ArrayList<>();
+        try {
+            for (MultipartFile file : files) {
+                Map<String, Object> result = cloudinaryService.uploadFile(file, EVIDENCE_FOLDER);
+                uploaded.add(ActivityEvidence.builder()
+                        .participant(participant)
+                        .fileUrl((String) result.get("secure_url"))
+                        .publicId((String) result.get("public_id"))
+                        .originalName(file.getOriginalFilename())
+                        .fileSize(file.getSize())
+                        .build());
+            }
+            return uploaded;
+        } catch (IOException | RuntimeException error) {
+            uploaded.forEach(item -> cloudinaryService.deleteFile(item.getPublicId(), true));
+            log.error("Failed to upload community evidence: {}", error.getMessage());
+            if (error instanceof AppException appException) throw appException;
+            throw new AppException(ErrorCode.UPLOAD_FAILED);
         }
     }
 

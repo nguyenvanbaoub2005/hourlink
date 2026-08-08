@@ -48,6 +48,20 @@ const CommunityApi = {
     );
   },
 
+  getMyParticipation: (id: string) => {
+    return axiosInstance.get<ApiResponse<ParticipantResponse>>(
+      `${BASE_URL}/activities/${id}/my-participation`
+    );
+  },
+
+  submitEvidence: (id: string, formData: FormData) => {
+    return axiosInstance.post<ApiResponse<ParticipantResponse>>(
+      `${BASE_URL}/activities/${id}/evidence`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  },
+
   // ─── Tổ chức (CRUD) ─────────────────────────────────────────
 
   createActivity: (data: CreateActivityRequest) => {

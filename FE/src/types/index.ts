@@ -496,12 +496,23 @@ export interface ParticipantResponse {
   confirmNote?: string;
   creditAwarded?: boolean;
   confirmedAt?: string;
+  evidenceNote?: string;
+  evidenceSubmittedAt?: string;
+  evidence: ActivityEvidenceResponse[];
   activityId: string;
   activityTitle: string;
   activityLocation?: string;
   activityStartTime: string;
   activityEndTime: string;
   activityCreditReward: number;
+  createdAt: string;
+}
+
+export interface ActivityEvidenceResponse {
+  id: string;
+  fileUrl: string;
+  originalName?: string;
+  fileSize?: number;
   createdAt: string;
 }
 

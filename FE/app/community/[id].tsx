@@ -146,11 +146,20 @@ export default function ActivityDetailScreen() {
         ) : (
           activity.registered ? (
             <TouchableOpacity 
-              style={[styles.actionBtn, { backgroundColor: '#EF4444' }]}
-              onPress={handleCancel}
+              style={[styles.actionBtn, new Date(activity.endTime) <= new Date() ? styles.evidenceBtn : { backgroundColor: '#EF4444' }]}
+              onPress={new Date(activity.endTime) <= new Date()
+                ? () => router.push(`/community/evidence/${activity.id}` as any)
+                : handleCancel}
               disabled={actionLoading}
             >
-              {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionBtnText}>Hủy đăng ký</Text>}
+              {actionLoading ? <ActivityIndicator color="#fff" /> : (
+                <View style={styles.buttonContent}>
+                  {new Date(activity.endTime) <= new Date() && <Ionicons name="camera-outline" size={19} color="#FFFFFF" />}
+                  <Text style={styles.actionBtnText}>
+                    {new Date(activity.endTime) <= new Date() ? 'Gửi / cập nhật minh chứng' : 'Hủy đăng ký'}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
@@ -206,6 +215,8 @@ const styles = StyleSheet.create({
   bottomBar: { padding: Spacing.md, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: Colors.border },
   actionBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
   actionBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  evidenceBtn: { backgroundColor: '#0D9488' },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reportBtn: { marginTop: 10, padding: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
   reportBtnText: { color: Colors.danger, fontSize: 14, fontWeight: '600' },
   organizerActions: { flexDirection: 'row', gap: 10 },
