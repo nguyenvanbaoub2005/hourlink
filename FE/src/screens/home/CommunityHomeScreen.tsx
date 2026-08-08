@@ -21,7 +21,7 @@ export default function CommunityHomeScreen() {
 
   const fetchActivities = async () => {
     try {
-      const res = await CommunityApi.getOpenActivities(0, 20);
+      const res = await CommunityApi.getCommunityFeed(0, 50);
       setActivities(res.data?.data?.content || []);
     } catch (e) {
       console.error('Lỗi tải hoạt động cộng đồng:', e);

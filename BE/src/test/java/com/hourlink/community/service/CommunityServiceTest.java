@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -97,6 +99,32 @@ class CommunityServiceTest {
         AppException error = assertThrows(AppException.class, () -> service.register(activity.getId()));
 
         assertEquals(ErrorCode.ORGANIZER_CANNOT_REGISTER, error.getErrorCode());
+    }
+
+    @Test
+    void communityFeed_keepsEndedRegisteredActivityVisibleForEvidence() {
+        CommunityActivity activity = futureActivity(user("org@hourlink.vn"));
+        activity.setStatus(ActivityStatus.CLOSED);
+        activity.setStartTime(Instant.now().minusSeconds(7200));
+        activity.setEndTime(Instant.now().minusSeconds(3600));
+        ActivityParticipant participant = participant(
+                activity, currentUser, ActivityParticipantStatus.REGISTERED);
+
+        when(activityRepo.findCommunityFeedForUser(
+                eq(currentUser.getId()), any(Instant.class), eq(ActivityStatus.OPEN),
+                argThat(statuses -> statuses.contains(ActivityParticipantStatus.REGISTERED)
+                        && statuses.contains(ActivityParticipantStatus.CONFIRMED)
+                        && statuses.contains(ActivityParticipantStatus.ABSENT)),
+                any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(activity)));
+        when(participantRepo.findByActivityIdAndUserId(activity.getId(), currentUser.getId()))
+                .thenReturn(Optional.of(participant));
+
+        var result = service.getCommunityFeed(0, 20);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(activity.getId(), result.getContent().getFirst().getId());
+        assertTrue(result.getContent().getFirst().isRegistered());
     }
 
     @Test

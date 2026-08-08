@@ -1,6 +1,7 @@
 package com.hourlink.community.repository;
 
 import com.hourlink.community.entity.CommunityActivity;
+import com.hourlink.community.enums.ActivityParticipantStatus;
 import com.hourlink.community.enums.ActivityStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Instant;
+import java.util.Collection;
 
 public interface CommunityActivityRepository extends JpaRepository<CommunityActivity, UUID> {
 
@@ -26,6 +28,31 @@ public interface CommunityActivityRepository extends JpaRepository<CommunityActi
 
     Page<CommunityActivity> findByStatusAndStartTimeAfterOrderByCreatedAtDesc(
             ActivityStatus status, Instant now, Pageable pageable);
+
+    /**
+     * Feed Community: hoạt động đang mở cho mọi người và các hoạt động mà user
+     * đã/đang tham gia. Nhờ vậy hoạt động không biến mất khỏi UI trước lúc user
+     * có thể gửi minh chứng sau khi kết thúc.
+     */
+    @Query(value = """
+            SELECT DISTINCT a FROM CommunityActivity a
+            LEFT JOIN a.participants p
+            WHERE (a.status = :open AND a.startTime > :now)
+               OR (p.user.id = :userId AND p.status IN :participantStatuses)
+            ORDER BY a.createdAt DESC
+            """,
+            countQuery = """
+            SELECT COUNT(DISTINCT a) FROM CommunityActivity a
+            LEFT JOIN a.participants p
+            WHERE (a.status = :open AND a.startTime > :now)
+               OR (p.user.id = :userId AND p.status IN :participantStatuses)
+            """)
+    Page<CommunityActivity> findCommunityFeedForUser(
+            @Param("userId") UUID userId,
+            @Param("now") Instant now,
+            @Param("open") ActivityStatus open,
+            @Param("participantStatuses") Collection<ActivityParticipantStatus> participantStatuses,
+            Pageable pageable);
 
     /** Lấy tất cả hoạt động của một tổ chức, mới nhất trước */
     Page<CommunityActivity> findByOrganizerIdOrderByCreatedAtDesc(UUID organizerId, Pageable pageable);

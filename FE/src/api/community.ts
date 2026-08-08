@@ -22,6 +22,14 @@ const CommunityApi = {
     );
   },
 
+  /** Hoạt động đang mở + hoạt động người dùng đã đăng ký để truy cập minh chứng */
+  getCommunityFeed: (page = 0, size = 10) => {
+    return axiosInstance.get<ApiResponse<PagedResponse<ActivityResponse>>>(
+      `${BASE_URL}/activities/feed`,
+      { params: { page, size } }
+    );
+  },
+
   getAllActivities: (page = 0, size = 10) => {
     return axiosInstance.get<ApiResponse<PagedResponse<ActivityResponse>>>(
       `${BASE_URL}/activities/all`,

@@ -102,6 +102,14 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success(communityService.getOpenActivities(page, size)));
     }
 
+    @Operation(summary = "Feed Community gồm hoạt động đang mở và hoạt động tôi đã đăng ký")
+    @GetMapping("/activities/feed")
+    public ResponseEntity<ApiResponse<Page<ActivityResponse>>> getCommunityFeed(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.success(communityService.getCommunityFeed(page, size)));
+    }
+
     @Operation(summary = "Toàn bộ hoạt động (admin / organizer)")
     @GetMapping("/activities/all")
     public ResponseEntity<ApiResponse<Page<ActivityResponse>>> getAll(

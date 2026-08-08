@@ -211,6 +211,24 @@ public class CommunityService {
                 .map(a -> toResponse(a, currentUser));
     }
 
+    /**
+     * Feed dành cho màn Community: gồm hoạt động đang mở và hoạt động người
+     * dùng đã đăng ký để vẫn truy cập được minh chứng sau khi hoạt động kết thúc.
+     */
+    public Page<ActivityResponse> getCommunityFeed(int page, int size) {
+        User currentUser = getCurrentUser();
+        return activityRepo.findCommunityFeedForUser(
+                        currentUser.getId(),
+                        Instant.now(),
+                        ActivityStatus.OPEN,
+                        List.of(
+                                ActivityParticipantStatus.REGISTERED,
+                                ActivityParticipantStatus.CONFIRMED,
+                                ActivityParticipantStatus.ABSENT),
+                        PageRequest.of(page, size))
+                .map(a -> toResponse(a, currentUser));
+    }
+
     /** Lấy tất cả hoạt động (admin / organizer xem toàn bộ) */
     @PreAuthorize("hasAnyAuthority('ROLE_ORGANIZATION', 'ROLE_ADMIN')")
     public Page<ActivityResponse> getAllActivities(int page, int size) {
