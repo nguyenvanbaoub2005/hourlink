@@ -83,3 +83,34 @@ export async function openChatFromInvitation(
     Alert.alert('Lỗi', msg);
   }
 }
+
+/**
+ * Mở cuộc trò chuyện riêng của một lượt đăng ký hoạt động cộng đồng.
+ * Backend kiểm tra quyền tham gia và đảm bảo gọi lại vẫn trả cùng hội thoại.
+ */
+export async function openCommunityChat(
+  router: Router,
+  activityId: string
+): Promise<void> {
+  try {
+    const res = await ChatApi.openFromCommunity(activityId);
+    const conv: Conversation | undefined = res.data?.data;
+    if (!conv) return;
+
+    router.push({
+      pathname: '/chat/[id]' as any,
+      params: {
+        id: conv.id,
+        otherName: conv.otherUserName,
+        otherUserId: conv.otherUserId,
+        otherAvatarUrl: conv.otherUserAvatarUrl ?? '',
+        skillName: conv.communityActivityTitle ?? '',
+        sourceType: conv.sourceType,
+      },
+    });
+  } catch (e: any) {
+    const msg = e?.response?.data?.message
+      ?? 'Không mở được cuộc trò chuyện với tổ chức. Vui lòng thử lại.';
+    Alert.alert('Chưa thể nhắn tin', msg);
+  }
+}

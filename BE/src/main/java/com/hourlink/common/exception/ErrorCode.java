@@ -99,7 +99,8 @@ public enum ErrorCode {
     EVIDENCE_NOT_ALLOWED(8013,    "Không thể gửi minh chứng ở trạng thái hiện tại", HttpStatus.BAD_REQUEST),
     ACTIVITY_CANNOT_CANCEL(8014,  "Không thể hủy hoạt động ở trạng thái hiện tại", HttpStatus.BAD_REQUEST),
     ACTUAL_HOURS_INVALID(8015,    "Số giờ xác nhận không hợp lệ",                 HttpStatus.BAD_REQUEST),
-    ORGANIZATION_NOT_FOLLOWABLE(8016, "Không thể theo dõi tổ chức này",           HttpStatus.BAD_REQUEST);
+    ORGANIZATION_NOT_FOLLOWABLE(8016, "Không thể theo dõi tổ chức này",           HttpStatus.BAD_REQUEST),
+    COMMUNITY_CHAT_NOT_ALLOWED(8017, "Chỉ người đã đăng ký hoạt động mới có thể nhắn tin với tổ chức", HttpStatus.FORBIDDEN);
 
     // ─── Fields ──────────────────────────────────────────────────────
     private final int code;

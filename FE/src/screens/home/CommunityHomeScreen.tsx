@@ -6,7 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import CommunityApi from '@api/community';
 import type { ActivityResponse } from '@types';
 import { useAuthStore } from '@store/authStore';
-import { openChatWithUser } from '@utils/chatNav';
+import { openCommunityChat } from '@utils/chatNav';
 
 export default function CommunityHomeScreen() {
   const router = useRouter();
@@ -82,7 +82,11 @@ export default function CommunityHomeScreen() {
           disabled={!user?.id || user.id === item.organizerId}
           onPress={(event) => {
             event.stopPropagation();
-            openChatWithUser(router, item.organizerId, item.organizerName);
+            if (item.registered) {
+              openCommunityChat(router, item.id);
+            } else {
+              Alert.alert('Chưa thể nhắn tin', 'Bạn cần đăng ký hoạt động trước khi nhắn tin với tổ chức.');
+            }
           }}
           accessibilityRole="button"
           accessibilityLabel={`Nhắn tin với ${item.organizerName}`}
@@ -91,7 +95,7 @@ export default function CommunityHomeScreen() {
             <Text style={styles.avatarLetter}>{item.organizerName.charAt(0).toUpperCase()}</Text>
           </View>
           <Text style={styles.orgName}>{item.organizerName}</Text>
-          {!!user?.id && user.id !== item.organizerId && (
+          {!!user?.id && user.id !== item.organizerId && item.registered && (
             <Ionicons name="chatbubble-ellipses-outline" size={17} color={Colors.primary} style={styles.chatIcon} />
           )}
         </TouchableOpacity>

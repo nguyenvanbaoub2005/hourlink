@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import CommunityApi from '@api/community';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import type { ActivityResponse, ParticipantResponse } from '@types';
-import { openChatWithUser } from '@utils/chatNav';
+import { openCommunityChat } from '@utils/chatNav';
 
 const MAX_IMAGES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -140,10 +140,10 @@ export default function ActivityEvidenceScreen() {
         <Text style={styles.activityTitle}>{participant.activityTitle}</Text>
         <Text style={styles.meta}>Kết thúc: {new Date(participant.activityEndTime).toLocaleString('vi-VN')}</Text>
 
-        {!!activity && (
+        {!!activity && participant.status !== 'CANCELLED' && (
           <TouchableOpacity
             style={styles.chatButton}
-            onPress={() => openChatWithUser(router, activity.organizerId, activity.organizerName)}
+            onPress={() => openCommunityChat(router, id)}
             accessibilityRole="button"
             accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
           >

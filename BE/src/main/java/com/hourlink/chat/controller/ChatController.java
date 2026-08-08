@@ -61,6 +61,13 @@ public class ChatController {
         return ApiResponse.success(chatService.getOrCreateConversation(invitationId));
     }
 
+    @Operation(summary = "Mở cuộc trò chuyện với tổ chức từ hoạt động cộng đồng",
+            description = "Dành cho người đã đăng ký; không yêu cầu lời mời kỹ năng và có tính idempotent")
+    @PostMapping("/conversations/from-community/{activityId}")
+    public ApiResponse<ConversationResponse> openCommunityConversation(@PathVariable UUID activityId) {
+        return ApiResponse.success(chatService.getOrCreateCommunityConversation(activityId));
+    }
+
     @Operation(summary = "Danh sách cuộc trò chuyện của tôi")
     @GetMapping("/conversations")
     public ApiResponse<List<ConversationResponse>> getMyConversations() {

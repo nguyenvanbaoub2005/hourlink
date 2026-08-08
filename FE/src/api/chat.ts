@@ -18,6 +18,10 @@ const ChatApi = {
   openFromInvitation: (invitationId: string) =>
     api.post(`/chat/conversations/from-invitation/${invitationId}`),
 
+  /** Mở chat giữa người đã đăng ký hoạt động cộng đồng và tổ chức */
+  openFromCommunity: (activityId: string) =>
+    api.post(`/chat/conversations/from-community/${activityId}`),
+
   /** Danh sách cuộc trò chuyện của tôi */
   getConversations: () => api.get('/chat/conversations'),
 

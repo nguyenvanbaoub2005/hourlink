@@ -221,11 +221,14 @@ export interface Invitation {
 /** Mirror com.hourlink.chat.dto.response.ConversationResponse */
 export interface Conversation {
   id: string;
-  invitationId: string;
-  invitationStatus: string;
-  invitationSenderId: string;
-  invitationReceiverId: string;
+  sourceType: 'SKILL_INVITATION' | 'COMMUNITY_ACTIVITY';
+  invitationId?: string;
+  invitationStatus?: string;
+  invitationSenderId?: string;
+  invitationReceiverId?: string;
   skillName?: string;
+  communityActivityId?: string;
+  communityActivityTitle?: string;
 
   otherUserId: string;
   otherUserName: string;

@@ -85,12 +85,13 @@ const CREDIT_OPTIONS = [
 
 export default function ChatRoomScreen() {
   const router = useRouter();
-  const { id, otherName, otherUserId, otherAvatarUrl, skillName } = useLocalSearchParams<{
+  const { id, otherName, otherUserId, otherAvatarUrl, skillName, sourceType } = useLocalSearchParams<{
     id: string;
     otherName?: string;
     otherUserId?: string;
     otherAvatarUrl?: string;
     skillName?: string;
+    sourceType?: Conversation['sourceType'];
   }>();
 
   const { clearUnread } = useChatStore();
@@ -106,7 +107,9 @@ export default function ChatRoomScreen() {
   const peerName = conversation?.otherUserName ?? otherName;
   const peerAvatar = conversation?.otherUserAvatarUrl ?? (otherAvatarUrl || undefined);
   const peerId = conversation?.otherUserId ?? otherUserId;
-  const peerSkill = conversation?.skillName ?? skillName;
+  const peerSkill = conversation?.communityActivityTitle ?? conversation?.skillName ?? skillName;
+  const isCommunityChat = conversation?.sourceType === 'COMMUNITY_ACTIVITY'
+    || (!conversation && sourceType === 'COMMUNITY_ACTIVITY');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -428,6 +431,7 @@ export default function ChatRoomScreen() {
   };
 
   const submitReschedule = async () => {
+    if (isCommunityChat) return;
     const time = rescheduleTime.trim();
     if (!time || !id) return;
 
@@ -446,6 +450,7 @@ export default function ChatRoomScreen() {
   };
 
   const openCreateAppointmentModal = () => {
+    if (isCommunityChat) return;
     setAptTitle(peerSkill ? `Hỗ trợ: ${peerSkill}` : 'Buổi hỗ trợ kỹ năng');
 
     // Tìm tin nhắn chứa link họp gần nhất (MEETING_LINK) để điền tự động
@@ -895,12 +900,14 @@ export default function ChatRoomScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={openCreateAppointmentModal}
-        >
-          <Ionicons name="calendar-outline" size={23} color={Colors.primary} />
-        </TouchableOpacity>
+        {!isCommunityChat && (
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={openCreateAppointmentModal}
+          >
+            <Ionicons name="calendar-outline" size={23} color={Colors.primary} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.headerBtn} onPress={() => setMeetingVisible(true)}>
           <Ionicons name="videocam-outline" size={23} color={Colors.textPrimary} />
         </TouchableOpacity>
@@ -1056,26 +1063,30 @@ export default function ChatRoomScreen() {
               <Ionicons name="person-outline" size={22} color={Colors.textPrimary} />
               <Text style={styles.menuText}>Xem hồ sơ</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                openCreateAppointmentModal();
-              }}
-            >
-              <Ionicons name="calendar" size={22} color={Colors.primary} />
-              <Text style={[styles.menuText, { color: Colors.primary, fontWeight: '700' }]}>Tạo lịch hẹn mới</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                setRescheduleVisible(true);
-              }}
-            >
-              <Ionicons name="calendar-outline" size={22} color={Colors.textPrimary} />
-              <Text style={styles.menuText}>Đề xuất đổi lịch</Text>
-            </TouchableOpacity>
+            {!isCommunityChat && (
+              <>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    openCreateAppointmentModal();
+                  }}
+                >
+                  <Ionicons name="calendar" size={22} color={Colors.primary} />
+                  <Text style={[styles.menuText, { color: Colors.primary, fontWeight: '700' }]}>Tạo lịch hẹn mới</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    setMenuVisible(false);
+                    setRescheduleVisible(true);
+                  }}
+                >
+                  <Ionicons name="calendar-outline" size={22} color={Colors.textPrimary} />
+                  <Text style={styles.menuText}>Đề xuất đổi lịch</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <TouchableOpacity style={styles.menuItem} onPress={confirmBlock}>
               <Ionicons name="ban-outline" size={22} color={Colors.danger} />
               <Text style={[styles.menuText, { color: Colors.danger }]}>Chặn người dùng</Text>
@@ -1237,12 +1248,14 @@ export default function ChatRoomScreen() {
                 <Text style={styles.attachOptionText}>Phòng họp</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); openCreateAppointmentModal(); }}>
-                <View style={[styles.attachOptionIcon, { backgroundColor: '#FEF9C3' }]}>
-                  <Ionicons name="calendar" size={26} color="#CA8A04" />
-                </View>
-                <Text style={styles.attachOptionText}>Lịch hẹn</Text>
-              </TouchableOpacity>
+              {!isCommunityChat && (
+                <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); openCreateAppointmentModal(); }}>
+                  <View style={[styles.attachOptionIcon, { backgroundColor: '#FEF9C3' }]}>
+                    <Ionicons name="calendar" size={26} color="#CA8A04" />
+                  </View>
+                  <Text style={styles.attachOptionText}>Lịch hẹn</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </TouchableOpacity>

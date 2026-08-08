@@ -7,7 +7,7 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import CommunityApi from '@api/community';
 import type { ActivityResponse } from '@types';
 import { useAuthStore } from '@store/authStore';
-import { openChatWithUser } from '@utils/chatNav';
+import { openCommunityChat } from '@utils/chatNav';
 
 export default function ActivityDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -110,7 +110,9 @@ export default function ActivityDetailScreen() {
         <View style={styles.orgRow}>
           <TouchableOpacity
             style={styles.orgChat}
-            onPress={() => openChatWithUser(router, activity.organizerId, activity.organizerName)}
+            onPress={() => activity.registered
+              ? openCommunityChat(router, activity.id)
+              : Alert.alert('Chưa thể nhắn tin', 'Bạn cần đăng ký hoạt động trước khi nhắn tin với tổ chức.')}
             disabled={isOrganizer}
             accessibilityRole="button"
             accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
@@ -120,9 +122,15 @@ export default function ActivityDetailScreen() {
             </View>
             <View style={styles.orgText}>
               <Text style={styles.orgName}>{activity.organizerName}</Text>
-              {!isOrganizer && <Text style={styles.chatLabel}>Nhấn để nhắn tin</Text>}
+              {!isOrganizer && (
+                <Text style={styles.chatLabel}>
+                  {activity.registered ? 'Nhấn để nhắn tin' : 'Đăng ký để nhắn tin'}
+                </Text>
+              )}
             </View>
-            {!isOrganizer && <Ionicons name="chatbubble-ellipses-outline" size={21} color={Colors.primary} />}
+            {!isOrganizer && activity.registered && (
+              <Ionicons name="chatbubble-ellipses-outline" size={21} color={Colors.primary} />
+            )}
           </TouchableOpacity>
           {!isOrganizer && (
             <TouchableOpacity

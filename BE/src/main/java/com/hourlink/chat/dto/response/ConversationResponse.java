@@ -1,5 +1,6 @@
 package com.hourlink.chat.dto.response;
 
+import com.hourlink.chat.enums.ConversationSourceType;
 import com.hourlink.chat.enums.MessageType;
 import com.hourlink.invitation.enums.InvitationStatus;
 import lombok.*;
@@ -17,6 +18,8 @@ public class ConversationResponse {
 
     UUID id;
 
+    ConversationSourceType sourceType;
+
     // ─── Lời mời nguồn ───────────────────────────────────────────────────────
     UUID invitationId;
     InvitationStatus invitationStatus;
@@ -25,6 +28,10 @@ public class ConversationResponse {
 
     /** Tên kỹ năng trao đổi, hiển thị làm phụ đề dưới tên người dùng */
     String skillName;
+
+    // ─── Hoạt động cộng đồng nguồn ──────────────────────────────────────────
+    UUID communityActivityId;
+    String communityActivityTitle;
 
     // ─── Người còn lại trong cuộc trò chuyện ─────────────────────────────────
     UUID otherUserId;
