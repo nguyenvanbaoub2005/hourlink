@@ -15,6 +15,7 @@ import com.hourlink.invitation.entity.Invitation;
 import com.hourlink.invitation.repository.InvitationRepository;
 import com.hourlink.notification.enums.NotificationType;
 import com.hourlink.notification.service.NotificationService;
+import com.hourlink.rating.service.RatingService;
 import com.hourlink.skill.entity.Skill;
 import com.hourlink.skill.enums.SessionFormat;
 import com.hourlink.skill.repository.SkillRepository;
@@ -52,6 +53,7 @@ public class AppointmentService {
     private final NotificationService notificationService;
     private final ChatService chatService;
     private final WalletService walletService;
+    private final RatingService ratingService;
 
     // ─── 1. Tạo lịch hẹn (9.11) ──────────────────────────────────────────────
 
@@ -358,10 +360,12 @@ public class AppointmentService {
             User provider = appointment.getProvider();
             provider.setCompletedSessions(provider.getCompletedSessions() + 1);
             userRepository.save(provider);
+            ratingService.checkAndAwardBadges(provider);
             
             User receiver = appointment.getReceiver();
             receiver.setCompletedSessions(receiver.getCompletedSessions() + 1);
             userRepository.save(receiver);
+            ratingService.checkAndAwardBadges(receiver);
 
             // Wallet Hook: Chuyển Time Credit từ Receiver sang Provider
             walletService.transferCredit(appointment);

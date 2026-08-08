@@ -391,6 +391,7 @@ export interface WalletTransaction {
 export interface RatingResponse {
   id: string;
   appointmentId: string;
+  appointmentTitle?: string;
   reviewerId: string;
   reviewerName: string;
   reviewerAvatarUrl?: string;
@@ -412,6 +413,8 @@ export type Rating = RatingResponse;
 export interface BadgeResponse {
   id: string;
   code: string;
+  category?: string;
+  level?: number;
   name: string;
   description?: string;
   iconUrl?: string;

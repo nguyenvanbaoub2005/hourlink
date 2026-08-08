@@ -30,6 +30,14 @@ public class Badge extends BaseEntity {
     @Column(name = "code", nullable = false, unique = true, length = 50)
     String code;
 
+    /** Nhóm huy hiệu (vd: SESSION_COUNT, RATING_SCORE) để gom nhóm tiến hóa */
+    @Column(name = "category", length = 50)
+    String category;
+
+    /** Cấp độ trong nhóm (số càng lớn cấp càng cao) */
+    @Column(name = "level_val")
+    Integer level;
+
     /** Tên hiển thị của huy hiệu */
     @Column(name = "name", nullable = false, length = 100)
     String name;

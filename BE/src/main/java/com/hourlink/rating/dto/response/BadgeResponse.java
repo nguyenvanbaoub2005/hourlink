@@ -13,6 +13,8 @@ import java.time.Instant;
 public class BadgeResponse {
     private String id;
     private String code;
+    private String category;
+    private Integer level;
     private String name;
     private String description;
     private String iconUrl;

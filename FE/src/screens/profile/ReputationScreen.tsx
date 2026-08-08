@@ -16,11 +16,12 @@ import Avatar from '@components/Avatar';
 export default function ReputationScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-  
+
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [ratings, setRatings] = useState<RatingResponse[]>([]);
   const [badges, setBadges] = useState<BadgeResponse[]>([]);
-  
+  const [systemBadges, setSystemBadges] = useState<BadgeResponse[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'RATINGS' | 'BADGES'>('RATINGS');
@@ -28,14 +29,21 @@ export default function ReputationScreen() {
   const fetchData = async () => {
     if (!user) return;
     try {
-      const [profRes, ratRes, badgRes] = await Promise.all([
+      const [profRes, ratRes, badgRes, sysBadgRes] = await Promise.all([
         UserApi.getMyProfile(),
         RatingApi.getRatingsReceived(user.id, 0, 50),
         RatingApi.getUserBadges(user.id),
+        RatingApi.getAllSystemBadges(),
       ]);
       setProfile(profRes.data?.data || null);
       setRatings(ratRes.data?.data?.content || []);
       setBadges(badgRes.data?.data || []);
+
+      const sortedSys = (sysBadgRes.data?.data || []).sort((a, b) => {
+        if (a.category !== b.category) return (a.category || '').localeCompare(b.category || '');
+        return (a.level || 0) - (b.level || 0);
+      });
+      setSystemBadges(sortedSys);
     } catch (e) {
       console.error('Error fetching reputation data', e);
     } finally {
@@ -62,11 +70,20 @@ export default function ReputationScreen() {
   }
 
   const renderRating = ({ item }: { item: RatingResponse }) => (
-    <View style={styles.ratingCard}>
+    <TouchableOpacity
+      style={styles.ratingCard}
+      onPress={() => router.push(`/appointment/${item.appointmentId}` as any)}
+      activeOpacity={0.7}
+    >
       <View style={styles.ratingHeader}>
         <Avatar uri={item.reviewerAvatarUrl} name={item.reviewerName} size={40} />
         <View style={styles.ratingInfo}>
           <Text style={styles.reviewerName}>{item.reviewerName}</Text>
+          {item.appointmentTitle && (
+            <Text style={{ fontSize: 13, color: Colors.primary, marginTop: 2, fontWeight: '500' }}>
+              {item.appointmentTitle}
+            </Text>
+          )}
           <Text style={styles.ratingDate}>
             {new Date(item.createdAt).toLocaleDateString('vi-VN')}
           </Text>
@@ -89,25 +106,75 @@ export default function ReputationScreen() {
           Không có nhận xét
         </Text>
       )}
-    </View>
+
+      {/* Các tiêu chí đánh giá phụ */}
+      {(item.punctualityScore !== undefined || item.attitudeScore !== undefined || item.communicationScore !== undefined || item.qualityScore !== undefined) && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+          {item.punctualityScore !== undefined && item.punctualityScore !== null && (
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{item.punctualityScore}</Text></Text>
+          )}
+          {item.attitudeScore !== undefined && item.attitudeScore !== null && (
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{item.attitudeScore}</Text></Text>
+          )}
+          {item.communicationScore !== undefined && item.communicationScore !== null && (
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{item.communicationScore}</Text></Text>
+          )}
+          {item.qualityScore !== undefined && item.qualityScore !== null && (
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{item.qualityScore}</Text></Text>
+          )}
+        </View>
+      )}
+
+      <Text style={{ fontSize: 12, color: Colors.primary, marginTop: 12, textAlign: 'right', fontWeight: '600' }}>
+        Xem chi tiết lịch hẹn →
+      </Text>
+    </TouchableOpacity>
   );
 
-  const renderBadge = ({ item }: { item: BadgeResponse }) => (
-    <View style={styles.badgeCard}>
-      <View style={styles.badgeIconWrap}>
-        <Text style={styles.badgeEmoji}>{item.iconUrl || '🏆'}</Text>
-      </View>
-      <View style={styles.badgeInfo}>
-        <Text style={styles.badgeName}>{item.name}</Text>
-        <Text style={styles.badgeDesc}>{item.description}</Text>
-        {item.awardedAt && (
-          <Text style={styles.badgeDate}>
-            Đạt được: {new Date(item.awardedAt).toLocaleDateString('vi-VN')}
+  const renderBadge = ({ item }: { item: BadgeResponse }) => {
+    // Xác định trạng thái của huy hiệu
+    const myBadgeInSameCategory = badges.find(b => b.category === item.category);
+    let status: 'EARNED' | 'PASSED' | 'LOCKED' = 'LOCKED';
+    let awardedAtStr = '';
+
+    if (myBadgeInSameCategory) {
+      const myLevel = myBadgeInSameCategory.level || 0;
+      const itemLevel = item.level || 0;
+      if (item.id === myBadgeInSameCategory.id || item.code === myBadgeInSameCategory.code) {
+        status = 'EARNED';
+        awardedAtStr = myBadgeInSameCategory.awardedAt || '';
+      } else if (itemLevel < myLevel) {
+        status = 'PASSED';
+      }
+    }
+
+    const opacity = status === 'LOCKED' ? 0.5 : 1;
+    const bgColor = status === 'LOCKED' ? '#F1F5F9' : (status === 'PASSED' ? '#F8FAFC' : '#FEF3C7');
+    const borderColor = status === 'LOCKED' ? 'transparent' : (status === 'PASSED' ? Colors.border : '#FCD34D');
+
+    return (
+      <View style={[styles.badgeCard, { opacity, borderColor, backgroundColor: status === 'EARNED' ? '#fff' : '#FAFAFA' }]}>
+        <View style={[styles.badgeIconWrap, { backgroundColor: bgColor }]}>
+          <Text style={styles.badgeEmoji}>{item.iconUrl || '🏆'}</Text>
+        </View>
+        <View style={styles.badgeInfo}>
+          <Text style={[styles.badgeName, status === 'LOCKED' && { color: Colors.textMuted }]}>
+            {item.name}
           </Text>
-        )}
+          <Text style={styles.badgeDesc}>{item.description}</Text>
+          {status === 'EARNED' && awardedAtStr ? (
+            <Text style={styles.badgeDate}>
+              Đạt được: {new Date(awardedAtStr).toLocaleDateString('vi-VN')}
+            </Text>
+          ) : status === 'PASSED' ? (
+            <Text style={styles.badgeDate}>Đã vượt qua</Text>
+          ) : (
+            <Text style={styles.badgeDate}>Chưa đạt</Text>
+          )}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -121,7 +188,7 @@ export default function ReputationScreen() {
       </View>
 
       <FlatList
-        data={(activeTab === 'RATINGS' ? ratings : badges) as Array<RatingResponse | BadgeResponse>}
+        data={(activeTab === 'RATINGS' ? ratings : systemBadges) as Array<RatingResponse | BadgeResponse>}
         keyExtractor={item => item.id}
         renderItem={({ item }) => activeTab === 'RATINGS'
           ? renderRating({ item: item as RatingResponse })
@@ -170,7 +237,7 @@ export default function ReputationScreen() {
                 onPress={() => setActiveTab('BADGES')}
               >
                 <Text style={[styles.tabText, activeTab === 'BADGES' && styles.tabTextActive]}>
-                  Huy hiệu ({badges.length})
+                  Huy hiệu
                 </Text>
               </TouchableOpacity>
             </View>

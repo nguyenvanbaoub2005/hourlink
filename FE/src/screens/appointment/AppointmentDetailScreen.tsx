@@ -41,7 +41,7 @@ export default function AppointmentDetailScreen() {
   const [hasIssue, setHasIssue] = useState<boolean>(false);
   const [issueDescription, setIssueDescription] = useState<string>('');
   // Thông tin đánh giá
-  const [myRating, setMyRating] = useState<RatingResponse | null>(null);
+  const [allRatings, setAllRatings] = useState<RatingResponse[]>([]);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -51,13 +51,13 @@ export default function AppointmentDetailScreen() {
       if (res.data?.data) {
         const appt = res.data.data;
         setAppointment(appt);
-        
-        // Nếu đã hoàn thành, thử tải đánh giá của mình
+
+        // Nếu đã hoàn thành, thử tải danh sách đánh giá
         if (appt.status === 'COMPLETED') {
           try {
-            const ratingRes = await RatingApi.getRatingForAppointment(id);
+            const ratingRes = await RatingApi.getRatingsForAppointment(id);
             if (ratingRes.data?.data) {
-              setMyRating(ratingRes.data.data);
+              setAllRatings(ratingRes.data.data);
             }
           } catch (e) {
             // Chưa đánh giá hoặc lỗi lấy đánh giá
@@ -85,7 +85,7 @@ export default function AppointmentDetailScreen() {
   const handleRespond = async (action: 'CONFIRM' | 'CANCEL', link?: string) => {
     if (!id || !appointment) return;
     const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
-    
+
     // Nếu là xác nhận và là Online, kiểm tra link
     if (action === 'CONFIRM' && (appointment.meetingType?.toUpperCase() === 'ONLINE' || (appointment as any).format === 'online')) {
       const existingLink = appointment.locationOrLink || (appointment as any).meetingLink;
@@ -106,8 +106,8 @@ export default function AppointmentDetailScreen() {
           onPress: async () => {
             try {
               setActionLoading(true);
-              await AppointmentApi.respond(id, { 
-                action, 
+              await AppointmentApi.respond(id, {
+                action,
                 reason: action === 'CANCEL' ? 'Người dùng hủy từ màn chi tiết' : undefined,
                 locationOrLink: link
               });
@@ -200,7 +200,7 @@ export default function AppointmentDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi Tiết Lịch Hẹn</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.headerBack}
           onPress={() => {
             const isProvider = currentUser?.id === appointment?.providerId;
@@ -244,7 +244,7 @@ export default function AppointmentDetailScreen() {
         {/* Schedule & Location */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>Thời Gian & Địa Điểm</Text>
-          
+
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
@@ -346,51 +346,111 @@ export default function AppointmentDetailScreen() {
           </View>
         )}
 
-        {/* Thông tin đánh giá của tôi */}
-        {myRating && (
-          <View style={[styles.sectionCard, { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <Text style={[styles.sectionHeader, { marginBottom: 0, color: Colors.primary }]}>
-                Đánh giá của bạn
-              </Text>
-              <View style={{ flexDirection: 'row' }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Ionicons 
-                    key={star} 
-                    name={myRating.overallStars >= star ? 'star' : 'star-outline'} 
-                    size={16} 
-                    color={myRating.overallStars >= star ? Colors.warning : Colors.border} 
-                  />
-                ))}
+        {/* Thông tin đánh giá của đối tác (họ đánh giá mình) */}
+        {(() => {
+          const partnerRating = allRatings.find(r => r.reviewerId !== currentUser?.id);
+          if (!partnerRating) return null;
+          return (
+            <View style={[styles.sectionCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', marginTop: 16 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Avatar uri={partnerRating.reviewerAvatarUrl} name={partnerRating.reviewerName} size={28} />
+                  <Text style={[styles.sectionHeader, { marginBottom: 0, color: '#166534', marginLeft: 8 }]}>
+                    {partnerRating.reviewerName} đánh giá bạn
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={partnerRating.overallStars >= star ? 'star' : 'star-outline'}
+                      size={16}
+                      color={partnerRating.overallStars >= star ? Colors.warning : Colors.border}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {partnerRating.comment ? (
+                <Text style={{ fontSize: 14, color: '#166534', fontStyle: 'italic', marginBottom: 12 }}>
+                  "{partnerRating.comment}"
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 14, color: Colors.textMuted, fontStyle: 'italic', marginBottom: 12 }}>
+                  Không có nhận xét.
+                </Text>
+              )}
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {partnerRating.punctualityScore !== undefined && partnerRating.punctualityScore !== null && (
+                  <Text style={{ fontSize: 12, color: '#15803D' }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{partnerRating.punctualityScore}</Text></Text>
+                )}
+                {partnerRating.attitudeScore !== undefined && partnerRating.attitudeScore !== null && (
+                  <Text style={{ fontSize: 12, color: '#15803D' }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{partnerRating.attitudeScore}</Text></Text>
+                )}
+                {partnerRating.communicationScore !== undefined && partnerRating.communicationScore !== null && (
+                  <Text style={{ fontSize: 12, color: '#15803D' }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{partnerRating.communicationScore}</Text></Text>
+                )}
+                {partnerRating.qualityScore !== undefined && partnerRating.qualityScore !== null && (
+                  <Text style={{ fontSize: 12, color: '#15803D' }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{partnerRating.qualityScore}</Text></Text>
+                )}
               </View>
             </View>
-            
-            {myRating.comment ? (
-              <Text style={{ fontSize: 14, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 }}>
-                "{myRating.comment}"
-              </Text>
-            ) : (
-              <Text style={{ fontSize: 14, color: Colors.textMuted, fontStyle: 'italic', marginBottom: 12 }}>
-                Không có nhận xét.
-              </Text>
-            )}
-            
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-              {myRating.punctualityScore && (
-                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text>
+          );
+        })()}
+
+        {/* Thông tin đánh giá của tôi (mình đánh giá họ) */}
+        {(() => {
+          const myRating = allRatings.find(r => r.reviewerId === currentUser?.id);
+          if (!myRating) return null;
+          return (
+            <View style={[styles.sectionCard, { backgroundColor: '#F9FAFB', borderColor: '#E5E7EB', marginTop: 16 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Avatar uri={myRating.reviewerAvatarUrl} name={myRating.reviewerName} size={28} />
+                  <Text style={[styles.sectionHeader, { marginBottom: 0, color: Colors.primary, marginLeft: 8 }]}>
+                    Đánh giá của bạn
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row' }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={myRating.overallStars >= star ? 'star' : 'star-outline'}
+                      size={16}
+                      color={myRating.overallStars >= star ? Colors.warning : Colors.border}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {myRating.comment ? (
+                <Text style={{ fontSize: 14, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 }}>
+                  "{myRating.comment}"
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 14, color: Colors.textMuted, fontStyle: 'italic', marginBottom: 12 }}>
+                  Không có nhận xét.
+                </Text>
               )}
-              {myRating.attitudeScore && (
-                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text>
-              )}
-              {myRating.communicationScore && (
-                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text>
-              )}
-              {myRating.qualityScore && (
-                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text>
-              )}
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {myRating.punctualityScore !== undefined && myRating.punctualityScore !== null && (
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text>
+                )}
+                {myRating.attitudeScore !== undefined && myRating.attitudeScore !== null && (
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text>
+                )}
+                {myRating.communicationScore !== undefined && myRating.communicationScore !== null && (
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text>
+                )}
+                {myRating.qualityScore !== undefined && myRating.qualityScore !== null && (
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text>
+                )}
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
       </ScrollView>
 
       {/* Footer Actions */}
@@ -434,7 +494,7 @@ export default function AppointmentDetailScreen() {
           )}
 
           {/* Nút Đánh giá — chỉ hiện khi COMPLETED và CHƯA đánh giá */}
-          {statusStr === 'COMPLETED' && !myRating && (() => {
+          {statusStr === 'COMPLETED' && !allRatings.find(r => r.reviewerId === currentUser?.id) && (() => {
             const isProvider = currentUser?.id === appointment.providerId;
             const otherUserId   = isProvider ? appointment.receiverId  : appointment.providerId;
             const otherUserName  = isProvider ? appointment.receiverName : appointment.providerName;
@@ -533,7 +593,7 @@ export default function AppointmentDetailScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Cung Cấp Link Họp</Text>
             <Text style={styles.modalSub}>Vì đây là buổi hỗ trợ Online, bạn cần cung cấp link Google Meet, Zoom... để người nhận tham gia.</Text>
-            
+
             <Text style={styles.inputLabel}>Link họp / Phòng học *</Text>
             <TextInput
               style={styles.input}

@@ -262,7 +262,12 @@ export default function ProfileScreen() {
           </View>
 
           {/* Huy hiệu */}
-          <Text style={[styles.sectionTitle, { marginTop: Spacing.lg }]}>Huy hiệu</Text>
+          <View style={[styles.sectionHeaderRow, { marginTop: Spacing.lg }]}>
+            <Text style={styles.sectionTitle}>Huy hiệu</Text>
+            <TouchableOpacity onPress={() => router.push('/profile/reputation' as any)}>
+              <Text style={styles.actionLink}>Chi tiết</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.badgeRow}>
             {badges.length > 0 ? (
               badges.slice(0, 3).map(b => (
@@ -427,8 +432,8 @@ const styles = StyleSheet.create({
   emptyHint:     { color: Colors.textMuted, fontStyle: 'italic', fontSize: 13 },
 
   // Badges
-  badgeRow:     { flexDirection: 'row', gap: 12 },
-  badgeCard:    { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: Radius.lg, padding: Spacing.md, flex: 1, borderWidth: 1, borderColor: Colors.border },
+  badgeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  badgeCard:    { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: Radius.lg, padding: Spacing.md, width: 100, borderWidth: 1, borderColor: Colors.border },
   badgeEmoji:   { fontSize: 28, marginBottom: 6 },
   badgeLabel:   { fontSize: 12, color: Colors.textMuted, textAlign: 'center', lineHeight: 16 },
 
