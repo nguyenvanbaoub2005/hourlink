@@ -25,4 +25,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     Page<Appointment> findByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") AppointmentStatus status, Pageable pageable);
 
     Optional<Appointment> findByInvitationId(UUID invitationId);
+
+    @Query("SELECT COUNT(a) > 0 FROM Appointment a WHERE (a.provider.id = :userId OR a.receiver.id = :userId) AND a.status IN :statuses")
+    boolean hasActiveAppointments(@Param("userId") UUID userId, @Param("statuses") List<AppointmentStatus> statuses);
 }

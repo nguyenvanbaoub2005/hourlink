@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
 
 import { useAuthStore } from '@/store/authStore';
 import AdminLayout from '@/components/layout/AdminLayout';
@@ -8,6 +9,7 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import LoginPage        from '@/pages/login/LoginPage';
 import DashboardPage    from '@/pages/dashboard/DashboardPage';
 import UsersPage        from '@/pages/users/UsersPage';
+import UserDetailPage   from '@/pages/users/UserDetailPage';
 import SkillsPage       from '@/pages/skills/SkillsPage';
 import ReportsPage      from '@/pages/reports/ReportsPage';
 import DisputesPage     from '@/pages/disputes/DisputesPage';
@@ -41,6 +43,7 @@ function AppRoutes() {
       <Route element={<AdminLayout />}>
         <Route path="/"             element={<DashboardPage />} />
         <Route path="/users"        element={<UsersPage />} />
+        <Route path="/users/:id"    element={<UserDetailPage />} />
         <Route path="/skills"       element={<SkillsPage />} />
         <Route path="/reports"      element={<ReportsPage />} />
         <Route path="/disputes"     element={<DisputesPage />} />
@@ -60,6 +63,11 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppRoutes />
+        <Toaster 
+          position="top-right" 
+          toastOptions={{ duration: 4000 }} 
+          containerStyle={{ top: 80, right: 20 }}
+        />
       </BrowserRouter>
     </QueryClientProvider>
   );

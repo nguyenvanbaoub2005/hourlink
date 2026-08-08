@@ -55,8 +55,8 @@ export interface UserResponse {
   userType: UserType;
   avatarUrl?: string;
   bio?: string;
-  isVerified: boolean;
-  isLocked: boolean;
+  verified: boolean;
+  locked: boolean;
   reputationScore: number;
   completedSessions: number;
   cancelRate: number;

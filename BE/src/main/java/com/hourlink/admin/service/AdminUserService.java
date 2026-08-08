@@ -1,0 +1,338 @@
+package com.hourlink.admin.service;
+
+import com.hourlink.admin.dto.request.AdminNoteUpdateRequest;
+import com.hourlink.admin.dto.request.UserActionRequest;
+import com.hourlink.admin.dto.response.AdminUserDetailResponse;
+import com.hourlink.admin.dto.response.AdminUserResponse;
+import com.hourlink.admin.entity.UserAdminAction;
+import com.hourlink.admin.repository.UserAdminActionRepository;
+import com.hourlink.user.entity.User;
+import com.hourlink.user.repository.UserRepository;
+import com.hourlink.appointment.repository.AppointmentRepository;
+import com.hourlink.helprequest.repository.HelpRequestRepository;
+import com.hourlink.common.service.EmailService;
+import com.hourlink.common.service.CloudinaryService;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.util.Map;
+import com.hourlink.admin.dto.request.AdminCreateUserRequest;
+import com.hourlink.admin.dto.request.AdminUpdateUserRequest;
+import com.hourlink.user.entity.Role;
+import com.hourlink.user.entity.UserRole;
+import com.hourlink.user.repository.RoleRepository;
+import com.hourlink.user.repository.UserRoleRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import com.hourlink.appointment.enums.AppointmentStatus;
+import com.hourlink.helprequest.enums.RequestStatus;
+import com.hourlink.common.exception.BadRequestException;
+import java.util.Arrays;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class AdminUserService {
+
+    private final UserRepository userRepository;
+    private final UserAdminActionRepository userAdminActionRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final HelpRequestRepository helpRequestRepository;
+    private final EmailService emailService;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final CloudinaryService cloudinaryService;
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponse> getUsers(String name, String email, String phone, String userType, Boolean locked, Boolean verified, Pageable pageable) {
+        Specification<User> spec = Specification.where((root, query, cb) -> {
+            Subquery<UUID> subquery = query.subquery(UUID.class);
+            Root<UserRole> subRoot = subquery.from(UserRole.class);
+            Join<UserRole, Role> roleJoin = subRoot.join("role", JoinType.INNER);
+            subquery.select(subRoot.get("user").get("id"))
+                    .where(cb.equal(roleJoin.get("roleCode"), "ROLE_ADMIN"));
+            return cb.not(root.get("id").in(subquery));
+        });
+
+        if (name != null && !name.trim().isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("fullName")), "%" + name.toLowerCase().trim() + "%"));
+        }
+        if (email != null && !email.trim().isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("email")), "%" + email.toLowerCase().trim() + "%"));
+        }
+        if (phone != null && !phone.trim().isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("phone")), "%" + phone.toLowerCase().trim() + "%"));
+        }
+        if (userType != null && !userType.trim().isEmpty()) {
+            try {
+                com.hourlink.user.enums.UserType type = com.hourlink.user.enums.UserType.valueOf(userType.toLowerCase());
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("userType"), type));
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid userType
+            }
+        }
+        if (locked != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("isLocked"), locked));
+        }
+        if (verified != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("isVerified"), verified));
+        }
+        
+        // Exclude soft-deleted users from main list unless specified
+        spec = spec.and((root, query, cb) -> cb.isFalse(root.get("isDeleted")));
+
+        return userRepository.findAll(spec, pageable).map(this::mapToResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminUserDetailResponse getUserDetail(UUID id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<UserAdminAction> actions = userAdminActionRepository.findByUserIdOrderByCreatedAtDesc(id);
+
+        List<AdminUserDetailResponse.UserAdminActionDto> actionDtos = actions.stream()
+                .map(a -> AdminUserDetailResponse.UserAdminActionDto.builder()
+                        .actionType(a.getActionType())
+                        .reason(a.getReason())
+                        .adminName(a.getAdmin().getFullName())
+                        .createdAt(a.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        return AdminUserDetailResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .userType(user.getUserType())
+                .region(user.getRegion())
+                .occupation(user.getOccupation())
+                .avatarUrl(user.getAvatarUrl())
+                .bio(user.getBio())
+                .isVerified(user.isVerified())
+                .isLocked(user.isLocked())
+                .isDeleted(user.isDeleted())
+                .reputationScore(user.getReputationScore())
+                .completedSessions(user.getCompletedSessions())
+                .cancelRate(user.getCancelRate())
+                .adminNotes(user.getAdminNotes())
+                .warningCount(user.getWarningCount())
+                .createdAt(user.getCreatedAt())
+                .adminActions(actionDtos)
+                .build();
+    }
+
+    @Transactional
+    public void updateUserNotes(UUID id, AdminNoteUpdateRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setAdminNotes(request.getAdminNotes());
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void performAction(UUID id, UserActionRequest request, String adminEmail) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        switch (request.getActionType().toUpperCase()) {
+            case "WARN":
+                user.setWarningCount(user.getWarningCount() + 1);
+                emailService.sendWarningEmail(user.getEmail(), user.getFullName(), user.getWarningCount(), request.getReason());
+                break;
+            case "LOCK":
+                user.setLocked(true);
+                break;
+            case "UNLOCK":
+                user.setLocked(false);
+                break;
+            case "SOFT_DELETE":
+                boolean hasActiveAppointments = appointmentRepository.hasActiveAppointments(user.getId(), Arrays.asList(
+                        AppointmentStatus.PENDING,
+                        AppointmentStatus.CONFIRMED,
+                        AppointmentStatus.UPCOMING,
+                        AppointmentStatus.IN_PROGRESS,
+                        AppointmentStatus.DISPUTED,
+                        AppointmentStatus.RESCHEDULED
+                ));
+                if (hasActiveAppointments) {
+                    throw new BadRequestException("Không thể xoá tài khoản vì người dùng đang có lịch hẹn chưa hoàn tất hoặc đang tranh chấp.");
+                }
+
+                boolean hasActiveRequests = helpRequestRepository.hasActiveRequests(user.getId(), Arrays.asList(
+                        RequestStatus.SEARCHING,
+                        RequestStatus.ASSIGNED
+                ));
+                if (hasActiveRequests) {
+                    throw new BadRequestException("Không thể xoá tài khoản vì người dùng đang có yêu cầu hỗ trợ chưa hoàn tất.");
+                }
+
+                user.setDeleted(true);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown action type");
+        }
+
+        userRepository.save(user);
+
+        UserAdminAction action = UserAdminAction.builder()
+                .user(user)
+                .admin(admin)
+                .actionType(request.getActionType().toUpperCase())
+                .reason(request.getReason())
+                .build();
+        userAdminActionRepository.save(action);
+    }
+
+    @Transactional
+    public void createUser(AdminCreateUserRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email đã được sử dụng");
+        }
+        if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+            if (userRepository.existsByPhone(request.getPhone())) {
+                throw new BadRequestException("Số điện thoại đã được sử dụng");
+            }
+        }
+
+        User user = User.builder()
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .phone(request.getPhone())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .userType(request.getUserType())
+                .region(request.getRegion())
+                .occupation(request.getOccupation())
+                .avatarUrl(request.getAvatarUrl())
+                .bio(request.getBio())
+                .isVerified(true) // Admin creates, so it's verified
+                .build();
+
+        user = userRepository.save(user);
+
+        Role userRole = roleRepository.findByName("USER")
+                .orElseThrow(() -> new RuntimeException("Role USER not found"));
+
+        UserRole mapping = UserRole.builder()
+                .user(user)
+                .role(userRole)
+                .build();
+        userRoleRepository.save(mapping);
+    }
+
+    @Transactional
+    public void updateUser(UUID id, AdminUpdateUserRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new BadRequestException("Email đã được sử dụng");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        user.setFullName(request.getFullName());
+
+        if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
+            if (userRepository.existsByPhone(request.getPhone())) {
+                throw new BadRequestException("Số điện thoại đã được sử dụng");
+            }
+            user.setPhone(request.getPhone());
+        }
+        user.setUserType(request.getUserType());
+        user.setRegion(request.getRegion());
+        user.setOccupation(request.getOccupation());
+        user.setAvatarUrl(request.getAvatarUrl());
+        user.setBio(request.getBio());
+        
+        if (request.getIsVerified() != null) {
+            user.setVerified(request.getIsVerified());
+        }
+
+        userRepository.save(user);
+    }
+
+    public String uploadAvatar(MultipartFile file) {
+        try {
+            Map<String, Object> uploadResult = cloudinaryService.uploadFile(file, "avatars");
+            return (String) uploadResult.get("secure_url");
+        } catch (IOException e) {
+            throw new RuntimeException("Lỗi upload file: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void resetPassword(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+
+        // Generate a secure random password: 2 uppercase + 2 digits + 4 lowercase + 2 special
+        String newPassword = generateRandomPassword();
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Send email async
+        emailService.sendResetPasswordEmail(user.getEmail(), user.getFullName(), newPassword);
+    }
+
+    private String generateRandomPassword() {
+        String upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        String lower = "abcdefghjkmnpqrstuvwxyz";
+        String digits = "23456789";
+        String special = "@#$%&*";
+        java.util.Random rnd = new java.util.Random();
+
+        StringBuilder sb = new StringBuilder();
+        // 2 uppercase
+        for (int i = 0; i < 2; i++) sb.append(upper.charAt(rnd.nextInt(upper.length())));
+        // 2 digits
+        for (int i = 0; i < 2; i++) sb.append(digits.charAt(rnd.nextInt(digits.length())));
+        // 4 lowercase
+        for (int i = 0; i < 4; i++) sb.append(lower.charAt(rnd.nextInt(lower.length())));
+        // 1 special
+        sb.append(special.charAt(rnd.nextInt(special.length())));
+
+        // Shuffle
+        java.util.List<Character> chars = new java.util.ArrayList<>();
+        for (char c : sb.toString().toCharArray()) chars.add(c);
+        java.util.Collections.shuffle(chars);
+        StringBuilder result = new StringBuilder();
+        for (char c : chars) result.append(c);
+        return result.toString();
+    }
+
+    private AdminUserResponse mapToResponse(User user) {
+        return AdminUserResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .avatarUrl(user.getAvatarUrl())
+                .userType(user.getUserType())
+                .isVerified(user.isVerified())
+                .isLocked(user.isLocked())
+                .isDeleted(user.isDeleted())
+                .reputationScore(user.getReputationScore())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+}
