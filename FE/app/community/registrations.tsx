@@ -16,7 +16,7 @@ import { Colors, Radius, Spacing } from '@constants/Colors';
 import CommunityApi from '@api/community';
 import type { ParticipantResponse } from '@types';
 
-const labels = { REGISTERED: 'Đã đăng ký', CONFIRMED: 'Đã xác nhận', CANCELLED: 'Đã hủy' };
+const labels = { REGISTERED: 'Đã đăng ký', CONFIRMED: 'Đã xác nhận', ABSENT: 'Vắng mặt', CANCELLED: 'Đã hủy' };
 
 export default function MyRegistrationsScreen() {
   const router = useRouter();
@@ -39,8 +39,15 @@ export default function MyRegistrationsScreen() {
 
   const renderItem = ({ item }: { item: ParticipantResponse }) => {
     const hasEnded = new Date(item.activityEndTime) <= new Date();
-    const canSubmitEvidence = item.status !== 'CANCELLED' && hasEnded;
+    const canSubmitEvidence = ['REGISTERED', 'CONFIRMED'].includes(item.status) && hasEnded;
     const evidenceCount = item.evidence?.length ?? 0;
+    const creditText = item.status === 'CONFIRMED'
+      ? `+${item.actualHours ?? 0} TC · Đã nhận`
+      : item.status === 'ABSENT'
+        ? 'Không được xác nhận · Không nhận Credit'
+        : item.status === 'CANCELLED'
+          ? 'Đăng ký đã hủy'
+          : `Dự kiến +${item.activityCreditReward} TC · Chờ xác nhận`;
 
     return (
       <View style={styles.card}>
@@ -51,10 +58,10 @@ export default function MyRegistrationsScreen() {
           </View>
           <Text style={styles.meta}>{new Date(item.activityStartTime).toLocaleString('vi-VN')}</Text>
           {!!item.activityLocation && <Text style={styles.meta}>{item.activityLocation}</Text>}
-          <Text style={styles.credit}>+{item.activityCreditReward} TC {item.creditAwarded ? '· Đã nhận' : '· Chờ xác nhận'}</Text>
+          <Text style={[styles.credit, item.status === 'ABSENT' && styles.creditRejected]}>{creditText}</Text>
         </TouchableOpacity>
 
-        {item.status !== 'CANCELLED' && (
+        {(canSubmitEvidence || evidenceCount > 0) && (
           <TouchableOpacity
             style={styles.evidenceButton}
             onPress={() => router.push(`/community/evidence/${item.activityId}` as any)}
@@ -108,6 +115,7 @@ const styles = StyleSheet.create({
   status: { color: Colors.primary, fontWeight: '600', fontSize: 12 },
   meta: { color: Colors.textMuted, marginTop: 6 },
   credit: { color: '#D97706', fontWeight: 'bold', marginTop: 10 },
+  creditRejected: { color: '#DC2626' },
   evidenceButton: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, flexDirection: 'row', alignItems: 'center', gap: 7 },
   evidenceText: { flex: 1, color: Colors.primary, fontWeight: '700', fontSize: 13 },
 });

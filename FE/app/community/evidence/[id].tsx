@@ -115,7 +115,7 @@ export default function ActivityEvidenceScreen() {
   }
 
   const hasEnded = new Date(participant.activityEndTime) <= new Date();
-  const canSubmit = participant.status !== 'CANCELLED' && hasEnded;
+  const canSubmit = ['REGISTERED', 'CONFIRMED'].includes(participant.status) && hasEnded;
   const images = selected.length > 0
     ? selected.map((asset, index) => ({ id: `${asset.uri}-${index}`, url: asset.uri }))
     : (participant.evidence ?? []).map(item => ({ id: item.id, url: item.fileUrl }));
@@ -140,7 +140,9 @@ export default function ActivityEvidenceScreen() {
             <Text style={styles.noticeText}>
               {participant.status === 'CANCELLED'
                 ? 'Đăng ký này đã bị hủy nên không thể gửi minh chứng.'
-                : 'Bạn chỉ có thể gửi minh chứng sau khi hoạt động kết thúc.'}
+                : participant.status === 'ABSENT'
+                  ? 'Tổ chức đã ghi nhận bạn vắng mặt nên không thể gửi thêm minh chứng.'
+                  : 'Bạn chỉ có thể gửi minh chứng sau khi hoạt động kết thúc.'}
             </Text>
           </View>
         )}

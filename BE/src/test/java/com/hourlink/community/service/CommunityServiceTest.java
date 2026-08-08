@@ -4,6 +4,7 @@ import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.service.CloudinaryService;
 import com.hourlink.community.dto.request.ConfirmParticipantsRequest;
+import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.entity.ActivityParticipant;
 import com.hourlink.community.entity.ActivityEvidence;
 import com.hourlink.community.entity.CommunityActivity;
@@ -99,6 +100,7 @@ class CommunityServiceTest {
         User organizer = currentUser;
         User participantUser = user("participant@hourlink.vn");
         CommunityActivity activity = futureActivity(organizer);
+        activity.setCreditReward(0.5);
         activity.setStartTime(Instant.now().minusSeconds(7200));
         activity.setEndTime(Instant.now().minusSeconds(3600));
         ActivityParticipant participant = participant(activity, participantUser, ActivityParticipantStatus.REGISTERED);
@@ -120,7 +122,57 @@ class CommunityServiceTest {
         assertTrue(participant.getCreditAwarded());
         assertEquals(ActivityStatus.COMPLETED, activity.getStatus());
         assertEquals(1, walletService.calls);
+        assertEquals(2.0, walletService.lastAmount);
         assertEquals(1, notificationService.calls);
+    }
+
+    @Test
+    void markLastParticipantAbsent_completesWithoutAwardingCredit() {
+        CommunityActivity activity = futureActivity(currentUser);
+        activity.setStartTime(Instant.now().minusSeconds(7200));
+        activity.setEndTime(Instant.now().minusSeconds(3600));
+        ActivityParticipant participant = participant(
+                activity, user("absent@hourlink.vn"), ActivityParticipantStatus.REGISTERED);
+        MarkParticipantsAbsentRequest request = new MarkParticipantsAbsentRequest();
+        request.setParticipantIds(List.of(participant.getId(), participant.getId()));
+        request.setReason("Không check-in");
+
+        when(activityRepo.findById(activity.getId())).thenReturn(Optional.of(activity));
+        when(participantRepo.findById(participant.getId())).thenReturn(Optional.of(participant));
+        when(participantRepo.countByActivityIdAndStatus(
+                activity.getId(), ActivityParticipantStatus.REGISTERED)).thenReturn(0L);
+
+        var result = service.markParticipantsAbsent(activity.getId(), request);
+
+        assertEquals(1, result.size());
+        assertEquals(ActivityParticipantStatus.ABSENT, participant.getStatus());
+        assertEquals("Không check-in", participant.getConfirmNote());
+        assertFalse(participant.getCreditAwarded());
+        assertEquals(ActivityStatus.COMPLETED, activity.getStatus());
+        assertEquals(0, walletService.calls);
+        assertEquals(1, notificationService.calls);
+    }
+
+    @Test
+    void cancelActivity_cancelsWaitingParticipantsAndNotifiesEachUser() {
+        CommunityActivity activity = futureActivity(currentUser);
+        ActivityParticipant first = participant(
+                activity, user("first@hourlink.vn"), ActivityParticipantStatus.REGISTERED);
+        ActivityParticipant second = participant(
+                activity, user("second@hourlink.vn"), ActivityParticipantStatus.REGISTERED);
+        when(activityRepo.findById(activity.getId())).thenReturn(Optional.of(activity));
+        when(participantRepo.findByActivityIdAndStatus(
+                activity.getId(), ActivityParticipantStatus.REGISTERED))
+                .thenReturn(List.of(first, second));
+
+        var response = service.cancelActivity(activity.getId());
+
+        assertEquals(ActivityStatus.CANCELLED, response.getStatus());
+        assertEquals(ActivityParticipantStatus.CANCELLED, first.getStatus());
+        assertEquals(ActivityParticipantStatus.CANCELLED, second.getStatus());
+        assertEquals(2, notificationService.calls);
+        verify(participantRepo, times(2)).save(any(ActivityParticipant.class));
+        verify(activityRepo).save(activity);
     }
 
     @Test
@@ -212,11 +264,13 @@ class CommunityServiceTest {
 
     private static class TestWalletService extends WalletService {
         int calls;
+        Double lastAmount;
         TestWalletService() { super(null, null, null); }
         @Override
         public boolean addCommunityCredit(User user, Double amount, String description,
                                           UUID activityId, UUID participantId) {
             calls++;
+            lastAmount = amount;
             return true;
         }
     }

@@ -34,7 +34,7 @@ export function notificationTarget(
     return { pathname: '/(tabs)/appointments' };
   }
 
-  if (type === 'COMMUNITY_CREDIT_AWARDED') {
+  if (['COMMUNITY_CREDIT_AWARDED', 'COMMUNITY_PARTICIPANT_ABSENT', 'COMMUNITY_ACTIVITY_CANCELLED'].includes(type)) {
     return referenceId
       ? { pathname: '/community/[id]', params: { id: referenceId } }
       : { pathname: '/community/registrations' };

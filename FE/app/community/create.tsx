@@ -61,7 +61,7 @@ export default function CreateActivityScreen() {
     const start = new Date(`${startDate}T${startTime}:00`);
     const end = new Date(`${endDate}T${endTime}:00`);
     if (!title.trim() || !description.trim()) return Alert.alert('Thiếu thông tin', 'Vui lòng nhập tiêu đề và mô tả.');
-    if (!Number.isFinite(credit) || credit < 0.5) return Alert.alert('Dữ liệu chưa đúng', 'Time Credit tối thiểu là 0.5.');
+    if (!Number.isFinite(credit) || credit < 0.5) return Alert.alert('Dữ liệu chưa đúng', 'Số giờ dự kiến tối thiểu là 0.5.');
     if (max !== undefined && (!Number.isInteger(max) || max < 1)) return Alert.alert('Dữ liệu chưa đúng', 'Số người tối đa phải là số nguyên dương.');
     if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start <= new Date() || end <= start) {
       return Alert.alert('Thời gian chưa đúng', 'Thời gian bắt đầu phải ở tương lai và kết thúc phải sau bắt đầu.');
@@ -108,8 +108,9 @@ export default function CreateActivityScreen() {
         <View style={styles.row}><PickerButton text={endDate} onPress={() => setPicker('endDate')} /><PickerButton text={endTime} onPress={() => setPicker('endTime')} /></View>
         <View style={styles.row}>
           <View style={styles.flex}><Field label="Số người tối đa" value={maxParticipants} onChangeText={setMaxParticipants} placeholder="Không giới hạn" keyboardType="numeric" /></View>
-          <View style={styles.flex}><Field label="Time Credit *" value={creditReward} onChangeText={setCreditReward} placeholder="0.5" keyboardType="decimal-pad" /></View>
+          <View style={styles.flex}><Field label="Số giờ dự kiến (TC) *" value={creditReward} onChangeText={setCreditReward} placeholder="0.5" keyboardType="decimal-pad" /></View>
         </View>
+        <Text style={styles.creditHelper}>Credit thực nhận được tính theo số giờ tổ chức xác nhận: 1 giờ = 1 TC.</Text>
         <TouchableOpacity style={[styles.submit, submitting && styles.disabled]} onPress={submit} disabled={submitting}>
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{editId ? 'Lưu thay đổi' : 'Tạo hoạt động'}</Text>}
         </TouchableOpacity>
@@ -136,4 +137,5 @@ const styles = StyleSheet.create({
   area: { height: 105, textAlignVertical: 'top' }, row: { flexDirection: 'row', gap: 10, marginBottom: Spacing.md }, flex: { flex: 1 },
   picker: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }, submit: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
   disabled: { opacity: 0.6 }, submitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  creditHelper: { color: Colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: -10, marginBottom: Spacing.md },
 });

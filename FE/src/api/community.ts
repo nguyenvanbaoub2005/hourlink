@@ -90,6 +90,12 @@ const CommunityApi = {
     );
   },
 
+  cancelActivity: (id: string) => {
+    return axiosInstance.patch<ApiResponse<ActivityResponse>>(
+      `${BASE_URL}/activities/${id}/cancel`
+    );
+  },
+
   // ─── Đăng ký / Xác nhận (US-36, 37, 38) ──────────────────────
 
   register: (id: string) => {
@@ -115,6 +121,13 @@ const CommunityApi = {
     return axiosInstance.post<ApiResponse<ParticipantResponse[]>>(
       `${BASE_URL}/activities/${id}/participants/confirm`,
       data
+    );
+  },
+
+  markParticipantsAbsent: (id: string, participantIds: string[], reason?: string) => {
+    return axiosInstance.post<ApiResponse<ParticipantResponse[]>>(
+      `${BASE_URL}/activities/${id}/participants/absent`,
+      { participantIds, reason }
     );
   }
 };

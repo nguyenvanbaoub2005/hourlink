@@ -48,4 +48,10 @@ public enum NotificationType {
 
     /** Người dùng được xác nhận tham gia hoạt động và cộng Time Credit */
     COMMUNITY_CREDIT_AWARDED,
+
+    /** Tổ chức đánh dấu người đăng ký vắng mặt */
+    COMMUNITY_PARTICIPANT_ABSENT,
+
+    /** Tổ chức hủy hoạt động cộng đồng */
+    COMMUNITY_ACTIVITY_CANCELLED,
 }

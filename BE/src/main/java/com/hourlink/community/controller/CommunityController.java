@@ -4,6 +4,7 @@ import com.hourlink.common.response.ApiResponse;
 import com.hourlink.community.dto.request.ConfirmParticipantsRequest;
 import com.hourlink.community.dto.request.CreateActivityRequest;
 import com.hourlink.community.dto.request.UpdateActivityRequest;
+import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
 import com.hourlink.community.service.CommunityService;
@@ -81,6 +82,13 @@ public class CommunityController {
     @PatchMapping("/activities/{id}/close")
     public ResponseEntity<ApiResponse<ActivityResponse>> closeRegistration(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success("Đã đóng đăng ký", communityService.closeRegistration(id)));
+    }
+
+    @Operation(summary = "Hủy hoạt động và thông báo người tham gia")
+    @PatchMapping("/activities/{id}/cancel")
+    public ResponseEntity<ApiResponse<ActivityResponse>> cancelActivity(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã hủy hoạt động", communityService.cancelActivity(id)));
     }
 
     // ─── Read ─────────────────────────────────────────────────────────────────
@@ -175,5 +183,15 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success(
                 String.format("Đã xác nhận %d người tham gia và cộng Time Credit thành công", confirmed.size()),
                 confirmed));
+    }
+
+    @Operation(summary = "Đánh dấu người đăng ký vắng mặt")
+    @PostMapping("/activities/{id}/participants/absent")
+    public ResponseEntity<ApiResponse<List<ParticipantResponse>>> markParticipantsAbsent(
+            @PathVariable UUID id,
+            @Valid @RequestBody MarkParticipantsAbsentRequest request) {
+        List<ParticipantResponse> absent = communityService.markParticipantsAbsent(id, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                String.format("Đã đánh dấu %d người vắng mặt", absent.size()), absent));
     }
 }

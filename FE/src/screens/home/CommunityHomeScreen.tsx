@@ -53,7 +53,7 @@ export default function CommunityHomeScreen() {
           <Text style={styles.orgName}>{item.organizerName}</Text>
         </View>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>+{item.creditReward} TC</Text>
+          <Text style={styles.badgeText}>~{item.creditReward} TC</Text>
         </View>
       </View>
       

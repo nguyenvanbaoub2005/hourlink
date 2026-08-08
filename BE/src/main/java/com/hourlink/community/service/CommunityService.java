@@ -6,6 +6,7 @@ import com.hourlink.common.util.SecurityUtil;
 import com.hourlink.common.service.CloudinaryService;
 import com.hourlink.community.dto.request.ConfirmParticipantsRequest;
 import com.hourlink.community.dto.request.CreateActivityRequest;
+import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.dto.request.UpdateActivityRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
@@ -161,12 +162,47 @@ public class CommunityService {
         return toResponse(activity, currentUser);
     }
 
+    /** Hủy hoạt động trước khi kết thúc và thông báo cho toàn bộ người đang đăng ký. */
+    @Transactional
+    @PreAuthorize("hasAnyAuthority('ROLE_ORGANIZATION', 'ROLE_ADMIN')")
+    public ActivityResponse cancelActivity(UUID activityId) {
+        User currentUser = getCurrentUser();
+        CommunityActivity activity = getActivityOrThrow(activityId);
+        checkOrganizer(activity, currentUser);
+
+        if (activity.getStatus() == ActivityStatus.COMPLETED ||
+                activity.getStatus() == ActivityStatus.CANCELLED ||
+                !Instant.now().isBefore(activity.getEndTime())) {
+            throw new AppException(ErrorCode.ACTIVITY_CANNOT_CANCEL);
+        }
+
+        List<ActivityParticipant> waiting = participantRepo.findByActivityIdAndStatus(
+                activityId, ActivityParticipantStatus.REGISTERED);
+        for (ActivityParticipant participant : waiting) {
+            participant.setStatus(ActivityParticipantStatus.CANCELLED);
+            participant.setConfirmNote("Hoạt động đã bị tổ chức hủy");
+            participantRepo.save(participant);
+            notificationService.createNotification(
+                    participant.getUser(), NotificationType.COMMUNITY_ACTIVITY_CANCELLED,
+                    "Hoạt động cộng đồng đã bị hủy",
+                    String.format("Hoạt động %s đã bị tổ chức hủy", activity.getTitle()),
+                    activity.getId());
+        }
+
+        activity.setStatus(ActivityStatus.CANCELLED);
+        activityRepo.save(activity);
+        log.info("Activity [{}] cancelled by organizer [{}]; notified {} participants",
+                activityId, currentUser.getId(), waiting.size());
+        return toResponse(activity, currentUser);
+    }
+
     // ─── Read: Danh sách hoạt động ───────────────────────────────────────────
 
     /** Lấy tất cả hoạt động đang OPEN, phân trang, dành cho người dùng browse */
     public Page<ActivityResponse> getOpenActivities(int page, int size) {
         User currentUser = getCurrentUserOrNull();
-        return activityRepo.findByStatusOrderByCreatedAtDesc(ActivityStatus.OPEN, PageRequest.of(page, size))
+        return activityRepo.findByStatusAndStartTimeAfterOrderByCreatedAtDesc(
+                        ActivityStatus.OPEN, Instant.now(), PageRequest.of(page, size))
                 .map(a -> toResponse(a, currentUser));
     }
 
@@ -285,6 +321,7 @@ public class CommunityService {
      * @return Danh sách ParticipantResponse đã được xác nhận
      */
     @Transactional
+    @PreAuthorize("hasAnyAuthority('ROLE_ORGANIZATION', 'ROLE_ADMIN')")
     public List<ParticipantResponse> confirmParticipants(UUID activityId, ConfirmParticipantsRequest req) {
         User currentUser = getCurrentUser();
         CommunityActivity activity = getActivityOrThrow(activityId);
@@ -307,9 +344,10 @@ public class CommunityService {
 
             // US-38: Cộng Time Credit nếu chưa cộng
             if (!Boolean.TRUE.equals(p.getCreditAwarded())) {
+                double awardedCredit = target.actualHours();
                 boolean awarded = walletService.addCommunityCredit(
                         p.getUser(),
-                        activity.getCreditReward(),
+                        awardedCredit,
                         String.format("Tham gia hoạt động cộng đồng: %s (%.1f giờ)",
                                 activity.getTitle(), target.actualHours()),
                         activity.getId(),
@@ -321,9 +359,9 @@ public class CommunityService {
                             p.getUser(), NotificationType.COMMUNITY_CREDIT_AWARDED,
                             "Đã ghi nhận đóng góp cộng đồng",
                             String.format("Bạn nhận được %.1f Time Credit từ hoạt động %s",
-                                    activity.getCreditReward(), activity.getTitle()), activity.getId());
+                                    awardedCredit, activity.getTitle()), activity.getId());
                     log.info("TC awarded to user [{}] for activity [{}]: +{} TC",
-                            p.getUser().getId(), activityId, activity.getCreditReward());
+                            p.getUser().getId(), activityId, awardedCredit);
                 }
             }
 
@@ -332,13 +370,52 @@ public class CommunityService {
         }
 
         // Không còn ai chờ xác nhận → hoàn tất hoạt động.
-        if (participantRepo.countByActivityIdAndStatus(
-                activityId, ActivityParticipantStatus.REGISTERED) == 0) {
-            activity.setStatus(ActivityStatus.COMPLETED);
-            activityRepo.save(activity);
-        }
+        completeActivityIfResolved(activity);
 
         log.info("Organizer [{}] confirmed {} participants for activity [{}]",
+                currentUser.getId(), results.size(), activityId);
+        return results;
+    }
+
+    /** Đánh dấu người không tham gia; không cộng Credit. */
+    @Transactional
+    @PreAuthorize("hasAnyAuthority('ROLE_ORGANIZATION', 'ROLE_ADMIN')")
+    public List<ParticipantResponse> markParticipantsAbsent(
+            UUID activityId, MarkParticipantsAbsentRequest request) {
+        User currentUser = getCurrentUser();
+        CommunityActivity activity = getActivityOrThrow(activityId);
+        checkOrganizer(activity, currentUser);
+        if (Instant.now().isBefore(activity.getEndTime())) {
+            throw new AppException(ErrorCode.ACTIVITY_NOT_ENDED);
+        }
+
+        String reason = request.getReason() == null || request.getReason().isBlank()
+                ? "Không được tổ chức xác nhận tham gia"
+                : request.getReason().trim();
+        List<ParticipantResponse> results = new ArrayList<>();
+        for (UUID participantId : request.getParticipantIds().stream().distinct().toList()) {
+            ActivityParticipant participant = participantRepo.findById(participantId)
+                    .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+            if (!participant.getActivity().getId().equals(activityId)) {
+                throw new AppException(ErrorCode.INVALID_REQUEST);
+            }
+            if (participant.getStatus() != ActivityParticipantStatus.REGISTERED) {
+                throw new AppException(ErrorCode.PARTICIPANT_NOT_REGISTERED);
+            }
+
+            participant.setStatus(ActivityParticipantStatus.ABSENT);
+            participant.setConfirmNote(reason);
+            participantRepo.save(participant);
+            notificationService.createNotification(
+                    participant.getUser(), NotificationType.COMMUNITY_PARTICIPANT_ABSENT,
+                    "Chưa được xác nhận tham gia",
+                    String.format("Bạn được ghi nhận vắng mặt tại hoạt động %s. Lý do: %s",
+                            activity.getTitle(), reason), activity.getId());
+            results.add(ParticipantResponse.fromEntity(participant));
+        }
+
+        completeActivityIfResolved(activity);
+        log.info("Organizer [{}] marked {} participants absent for activity [{}]",
                 currentUser.getId(), results.size(), activityId);
         return results;
     }
@@ -379,7 +456,8 @@ public class CommunityService {
                 .findByActivityIdAndUserId(activityId, currentUser.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (participant.getStatus() == ActivityParticipantStatus.CANCELLED ||
+        if ((participant.getStatus() != ActivityParticipantStatus.REGISTERED &&
+                participant.getStatus() != ActivityParticipantStatus.CONFIRMED) ||
                 Instant.now().isBefore(participant.getActivity().getEndTime())) {
             throw new AppException(ErrorCode.EVIDENCE_NOT_ALLOWED);
         }
@@ -477,6 +555,14 @@ public class CommunityService {
         }
     }
 
+    private void completeActivityIfResolved(CommunityActivity activity) {
+        if (participantRepo.countByActivityIdAndStatus(
+                activity.getId(), ActivityParticipantStatus.REGISTERED) == 0) {
+            activity.setStatus(ActivityStatus.COMPLETED);
+            activityRepo.save(activity);
+        }
+    }
+
     private List<ConfirmationTarget> resolveConfirmations(UUID activityId, ConfirmParticipantsRequest req) {
         List<ConfirmationTarget> result = new ArrayList<>();
         if (req.getConfirmations() != null && !req.getConfirmations().isEmpty()) {
@@ -492,7 +578,10 @@ public class CommunityService {
         List<UUID> ids = req.getParticipantIds();
         if (ids == null || ids.isEmpty()) {
             return participantRepo.findByActivityIdAndStatus(activityId, ActivityParticipantStatus.REGISTERED)
-                    .stream().map(p -> new ConfirmationTarget(p, req.getActualHours(), req.getConfirmNote())).toList();
+                    .stream().map(p -> {
+                        validateActualHours(req.getActualHours());
+                        return new ConfirmationTarget(p, req.getActualHours(), req.getConfirmNote());
+                    }).toList();
         }
         for (UUID id : ids) {
             result.add(toConfirmationTarget(activityId, id, req.getActualHours(), req.getConfirmNote()));
@@ -510,7 +599,15 @@ public class CommunityService {
         if (participant.getStatus() != ActivityParticipantStatus.REGISTERED) {
             throw new AppException(ErrorCode.PARTICIPANT_NOT_REGISTERED);
         }
+        validateActualHours(actualHours);
         return new ConfirmationTarget(participant, actualHours, note);
+    }
+
+    private void validateActualHours(Double actualHours) {
+        if (actualHours == null || !Double.isFinite(actualHours) ||
+                actualHours < 0.5) {
+            throw new AppException(ErrorCode.ACTUAL_HOURS_INVALID);
+        }
     }
 
     private boolean isAdmin() {
@@ -525,7 +622,8 @@ public class CommunityService {
         boolean registered = false;
         if (currentUser != null) {
             registered = participantRepo.findByActivityIdAndUserId(activity.getId(), currentUser.getId())
-                    .map(p -> p.getStatus() != ActivityParticipantStatus.CANCELLED)
+                    .map(p -> p.getStatus() == ActivityParticipantStatus.REGISTERED ||
+                            p.getStatus() == ActivityParticipantStatus.CONFIRMED)
                     .orElse(false);
         }
         return ActivityResponse.fromEntity(activity, count, registered);

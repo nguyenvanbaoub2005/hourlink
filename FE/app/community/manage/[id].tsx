@@ -21,6 +21,7 @@ export default function ManageParticipantsScreen() {
   const [hoursById, setHoursById] = useState<Record<string, string>>({});
   const [confirmNote, setConfirmNote] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [markingAbsent, setMarkingAbsent] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string>();
   const [previewImage, setPreviewImage] = useState<string>();
 
@@ -81,7 +82,7 @@ export default function ManageParticipantsScreen() {
       await CommunityApi.confirmParticipants(id as string, {
         confirmations,
       });
-      Alert.alert('Thành công', `Đã xác nhận và cộng Time Credit cho ${selectedIds.size} người.`);
+      Alert.alert('Thành công', `Đã xác nhận và cộng Credit theo số giờ thực tế cho ${selectedIds.size} người.`);
       setSelectedIds(new Set());
       setHoursById({});
       fetchParticipants();
@@ -90,6 +91,44 @@ export default function ManageParticipantsScreen() {
     } finally {
       setConfirming(false);
     }
+  };
+
+  const handleMarkAbsent = () => {
+    if (activity && new Date(activity.endTime) > new Date()) {
+      Alert.alert('Chưa thể xử lý', 'Chỉ có thể đánh dấu vắng sau khi hoạt động kết thúc.');
+      return;
+    }
+    if (selectedIds.size === 0) {
+      Alert.alert('Chưa chọn người', 'Vui lòng chọn ít nhất một người tham gia.');
+      return;
+    }
+
+    Alert.alert('Đánh dấu vắng mặt?', `${selectedIds.size} người được chọn sẽ không nhận Credit.`, [
+      { text: 'Quay lại', style: 'cancel' },
+      {
+        text: 'Đánh dấu vắng',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setMarkingAbsent(true);
+            await CommunityApi.markParticipantsAbsent(
+              id as string,
+              Array.from(selectedIds),
+              confirmNote.trim() || undefined,
+            );
+            Alert.alert('Đã cập nhật', `Đã đánh dấu vắng mặt ${selectedIds.size} người.`);
+            setSelectedIds(new Set());
+            setHoursById({});
+            setConfirmNote('');
+            await fetchParticipants();
+          } catch (e: any) {
+            Alert.alert('Lỗi', e.response?.data?.message || 'Không thể đánh dấu vắng mặt.');
+          } finally {
+            setMarkingAbsent(false);
+          }
+        },
+      },
+    ]);
   };
 
   const renderItem = ({ item }: { item: ParticipantResponse }) => {
@@ -115,8 +154,12 @@ export default function ManageParticipantsScreen() {
                 size={24}
                 color={isSelected ? Colors.primary : Colors.border}
               />
-            ) : (
+            ) : item.status === 'CONFIRMED' ? (
               <Ionicons name="checkmark-done-circle" size={24} color="#059669" />
+            ) : item.status === 'ABSENT' ? (
+              <Ionicons name="close-circle" size={24} color="#DC2626" />
+            ) : (
+              <Ionicons name="ban" size={24} color={Colors.textMuted} />
             )}
           </TouchableOpacity>
 
@@ -136,6 +179,8 @@ export default function ManageParticipantsScreen() {
                 <Text style={styles.statusConfirmed}>Đã xác nhận ({item.actualHours}h)</Text>
               ) : item.status === 'REGISTERED' ? (
                 <Text style={styles.statusRegistered}>Chờ xác nhận</Text>
+              ) : item.status === 'ABSENT' ? (
+                <Text style={styles.statusAbsent}>Vắng mặt{item.confirmNote ? ` · ${item.confirmNote}` : ''}</Text>
               ) : (
                 <Text style={styles.statusCancelled}>Đã hủy</Text>
               )}
@@ -228,16 +273,28 @@ export default function ManageParticipantsScreen() {
               style={styles.noteInput}
               value={confirmNote}
               onChangeText={setConfirmNote}
-              placeholder="Ghi chú xác nhận (tùy chọn)"
+              placeholder="Ghi chú xác nhận / lý do vắng mặt"
               placeholderTextColor={Colors.textMuted}
             />
-            <TouchableOpacity 
-              style={[styles.confirmBtn, selectedIds.size === 0 && { opacity: 0.5 }]}
-              onPress={handleConfirm}
-              disabled={selectedIds.size === 0 || confirming}
-            >
-              {confirming ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Xác nhận & Tặng Credit</Text>}
-            </TouchableOpacity>
+            <Text style={styles.creditRule}>Credit được cộng theo quy đổi 1 giờ thực tế = 1 TC.</Text>
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.absentBtn, (selectedIds.size === 0 || confirming || markingAbsent) && styles.disabledBtn]}
+                onPress={handleMarkAbsent}
+                disabled={selectedIds.size === 0 || confirming || markingAbsent}
+              >
+                {markingAbsent
+                  ? <ActivityIndicator color="#DC2626" />
+                  : <Text style={styles.absentBtnText}>Đánh dấu vắng</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmBtn, (selectedIds.size === 0 || confirming || markingAbsent) && styles.disabledBtn]}
+                onPress={handleConfirm}
+                disabled={selectedIds.size === 0 || confirming || markingAbsent}
+              >
+                {confirming ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Xác nhận & Tặng Credit</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
 
           <UserProfileSheet
@@ -291,6 +348,7 @@ const styles = StyleSheet.create({
   userName: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 4 },
   statusRegistered: { color: '#D97706', fontSize: 13 },
   statusConfirmed: { color: '#059669', fontSize: 13, fontWeight: 'bold' },
+  statusAbsent: { color: '#DC2626', fontSize: 13, fontWeight: '600' },
   statusCancelled: { color: '#EF4444', fontSize: 13 },
   
   emptyText: { textAlign: 'center', color: Colors.textMuted, marginTop: 40 },
@@ -303,8 +361,13 @@ const styles = StyleSheet.create({
   noteInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
   notice: { marginHorizontal: Spacing.md, marginTop: 10, padding: 10, backgroundColor: '#FEF3C7', borderRadius: Radius.md },
   noticeText: { color: '#92400E', fontSize: 13 },
-  confirmBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
+  creditRule: { color: Colors.textMuted, fontSize: 12, marginBottom: 10 },
+  actionRow: { flexDirection: 'row', gap: 10 },
+  absentBtn: { flex: 1, borderWidth: 1, borderColor: '#DC2626', padding: 14, borderRadius: Radius.md, alignItems: 'center' },
+  absentBtnText: { color: '#DC2626', fontSize: 14, fontWeight: 'bold' },
+  confirmBtn: { flex: 1.4, backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  disabledBtn: { opacity: 0.5 },
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', alignItems: 'center', justifyContent: 'center' },
   previewClose: { position: 'absolute', right: 18, top: 50, zIndex: 2, padding: 8 },
   previewImage: { width: '95%', height: '82%' },

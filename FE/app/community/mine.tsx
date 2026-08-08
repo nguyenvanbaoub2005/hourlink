@@ -30,6 +30,17 @@ export default function MyCommunityActivitiesScreen() {
     { text: 'Không', style: 'cancel' },
     { text: 'Xóa', style: 'destructive', onPress: async () => { try { await CommunityApi.deleteActivity(item.id); load(); } catch (e: any) { Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể xóa hoạt động.'); } } },
   ]);
+  const cancel = (item: ActivityResponse) => Alert.alert(
+    'Hủy hoạt động',
+    `Hủy “${item.title}”? Những người đang đăng ký sẽ được thông báo và không nhận Credit.`,
+    [
+      { text: 'Quay lại', style: 'cancel' },
+      { text: 'Hủy hoạt động', style: 'destructive', onPress: async () => {
+        try { await CommunityApi.cancelActivity(item.id); await load(); }
+        catch (e: any) { Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể hủy hoạt động.'); }
+      } },
+    ],
+  );
 
   return <SafeAreaView style={styles.container}>
     <View style={styles.header}><TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} /></TouchableOpacity><Text style={styles.headerTitle}>Hoạt Động Của Tôi</Text><TouchableOpacity onPress={() => router.push('/community/create' as any)}><Ionicons name="add-circle" size={26} color={Colors.primary} /></TouchableOpacity></View>
@@ -39,6 +50,7 @@ export default function MyCommunityActivitiesScreen() {
         <Action label="Người tham gia" icon="people-outline" onPress={() => router.push(`/community/manage/${item.id}` as any)} />
         {item.status === 'OPEN' && <Action label="Sửa" icon="create-outline" onPress={() => router.push({ pathname: '/community/create', params: { editId: item.id } } as any)} />}
         {item.status === 'OPEN' && <Action label="Đóng" icon="lock-closed-outline" onPress={() => close(item)} />}
+        {(item.status === 'OPEN' || item.status === 'CLOSED') && <Action label="Hủy" icon="ban-outline" danger onPress={() => cancel(item)} />}
         {(item.status === 'OPEN' || item.status === 'CLOSED') && <Action label="Xóa" icon="trash-outline" danger onPress={() => remove(item)} />}
       </View>
     </View>} />}

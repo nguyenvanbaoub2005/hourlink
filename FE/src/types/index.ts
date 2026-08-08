@@ -39,7 +39,7 @@ export type ReportReason = 'SPAM' | 'HARASSMENT' | 'MISINFORMATION' | 'ILLEGAL_C
 export type ReportStatus = 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED';
 export type ReportTargetType = 'USER' | 'MESSAGE' | 'CONTENT';
 export type DisputeStatus = 'open' | 'reviewing' | 'resolved';
-export type ActivityParticipantStatus = 'REGISTERED' | 'CONFIRMED' | 'CANCELLED';
+export type ActivityParticipantStatus = 'REGISTERED' | 'CONFIRMED' | 'CANCELLED' | 'ABSENT';
 export type NotificationType = 'invitation' | 'appointment' | 'wallet' | 'rating' | 'report' | 'community_activity' | 'system';
 
 // ─── API Response wrapper (mirrors ApiResponse<T> từ BE) ────

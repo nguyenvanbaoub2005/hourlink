@@ -121,8 +121,9 @@ export default function ActivityDetailScreen() {
           <View style={styles.infoRow}>
             <Ionicons name="gift-outline" size={20} color="#D97706" style={styles.infoIcon} />
             <View>
-              <Text style={styles.infoLabel}>Phần thưởng</Text>
-              <Text style={[styles.infoVal, { color: '#D97706', fontWeight: 'bold' }]}>{activity.creditReward} Time Credit</Text>
+              <Text style={styles.infoLabel}>Credit dự kiến</Text>
+              <Text style={[styles.infoVal, { color: '#D97706', fontWeight: 'bold' }]}>{activity.creditReward} TC dự kiến</Text>
+              <Text style={styles.creditHelper}>Thực nhận theo quy đổi 1 giờ xác nhận = 1 TC</Text>
             </View>
           </View>
         </View>
@@ -208,6 +209,7 @@ const styles = StyleSheet.create({
   infoIcon: { marginRight: 12, width: 24, textAlign: 'center' },
   infoLabel: { fontSize: 12, color: Colors.textMuted, marginBottom: 2 },
   infoVal: { fontSize: 15, fontWeight: '500', color: Colors.textPrimary },
+  creditHelper: { color: Colors.textMuted, fontSize: 12, marginTop: 3 },
   
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 8 },
   desc: { fontSize: 15, color: Colors.textSecondary, lineHeight: 24 },
