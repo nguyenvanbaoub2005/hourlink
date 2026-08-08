@@ -4,18 +4,41 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import ReportApi from '@api/report';
-import type { Report } from '@types';
+import ChatApi from '@api/chat';
+import type { MessageReport, Report, TrackedReport } from '@types';
 
 export default function MyReportsScreen() {
   const router = useRouter();
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<TrackedReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchReports = async () => {
     try {
-      const res = await ReportApi.getMyReports();
-      setReports(res.data || []);
+      const [reportRes, messageRes] = await Promise.all([
+        ReportApi.getMyReports(),
+        ChatApi.getMyMessageReports(),
+      ]);
+      const regular: TrackedReport[] = (reportRes.data || []).map((item: Report) => ({
+        ...item,
+        source: 'REPORT',
+        evidence: item.evidenceUrls,
+      }));
+      const messages: TrackedReport[] = ((messageRes.data?.data || []) as MessageReport[]).map((item) => ({
+        id: item.id,
+        source: 'MESSAGE',
+        targetId: item.messageId,
+        targetType: 'MESSAGE',
+        targetLabel: item.reportedUserName,
+        reason: item.reason,
+        description: item.description,
+        evidence: item.evidence,
+        status: item.status,
+        createdAt: item.createdAt,
+      }));
+      setReports([...regular, ...messages].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
     } catch (e) {
       console.log('Error fetching reports', e);
     } finally {
@@ -39,7 +62,9 @@ export default function MyReportsScreen() {
     switch (status) {
       case 'PENDING': return { bg: '#FEF3C7', text: '#D97706', label: 'Đang chờ' };
       case 'REVIEWING': return { bg: '#DBEAFE', text: '#2563EB', label: 'Đang xử lý' };
+      case 'REVIEWED': return { bg: '#DBEAFE', text: '#2563EB', label: 'Đã xem xét' };
       case 'RESOLVED': return { bg: '#D1FAE5', text: '#059669', label: 'Đã giải quyết' };
+      case 'ACTIONED': return { bg: '#D1FAE5', text: '#059669', label: 'Đã xử lý' };
       case 'DISMISSED': return { bg: '#F1F5F9', text: '#64748B', label: 'Bị từ chối' };
       default: return { bg: '#F1F5F9', text: '#64748B', label: status };
     }
@@ -51,17 +76,28 @@ export default function MyReportsScreen() {
       case 'HARASSMENT': return 'Quấy rối';
       case 'MISINFORMATION': return 'Thông tin sai lệch';
       case 'FRAUD': return 'Lừa đảo';
+      case 'SCAM': return 'Lừa đảo';
+      case 'OFFENSIVE': return 'Nội dung xúc phạm';
+      case 'OUTSIDE_PAYMENT': return 'Thanh toán ngoài hệ thống';
+      case 'ASK_CREDENTIALS': return 'Yêu cầu thông tin bảo mật';
       case 'ILLEGAL_CONTENT': return 'Nội dung bất hợp pháp';
       default: return 'Khác';
     }
   };
 
-  const renderItem = ({ item }: { item: Report }) => {
+  const renderItem = ({ item }: { item: TrackedReport }) => {
     const statusObj = getStatusColor(item.status);
     const date = new Date(item.createdAt).toLocaleDateString('vi-VN');
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.75}
+        onPress={() => router.push({
+          pathname: '/report/[id]',
+          params: { id: item.id, source: item.source },
+        } as any)}
+      >
         <View style={styles.cardHeader}>
           <Text style={styles.reasonText}>{getReasonLabel(item.reason)}</Text>
           <View style={[styles.statusBadge, { backgroundColor: statusObj.bg }]}>
@@ -81,7 +117,8 @@ export default function MyReportsScreen() {
         )}
 
         <Text style={styles.dateText}>Ngày gửi: {date}</Text>
-      </View>
+        <Text style={styles.detailHint}>Xem chi tiết ›</Text>
+      </TouchableOpacity>
     );
   };
 
@@ -187,6 +224,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'right'
   },
+  detailHint: { marginTop: 8, color: Colors.primary, fontSize: 13, fontWeight: '600' },
   
   emptyWrap: {
     padding: 40,

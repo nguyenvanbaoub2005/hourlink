@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -496,13 +497,47 @@ public class ChatService {
 
         log.info("Message {} reported by {} — reason {}", messageId, email, request.getReason());
 
+        return toChatReportResponse(report);
+    }
+
+    public List<ChatReportResponse> getMyMessageReports() {
+        String email = SecurityUtil.getCurrentUserEmail();
+        return chatReportRepository.findAllByReporter_EmailOrderByCreatedAtDesc(email)
+                .stream().map(this::toChatReportResponse).toList();
+    }
+
+    public ChatReportResponse getMyMessageReport(UUID reportId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        ChatReport report = chatReportRepository.findByIdAndReporter_Email(reportId, email)
+                .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+        return toChatReportResponse(report);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public List<ChatReportResponse> getAllMessageReports() {
+        return chatReportRepository.findAllByOrderByCreatedAtDesc()
+                .stream().map(this::toChatReportResponse).toList();
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ChatReportResponse updateMessageReportStatus(UUID reportId, ChatReportStatus status) {
+        ChatReport report = chatReportRepository.findById(reportId)
+                .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+        report.setStatus(status);
+        return toChatReportResponse(chatReportRepository.save(report));
+    }
+
+    private ChatReportResponse toChatReportResponse(ChatReport report) {
+        ChatMessage message = report.getMessage();
         return ChatReportResponse.builder()
                 .id(report.getId())
                 .messageId(message.getId())
-                .reportedUserId(message.getSender().getId())
-                .reportedUserName(message.getSender().getFullName())
+                .reportedUserId(report.getReportedUser().getId())
+                .reportedUserName(report.getReportedUser().getFullName())
                 .reason(report.getReason())
                 .description(report.getDescription())
+                .evidence(report.getMessageSnapshot())
                 .status(report.getStatus())
                 .createdAt(report.getCreatedAt())
                 .build();

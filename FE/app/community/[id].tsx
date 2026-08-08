@@ -160,6 +160,18 @@ export default function ActivityDetailScreen() {
             </TouchableOpacity>
           )
         )}
+        {!isOrganizer && (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => router.push({
+              pathname: '/report/create',
+              params: { targetId: activity.id, targetType: 'CONTENT' },
+            } as any)}
+          >
+            <Ionicons name="flag-outline" size={18} color={Colors.danger} />
+            <Text style={styles.reportBtnText}>Báo cáo nội dung</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -191,5 +203,7 @@ const styles = StyleSheet.create({
 
   bottomBar: { padding: Spacing.md, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: Colors.border },
   actionBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
-  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  actionBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  reportBtn: { marginTop: 10, padding: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  reportBtnText: { color: Colors.danger, fontSize: 14, fontWeight: '600' }
 });

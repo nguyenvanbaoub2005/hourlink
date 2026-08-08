@@ -10,4 +10,8 @@ import java.util.UUID;
 @Repository
 public interface ReportRepository extends JpaRepository<Report, UUID> {
     List<Report> findByReporterIdOrderByCreatedAtDesc(UUID reporterId);
+    List<Report> findAllByOrderByCreatedAtDesc();
+
+    boolean existsByReporterIdAndTargetIdAndTargetType(UUID reporterId, UUID targetId,
+                                                        com.hourlink.report.enums.ReportTargetType targetType);
 }

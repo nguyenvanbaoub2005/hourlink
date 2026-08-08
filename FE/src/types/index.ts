@@ -420,6 +420,32 @@ export interface Report {
   createdAt: string;
 }
 
+export interface MessageReport {
+  id: string;
+  messageId: string;
+  reportedUserId: string;
+  reportedUserName: string;
+  reason: ChatReportReason;
+  description?: string;
+  evidence?: string;
+  status: 'PENDING' | 'REVIEWED' | 'DISMISSED' | 'ACTIONED';
+  createdAt: string;
+}
+
+export interface TrackedReport {
+  id: string;
+  source: 'REPORT' | 'MESSAGE';
+  targetId: string;
+  targetType: ReportTargetType;
+  targetLabel?: string;
+  reason: string;
+  description?: string;
+  evidence?: string;
+  status: string;
+  adminNote?: string;
+  createdAt: string;
+}
+
 export interface Dispute {
   id: string;
   appointmentId: string;

@@ -79,6 +79,9 @@ public enum ErrorCode {
     REPORT_NOT_FOUND(7003,         "Không tìm thấy báo cáo",                    HttpStatus.NOT_FOUND),
     DISPUTE_NOT_FOUND(7004,        "Không tìm thấy tranh chấp",                 HttpStatus.NOT_FOUND),
     DISPUTE_ALREADY_RESOLVED(7005, "Tranh chấp đã được giải quyết",             HttpStatus.BAD_REQUEST),
+    REPORT_ALREADY_SUBMITTED(7006, "Bạn đã báo cáo nội dung này rồi",            HttpStatus.BAD_REQUEST),
+    CANNOT_REPORT_SELF(7007,       "Không thể báo cáo nội dung của chính bạn",   HttpStatus.BAD_REQUEST),
+    REPORT_TARGET_NOT_FOUND(7008,  "Không tìm thấy đối tượng cần báo cáo",       HttpStatus.NOT_FOUND),
 
     // ─── Community (8xxx) ────────────────────────────────────────────
     ACTIVITY_NOT_FOUND(8001,       "Không tìm thấy hoạt động cộng đồng",       HttpStatus.NOT_FOUND),

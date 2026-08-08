@@ -74,6 +74,10 @@ const ChatApi = {
     data: { reason: string; description?: string }
   ) => api.post(`/chat/messages/${messageId}/report`, data),
 
+  /** Danh sách/chi tiết báo cáo tin nhắn tôi đã gửi */
+  getMyMessageReports: () => api.get('/chat/reports/my'),
+  getMyMessageReport: (reportId: string) => api.get(`/chat/reports/my/${reportId}`),
+
   /** Chặn một người dùng */
   blockUser: (data: { userId: string; reason?: string }) =>
     api.post('/chat/block', data),

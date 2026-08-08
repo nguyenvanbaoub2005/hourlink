@@ -4,6 +4,7 @@ import com.hourlink.chat.dto.request.BlockUserRequest;
 import com.hourlink.chat.dto.request.ProposeRescheduleRequest;
 import com.hourlink.chat.dto.request.ReportMessageRequest;
 import com.hourlink.chat.dto.request.SendMessageRequest;
+import com.hourlink.chat.dto.request.UpdateChatReportStatusRequest;
 import com.hourlink.chat.dto.response.BlockedUserResponse;
 import com.hourlink.chat.dto.response.ChatMessageResponse;
 import com.hourlink.chat.dto.response.ChatReportResponse;
@@ -136,6 +137,33 @@ public class ChatController {
             @RequestBody @Valid ReportMessageRequest request) {
         return ApiResponse.created("Đã gửi báo cáo, quản trị viên sẽ xem xét",
                 chatService.reportMessage(messageId, request));
+    }
+
+    @Operation(summary = "Danh sách báo cáo tin nhắn tôi đã gửi")
+    @GetMapping("/reports/my")
+    public ApiResponse<List<ChatReportResponse>> getMyMessageReports() {
+        return ApiResponse.success(chatService.getMyMessageReports());
+    }
+
+    @Operation(summary = "Chi tiết báo cáo tin nhắn tôi đã gửi")
+    @GetMapping("/reports/my/{reportId}")
+    public ApiResponse<ChatReportResponse> getMyMessageReport(@PathVariable UUID reportId) {
+        return ApiResponse.success(chatService.getMyMessageReport(reportId));
+    }
+
+    @Operation(summary = "Admin: danh sách báo cáo tin nhắn")
+    @GetMapping("/reports/admin")
+    public ApiResponse<List<ChatReportResponse>> getAllMessageReports() {
+        return ApiResponse.success(chatService.getAllMessageReports());
+    }
+
+    @Operation(summary = "Admin: cập nhật trạng thái báo cáo tin nhắn")
+    @PatchMapping("/reports/admin/{reportId}/status")
+    public ApiResponse<ChatReportResponse> updateMessageReportStatus(
+            @PathVariable UUID reportId,
+            @Valid @RequestBody UpdateChatReportStatusRequest request) {
+        return ApiResponse.success("Đã cập nhật trạng thái báo cáo",
+                chatService.updateMessageReportStatus(reportId, request.getStatus()));
     }
 
     // ─── Chặn người dùng ────────────────────────────────────────────────────

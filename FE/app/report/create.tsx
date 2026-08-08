@@ -25,6 +25,10 @@ export default function CreateReportScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (!targetId || !targetType) {
+      Alert.alert('Lỗi', 'Không xác định được đối tượng cần báo cáo.');
+      return;
+    }
     if (!reason) {
       Alert.alert('Lỗi', 'Vui lòng chọn lý do báo cáo');
       return;
@@ -37,11 +41,11 @@ export default function CreateReportScreen() {
     setSubmitting(true);
     try {
       const requestPayload: ReportRequest = {
-        targetId: targetId || '00000000-0000-0000-0000-000000000000', // fallback if testing
-        targetType: (targetType as any) || 'USER',
+        targetId,
+        targetType: targetType as ReportRequest['targetType'],
         reason,
         description,
-        evidenceUrls
+        evidenceUrls: evidenceUrls.trim() || undefined
       };
 
       await ReportApi.submitReport(requestPayload);
