@@ -150,16 +150,16 @@ export default function ExploreScreen() {
     }
   };
 
-  const getCategoryIcon = (name: string): IoniconName => {
+  const getCategoryVisual = (name: string): { icon: IoniconName; color: string; background: string } => {
     const lower = name.toLowerCase();
-    if (lower.includes('lập trình')) return 'code-slash-outline';
-    if (lower.includes('ngôn ngữ')) return 'language-outline';
-    if (lower.includes('thiết kế')) return 'color-palette-outline';
-    if (lower.includes('kinh doanh')) return 'bar-chart-outline';
-    if (lower.includes('giáo dục')) return 'book-outline';
-    if (lower.includes('sức khỏe')) return 'fitness-outline';
-    if (lower.includes('nghệ thuật')) return 'musical-notes-outline';
-    return 'grid-outline';
+    if (lower.includes('lập trình')) return { icon: 'code-slash-outline', color: '#2563EB', background: '#DBEAFE' };
+    if (lower.includes('ngôn ngữ')) return { icon: 'language-outline', color: '#7C3AED', background: '#EDE9FE' };
+    if (lower.includes('thiết kế')) return { icon: 'color-palette-outline', color: '#DB2777', background: '#FCE7F3' };
+    if (lower.includes('kinh doanh')) return { icon: 'bar-chart-outline', color: '#D97706', background: '#FEF3C7' };
+    if (lower.includes('giáo dục')) return { icon: 'book-outline', color: '#059669', background: '#D1FAE5' };
+    if (lower.includes('sức khỏe')) return { icon: 'fitness-outline', color: '#DC2626', background: '#FEE2E2' };
+    if (lower.includes('nghệ thuật')) return { icon: 'musical-notes-outline', color: '#4F46E5', background: '#E0E7FF' };
+    return { icon: 'grid-outline', color: '#475569', background: '#F1F5F9' };
   };
 
   const renderAvatar = (item: SkillItem) => {
@@ -220,21 +220,31 @@ export default function ExploreScreen() {
           <View style={styles.categoryGrid}>
             {categories.map((cat) => {
               const active = selectedCategoryId === cat.id;
-              const categoryIcon = getCategoryIcon(cat.name);
+              const categoryVisual = getCategoryVisual(cat.name);
               const count = skills.filter(s => s.categoryId === cat.id || s.categoryName === cat.name).length;
               return (
                 <TouchableOpacity
                   key={cat.id}
-                  style={[styles.categoryCard, active && styles.categoryCardActive]}
+                  style={[
+                    styles.categoryCard,
+                    active && styles.categoryCardActive,
+                    active && { backgroundColor: categoryVisual.background, borderColor: categoryVisual.color },
+                  ]}
                   onPress={() => setSelectedCategoryId(active ? null : cat.id)}
                 >
-                  <View style={[styles.catIconCircle, active && styles.catIconCircleActive]}>
-                    <Ionicons name={categoryIcon} size={22} color={active ? '#1D4ED8' : '#475569'} />
+                  <View style={[
+                    styles.catIconCircle,
+                    { backgroundColor: active ? categoryVisual.color : categoryVisual.background },
+                  ]}>
+                    <Ionicons name={categoryVisual.icon} size={22} color={active ? '#FFFFFF' : categoryVisual.color} />
                   </View>
-                  <Text style={[styles.catCardName, active && styles.catCardNameActive]} numberOfLines={1}>
+                  <Text
+                    style={[styles.catCardName, active && styles.catCardNameActive, active && { color: categoryVisual.color }]}
+                    numberOfLines={1}
+                  >
                     {cat.name}
                   </Text>
-                  <Text style={[styles.catStatText, active && styles.catStatTextActive]}>
+                  <Text style={[styles.catStatText, active && styles.catStatTextActive, active && { color: categoryVisual.color }]}>
                     {count} kỹ năng
                   </Text>
                 </TouchableOpacity>
@@ -765,13 +775,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
-  categoryCardActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6', borderWidth: 1.5 },
+  categoryCardActive: { borderWidth: 1.5 },
   catIconCircle: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  catIconCircleActive: { backgroundColor: '#DBEAFE' },
   catCardName: { fontSize: 12, fontWeight: '600', color: '#334155', textAlign: 'center' },
-  catCardNameActive: { color: '#1D4ED8', fontWeight: '700' },
+  catCardNameActive: { fontWeight: '700' },
   catStatText: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  catStatTextActive: { color: '#3B82F6', fontWeight: '600' },
+  catStatTextActive: { fontWeight: '600' },
 
   // Trending pills
   trendingPill: { backgroundColor: '#FFF7ED', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: '#FFEDD5' },
