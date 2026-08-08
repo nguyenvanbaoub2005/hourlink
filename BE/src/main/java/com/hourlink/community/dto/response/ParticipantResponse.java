@@ -23,6 +23,13 @@ public class ParticipantResponse {
     private Double actualHours;
     private String confirmNote;
     private Boolean creditAwarded;
+    private Instant confirmedAt;
+    private UUID activityId;
+    private String activityTitle;
+    private String activityLocation;
+    private Instant activityStartTime;
+    private Instant activityEndTime;
+    private Double activityCreditReward;
     private Instant createdAt;
 
     public static ParticipantResponse fromEntity(ActivityParticipant p) {
@@ -35,6 +42,13 @@ public class ParticipantResponse {
                 .actualHours(p.getActualHours())
                 .confirmNote(p.getConfirmNote())
                 .creditAwarded(p.getCreditAwarded())
+                .confirmedAt(p.getConfirmedAt())
+                .activityId(p.getActivity().getId())
+                .activityTitle(p.getActivity().getTitle())
+                .activityLocation(p.getActivity().getLocation())
+                .activityStartTime(p.getActivity().getStartTime())
+                .activityEndTime(p.getActivity().getEndTime())
+                .activityCreditReward(p.getActivity().getCreditReward())
                 .createdAt(p.getCreatedAt())
                 .build();
     }

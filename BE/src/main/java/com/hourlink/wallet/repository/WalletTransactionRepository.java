@@ -16,4 +16,6 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
      * Dùng cho endpoint GET /wallet/transactions (phân trang).
      */
     Page<WalletTransaction> findByWalletIdOrderByCreatedAtDesc(UUID walletId, Pageable pageable);
+
+    boolean existsByIdempotencyKey(String idempotencyKey);
 }

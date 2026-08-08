@@ -48,6 +48,9 @@ public class ActivityParticipant extends BaseEntity {
     @Column(name = "confirm_note", length = 500)
     String confirmNote;
 
+    @Column(name = "confirmed_at")
+    java.time.Instant confirmedAt;
+
     /** Đánh dấu đã nhận Time Credit chưa (tránh cộng 2 lần) */
     @Column(name = "credit_awarded", nullable = false)
     @Builder.Default

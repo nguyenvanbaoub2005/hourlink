@@ -18,6 +18,7 @@ export type MessageType =
   | 'LOCATION'
   | 'MEETING_LINK'
   | 'RESCHEDULE_PROPOSAL'
+  | 'APPOINTMENT_CARD'
   | 'SYSTEM';
 
 /** Khớp com.hourlink.chat.enums.ChatReportReason */
@@ -38,7 +39,7 @@ export type ReportReason = 'SPAM' | 'HARASSMENT' | 'MISINFORMATION' | 'ILLEGAL_C
 export type ReportStatus = 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED';
 export type ReportTargetType = 'USER' | 'MESSAGE' | 'CONTENT';
 export type DisputeStatus = 'open' | 'reviewing' | 'resolved';
-export type ActivityParticipantStatus = 'registered' | 'confirmed' | 'completed' | 'cancelled';
+export type ActivityParticipantStatus = 'REGISTERED' | 'CONFIRMED' | 'CANCELLED';
 export type NotificationType = 'invitation' | 'appointment' | 'wallet' | 'rating' | 'report' | 'community_activity' | 'system';
 
 // ─── API Response wrapper (mirrors ApiResponse<T> từ BE) ────
@@ -222,6 +223,8 @@ export interface Conversation {
   id: string;
   invitationId: string;
   invitationStatus: string;
+  invitationSenderId: string;
+  invitationReceiverId: string;
   skillName?: string;
 
   otherUserId: string;
@@ -268,6 +271,10 @@ export interface ChatMessage {
 
   /** RESCHEDULE_PROPOSAL */
   proposedTime?: string;
+
+  /** APPOINTMENT_CARD */
+  appointmentId?: string;
+  appointmentData?: string;
 
   isRead: boolean;
   isRecalled?: boolean;
@@ -370,6 +377,8 @@ export interface WalletTransaction {
   relatedAppointmentId?: string;
   /** Tiêu đề lịch hẹn liên quan (nếu có) */
   relatedAppointmentTitle?: string;
+  referenceType?: string;
+  referenceId?: string;
   createdAt: string;
 }
 
@@ -486,6 +495,13 @@ export interface ParticipantResponse {
   actualHours?: number;
   confirmNote?: string;
   creditAwarded?: boolean;
+  confirmedAt?: string;
+  activityId: string;
+  activityTitle: string;
+  activityLocation?: string;
+  activityStartTime: string;
+  activityEndTime: string;
+  activityCreditReward: number;
   createdAt: string;
 }
 
@@ -503,8 +519,13 @@ export interface UpdateActivityRequest extends Partial<CreateActivityRequest> {}
 
 export interface ConfirmParticipantsRequest {
   participantIds?: string[];
-  actualHours: number;
+  actualHours?: number;
   confirmNote?: string;
+  confirmations?: Array<{
+    participantId: string;
+    actualHours: number;
+    confirmNote?: string;
+  }>;
 }
 
 // ─── Notification ────────────────────────────────────────────

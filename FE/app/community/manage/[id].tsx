@@ -5,26 +5,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import CommunityApi from '@api/community';
-import type { ParticipantResponse } from '@types';
+import UserProfileSheet from '@components/UserProfileSheet';
+import type { ActivityResponse, ParticipantResponse } from '@types';
 
 export default function ManageParticipantsScreen() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [participants, setParticipants] = useState<ParticipantResponse[]>([]);
+  const [activity, setActivity] = useState<ActivityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   
   // Trạng thái chọn người để xác nhận
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [actualHours, setActualHours] = useState('2');
+  const [hoursById, setHoursById] = useState<Record<string, string>>({});
+  const [confirmNote, setConfirmNote] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string>();
 
   const fetchParticipants = async () => {
     try {
-      const res = await CommunityApi.getParticipants(id as string, 0, 100);
-      setParticipants(res.data?.data?.content || []);
-    } catch (e) {
-      Alert.alert('Lỗi', 'Không thể tải danh sách người tham gia.');
-      router.back();
+      const [participantsRes, activityRes] = await Promise.all([
+        CommunityApi.getParticipants(id as string, 0, 100),
+        CommunityApi.getActivityDetail(id as string),
+      ]);
+      setParticipants(participantsRes.data?.data?.content || []);
+      setActivity(activityRes.data?.data || null);
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể tải danh sách người tham gia.');
     } finally {
       setLoading(false);
     }
@@ -51,25 +59,30 @@ export default function ManageParticipantsScreen() {
   };
 
   const handleConfirm = async () => {
+    if (activity && new Date(activity.endTime) > new Date()) {
+      return Alert.alert('Chưa thể xác nhận', 'Chỉ có thể xác nhận sau khi hoạt động kết thúc.');
+    }
     if (selectedIds.size === 0) {
       Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 người để xác nhận.');
       return;
     }
-    const hours = parseFloat(actualHours);
-    if (isNaN(hours) || hours <= 0) {
-      Alert.alert('Lỗi', 'Số giờ đóng góp không hợp lệ.');
-      return;
+    const confirmations = Array.from(selectedIds).map(participantId => ({
+      participantId,
+      actualHours: parseFloat(hoursById[participantId] || actualHours),
+      confirmNote: confirmNote.trim() || undefined,
+    }));
+    if (confirmations.some(item => !Number.isFinite(item.actualHours) || item.actualHours < 0.5)) {
+      return Alert.alert('Lỗi', 'Số giờ của mỗi người phải từ 0.5 giờ.');
     }
 
     try {
       setConfirming(true);
       await CommunityApi.confirmParticipants(id as string, {
-        participantIds: Array.from(selectedIds),
-        actualHours: hours,
-        confirmNote: 'Tổ chức xác nhận hoàn thành'
+        confirmations,
       });
       Alert.alert('Thành công', `Đã xác nhận và cộng Time Credit cho ${selectedIds.size} người.`);
       setSelectedIds(new Set());
+      setHoursById({});
       fetchParticipants();
     } catch (e: any) {
       Alert.alert('Lỗi', e.response?.data?.message || 'Không thể xác nhận.');
@@ -83,39 +96,63 @@ export default function ManageParticipantsScreen() {
     const isSelected = selectedIds.has(item.id);
 
     return (
-      <TouchableOpacity 
+      <View
         style={[styles.card, isSelected && styles.cardSelected]}
-        onPress={() => isRegistered && toggleSelect(item.id)}
-        disabled={!isRegistered}
       >
         <View style={styles.cardRow}>
-          {isRegistered ? (
-            <Ionicons 
-              name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
-              size={24} 
-              color={isSelected ? Colors.primary : Colors.border} 
-              style={{ marginRight: 12 }} 
-            />
-          ) : (
-            <Ionicons name="checkmark-done-circle" size={24} color="#059669" style={{ marginRight: 12 }} />
-          )}
-
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLetter}>{item.userName.charAt(0).toUpperCase()}</Text>
-          </View>
-          
-          <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>{item.userName}</Text>
-            {item.status === 'CONFIRMED' ? (
-              <Text style={styles.statusConfirmed}>Đã xác nhận ({item.actualHours}h)</Text>
-            ) : item.status === 'REGISTERED' ? (
-              <Text style={styles.statusRegistered}>Chờ xác nhận</Text>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => toggleSelect(item.id)}
+            disabled={!isRegistered}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isSelected, disabled: !isRegistered }}
+            accessibilityLabel={isRegistered ? `Chọn ${item.userName} để xác nhận` : `${item.userName} đã được xử lý`}
+          >
+            {isRegistered ? (
+              <Ionicons
+                name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                size={24}
+                color={isSelected ? Colors.primary : Colors.border}
+              />
             ) : (
-              <Text style={styles.statusCancelled}>Đã hủy</Text>
+              <Ionicons name="checkmark-done-circle" size={24} color="#059669" />
             )}
-          </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => setProfileUserId(item.userId)}
+            accessibilityRole="button"
+            accessibilityLabel={`Xem hồ sơ của ${item.userName}`}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarLetter}>{item.userName.charAt(0).toUpperCase()}</Text>
+            </View>
+
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{item.userName}</Text>
+              {item.status === 'CONFIRMED' ? (
+                <Text style={styles.statusConfirmed}>Đã xác nhận ({item.actualHours}h)</Text>
+              ) : item.status === 'REGISTERED' ? (
+                <Text style={styles.statusRegistered}>Chờ xác nhận</Text>
+              ) : (
+                <Text style={styles.statusCancelled}>Đã hủy</Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+
+          {isRegistered && isSelected && (
+            <TextInput
+              style={styles.itemHours}
+              value={hoursById[item.id] || actualHours}
+              onChangeText={(value) => setHoursById(current => ({ ...current, [item.id]: value }))}
+              keyboardType="decimal-pad"
+              placeholder="Giờ"
+            />
+          )}
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -140,6 +177,12 @@ export default function ManageParticipantsScreen() {
             <Text style={styles.countText}>{selectedIds.size} đang chọn</Text>
           </View>
 
+          {activity && new Date(activity.endTime) > new Date() && (
+            <View style={styles.notice}>
+              <Text style={styles.noticeText}>Có thể xác nhận sau {new Date(activity.endTime).toLocaleString('vi-VN')}.</Text>
+            </View>
+          )}
+
           <FlatList
             data={participants}
             keyExtractor={item => item.id}
@@ -150,7 +193,7 @@ export default function ManageParticipantsScreen() {
 
           <View style={styles.bottomBar}>
             <View style={styles.hoursInputRow}>
-              <Text style={styles.hoursLabel}>Số giờ đóng góp:</Text>
+              <Text style={styles.hoursLabel}>Số giờ mặc định:</Text>
               <TextInput 
                 style={styles.hoursInput}
                 value={actualHours}
@@ -158,6 +201,13 @@ export default function ManageParticipantsScreen() {
                 keyboardType="numeric"
               />
             </View>
+            <TextInput
+              style={styles.noteInput}
+              value={confirmNote}
+              onChangeText={setConfirmNote}
+              placeholder="Ghi chú xác nhận (tùy chọn)"
+              placeholderTextColor={Colors.textMuted}
+            />
             <TouchableOpacity 
               style={[styles.confirmBtn, selectedIds.size === 0 && { opacity: 0.5 }]}
               onPress={handleConfirm}
@@ -166,6 +216,12 @@ export default function ManageParticipantsScreen() {
               {confirming ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmBtnText}>Xác nhận & Tặng Credit</Text>}
             </TouchableOpacity>
           </View>
+
+          <UserProfileSheet
+            visible={!!profileUserId}
+            userId={profileUserId}
+            onClose={() => setProfileUserId(undefined)}
+          />
         </>
       )}
     </SafeAreaView>
@@ -187,6 +243,9 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', padding: Spacing.md, borderRadius: Radius.md, marginBottom: 8, borderWidth: 1, borderColor: Colors.border },
   cardSelected: { borderColor: Colors.primary, backgroundColor: '#F0FDF4' },
   cardRow: { flexDirection: 'row', alignItems: 'center' },
+  selectButton: { paddingVertical: 8, paddingRight: 12 },
+  profileButton: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  userInfo: { flex: 1, minWidth: 0 },
   
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   avatarLetter: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
@@ -201,6 +260,10 @@ const styles = StyleSheet.create({
   hoursInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   hoursLabel: { fontSize: 15, fontWeight: '500', marginRight: 12 },
   hoursInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 8, flex: 1, fontSize: 16 },
+  itemHours: { width: 64, borderWidth: 1, borderColor: Colors.primary, borderRadius: Radius.sm, paddingHorizontal: 8, paddingVertical: 6, textAlign: 'center' },
+  noteInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  notice: { marginHorizontal: Spacing.md, marginTop: 10, padding: 10, backgroundColor: '#FEF3C7', borderRadius: Radius.md },
+  noticeText: { color: '#92400E', fontSize: 13 },
   confirmBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

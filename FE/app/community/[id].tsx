@@ -135,12 +135,14 @@ export default function ActivityDetailScreen() {
 
       <View style={styles.bottomBar}>
         {isOrganizer ? (
-          <TouchableOpacity 
-            style={styles.actionBtn}
-            onPress={() => router.push(`/community/manage-${activity.id}` as any)}
-          >
-            <Text style={styles.actionBtnText}>Quản lý người tham gia</Text>
-          </TouchableOpacity>
+          <View style={styles.organizerActions}>
+            <TouchableOpacity style={[styles.actionBtn, styles.flexBtn]} onPress={() => router.push(`/community/manage/${activity.id}` as any)}>
+              <Text style={styles.actionBtnText}>Người tham gia</Text>
+            </TouchableOpacity>
+            {activity.status === 'OPEN' && <TouchableOpacity style={[styles.editBtn, styles.flexBtn]} onPress={() => router.push({ pathname: '/community/create', params: { editId: activity.id } } as any)}>
+              <Text style={styles.editBtnText}>Sửa hoạt động</Text>
+            </TouchableOpacity>}
+          </View>
         ) : (
           activity.registered ? (
             <TouchableOpacity 
@@ -205,5 +207,9 @@ const styles = StyleSheet.create({
   actionBtn: { backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
   actionBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   reportBtn: { marginTop: 10, padding: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
-  reportBtnText: { color: Colors.danger, fontSize: 14, fontWeight: '600' }
+  reportBtnText: { color: Colors.danger, fontSize: 14, fontWeight: '600' },
+  organizerActions: { flexDirection: 'row', gap: 10 },
+  flexBtn: { flex: 1 },
+  editBtn: { borderWidth: 1, borderColor: Colors.primary, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
+  editBtnText: { color: Colors.primary, fontSize: 15, fontWeight: 'bold' }
 });

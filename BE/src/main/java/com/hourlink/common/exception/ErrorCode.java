@@ -86,7 +86,14 @@ public enum ErrorCode {
     // ─── Community (8xxx) ────────────────────────────────────────────
     ACTIVITY_NOT_FOUND(8001,       "Không tìm thấy hoạt động cộng đồng",       HttpStatus.NOT_FOUND),
     ACTIVITY_FULL(8002,            "Hoạt động đã đủ người tham gia",            HttpStatus.BAD_REQUEST),
-    ALREADY_REGISTERED(8003,       "Bạn đã đăng ký hoạt động này rồi",         HttpStatus.BAD_REQUEST);
+    ALREADY_REGISTERED(8003,       "Bạn đã đăng ký hoạt động này rồi",         HttpStatus.BAD_REQUEST),
+    ACTIVITY_TIME_INVALID(8004,    "Thời gian hoạt động không hợp lệ",          HttpStatus.BAD_REQUEST),
+    ACTIVITY_ALREADY_STARTED(8005, "Hoạt động đã bắt đầu, không thể thay đổi",  HttpStatus.BAD_REQUEST),
+    ORGANIZER_CANNOT_REGISTER(8006,"Người tổ chức không thể đăng ký hoạt động của mình", HttpStatus.BAD_REQUEST),
+    ACTIVITY_HAS_PARTICIPANTS(8007,"Không thể xóa hoạt động đang có người đăng ký", HttpStatus.BAD_REQUEST),
+    ACTIVITY_NOT_ENDED(8008,       "Chỉ có thể xác nhận sau khi hoạt động kết thúc", HttpStatus.BAD_REQUEST),
+    PARTICIPANT_NOT_REGISTERED(8009,"Người tham gia không ở trạng thái chờ xác nhận", HttpStatus.BAD_REQUEST),
+    NO_PARTICIPANTS_TO_CONFIRM(8010,"Không có người tham gia cần xác nhận",      HttpStatus.BAD_REQUEST);
 
     // ─── Fields ──────────────────────────────────────────────────────
     private final int code;

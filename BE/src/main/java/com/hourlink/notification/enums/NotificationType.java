@@ -45,4 +45,7 @@ public enum NotificationType {
 
     /** Hoàn thành lịch hẹn */
     APPOINTMENT_COMPLETED,
+
+    /** Người dùng được xác nhận tham gia hoạt động và cộng Time Credit */
+    COMMUNITY_CREDIT_AWARDED,
 }

@@ -84,6 +84,14 @@ export default function CommunityHomeScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.shortcutRow}>
+        <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/registrations' as any)}>
+          <Ionicons name="bookmark-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Đã đăng ký</Text>
+        </TouchableOpacity>
+        {canCreate && <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/mine' as any)}>
+          <Ionicons name="settings-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Quản lý</Text>
+        </TouchableOpacity>}
+      </View>
       {canCreate && (
         <TouchableOpacity 
           style={styles.createBtn}
@@ -156,5 +164,8 @@ const styles = StyleSheet.create({
   registeredText: { color: '#059669', fontSize: 12, fontWeight: 'bold' },
 
   emptyBox: { alignItems: 'center', marginTop: 60, padding: 20 },
-  emptyText: { color: Colors.textMuted, marginTop: 12, textAlign: 'center' }
+  emptyText: { color: Colors.textMuted, marginTop: 12, textAlign: 'center' },
+  shortcutRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingHorizontal: Spacing.md, paddingTop: 10 },
+  shortcut: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 7, borderRadius: Radius.md },
+  shortcutText: { color: Colors.primary, fontWeight: '600', fontSize: 13 }
 });

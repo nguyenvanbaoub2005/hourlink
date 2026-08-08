@@ -20,6 +20,8 @@ public class ConversationResponse {
     // ─── Lời mời nguồn ───────────────────────────────────────────────────────
     UUID invitationId;
     InvitationStatus invitationStatus;
+    UUID invitationSenderId;
+    UUID invitationReceiverId;
 
     /** Tên kỹ năng trao đổi, hiển thị làm phụ đề dưới tên người dùng */
     String skillName;

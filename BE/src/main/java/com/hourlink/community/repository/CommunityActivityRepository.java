@@ -6,11 +6,18 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface CommunityActivityRepository extends JpaRepository<CommunityActivity, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM CommunityActivity a WHERE a.id = :id")
+    Optional<CommunityActivity> findByIdForUpdate(@Param("id") UUID id);
 
     /** Lấy tất cả hoạt động theo trạng thái, phân trang, mới nhất trước */
     Page<CommunityActivity> findByStatusOrderByCreatedAtDesc(ActivityStatus status, Pageable pageable);

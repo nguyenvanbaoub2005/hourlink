@@ -838,6 +838,8 @@ public class ChatService {
                 .id(conv.getId())
                 .invitationId(conv.getInvitation().getId())
                 .invitationStatus(conv.getInvitation().getStatus())
+                .invitationSenderId(conv.getInvitation().getSender().getId())
+                .invitationReceiverId(conv.getInvitation().getReceiver().getId())
                 .skillName(conv.getInvitation().getSkill() != null
                         ? conv.getInvitation().getSkill().getName() : null)
                 .otherUserId(other.getId())

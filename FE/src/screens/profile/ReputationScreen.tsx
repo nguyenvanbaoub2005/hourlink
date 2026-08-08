@@ -121,9 +121,11 @@ export default function ReputationScreen() {
       </View>
 
       <FlatList
-        data={activeTab === 'RATINGS' ? ratings : badges}
+        data={(activeTab === 'RATINGS' ? ratings : badges) as Array<RatingResponse | BadgeResponse>}
         keyExtractor={item => item.id}
-        renderItem={activeTab === 'RATINGS' ? (renderRating as any) : (renderBadge as any)}
+        renderItem={({ item }) => activeTab === 'RATINGS'
+          ? renderRating({ item: item as RatingResponse })
+          : renderBadge({ item: item as BadgeResponse })}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}

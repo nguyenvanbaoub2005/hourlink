@@ -1,78 +1,26 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Colors, Fonts, Spacing, Radius } from '@constants/Colors';
+import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Colors, Radius, Spacing } from '@constants/Colors';
 import { useAuthStore } from '@store/authStore';
+import CommunityApi from '@api/community';
+import type { ActivityResponse } from '@types';
 
 export default function OrganizationHomeScreen() {
-  const { user, logout } = useAuthStore();
-
-  return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Tổ chức,</Text>
-          <Text style={styles.name}>{user?.fullName || 'Tên Tổ Chức'}</Text>
-        </View>
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Feather name="log-out" size={18} color={Colors.danger} />
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.statsContainer}>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>5</Text>
-          <Text style={styles.statLabel}>Hoạt động</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>120</Text>
-          <Text style={styles.statLabel}>Người tham gia</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.createButton}>
-        <Feather name="plus-circle" size={20} color="#FFF" />
-        <Text style={styles.createButtonText}>Tạo hoạt động mới</Text>
-      </TouchableOpacity>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Đang chờ xác nhận giờ</Text>
-        <View style={styles.card}>
-          <View style={styles.cardRow}>
-            <Text style={styles.cardTitle}>Nguyễn Văn A</Text>
-            <Text style={styles.timeTag}>+4 giờ</Text>
-          </View>
-          <Text style={styles.cardDesc}>Hoạt động: Phân loại quần áo cũ</Text>
-          <TouchableOpacity style={styles.confirmButton}>
-            <Text style={styles.confirmText}>Xác nhận cấp giờ</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
-  );
+  const router = useRouter(); const { user } = useAuthStore();
+  const [activities, setActivities] = useState<ActivityResponse[]>([]); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false);
+  const load = async () => { try { const { data } = await CommunityApi.getMyActivities(0, 100); setActivities(data.data?.content || []); } finally { setLoading(false); } };
+  useFocusEffect(useCallback(() => { load(); }, []));
+  const totalRegistrations = activities.reduce((sum, item) => sum + item.registeredCount, 0);
+  return <FlatList style={styles.screen} data={activities.slice(0, 5)} keyExtractor={i => i.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />} contentContainerStyle={styles.container} ListHeaderComponent={<>
+    <Text style={styles.greeting}>Xin chào,</Text><Text style={styles.name}>{user?.fullName || 'Tổ chức'}</Text>
+    <View style={styles.stats}><Stat value={activities.length} label="Hoạt động" /><Stat value={totalRegistrations} label="Đang đăng ký" /></View>
+    <View style={styles.quickRow}><Quick icon="plus-circle" label="Tạo hoạt động" onPress={() => router.push('/community/create' as any)} /><Quick icon="list" label="Quản lý tất cả" onPress={() => router.push('/community/mine' as any)} /></View>
+    <View style={styles.sectionRow}><Text style={styles.sectionTitle}>Hoạt động gần đây</Text><TouchableOpacity onPress={() => router.push('/community/mine' as any)}><Text style={styles.link}>Xem tất cả</Text></TouchableOpacity></View>
+    {loading && <ActivityIndicator color={Colors.primary} />}
+  </>} ListEmptyComponent={!loading ? <Text style={styles.empty}>Chưa có hoạt động nào. Hãy tạo hoạt động đầu tiên.</Text> : null} renderItem={({ item }) => <TouchableOpacity style={styles.card} onPress={() => item.registeredCount > 0 ? router.push(`/community/manage/${item.id}` as any) : router.push(`/community/${item.id}` as any)}><View style={styles.cardTop}><Text style={styles.cardTitle}>{item.title}</Text><Text style={styles.badge}>{item.status}</Text></View><Text style={styles.meta}>{new Date(item.startTime).toLocaleString('vi-VN')}</Text><Text style={styles.pending}>{item.registeredCount} người {new Date(item.endTime) <= new Date() ? 'chờ xác nhận' : 'đã đăng ký'}</Text></TouchableOpacity>} />;
 }
-
-const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: Colors.bgLight, padding: Spacing.xl },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
-  greeting: { fontSize: 14, color: Colors.textSecondary },
-  name: { fontSize: 22, fontWeight: 'bold', color: Colors.secondary, fontFamily: Fonts.bold },
-  statsContainer: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl },
-  statBox: { flex: 1, backgroundColor: Colors.bgCard, padding: Spacing.lg, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  statValue: { fontSize: 24, fontWeight: 'bold', color: Colors.primary, marginBottom: Spacing.xs },
-  statLabel: { fontSize: 13, color: Colors.textSecondary },
-  createButton: { backgroundColor: Colors.secondary, padding: Spacing.md, borderRadius: Radius.md, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.xl },
-  createButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  section: { marginBottom: Spacing.xl },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: Spacing.md },
-  card: { backgroundColor: Colors.bgCard, padding: Spacing.lg, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary },
-  timeTag: { backgroundColor: '#E0F2FE', color: '#0284C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, fontSize: 12, fontWeight: 'bold' },
-  cardDesc: { fontSize: 14, color: Colors.textSecondary, marginBottom: Spacing.md },
-  confirmButton: { backgroundColor: Colors.primary, padding: Spacing.sm, borderRadius: Radius.sm, alignItems: 'center' },
-  confirmText: { color: '#FFF', fontWeight: 'bold' },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, gap: 6 },
-  logoutText: { color: Colors.danger, fontSize: 14, fontWeight: 'bold' },
-});
+function Stat({ value, label }: { value: number; label: string }) { return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>; }
+function Quick({ icon, label, onPress }: { icon: any; label: string; onPress: () => void }) { return <TouchableOpacity style={styles.quick} onPress={onPress}><Feather name={icon} size={20} color="#fff" /><Text style={styles.quickText}>{label}</Text></TouchableOpacity>; }
+const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: '#F8FAFC' }, container: { padding: Spacing.lg, paddingBottom: 40 }, greeting: { color: Colors.textSecondary }, name: { fontSize: 23, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 18 }, stats: { flexDirection: 'row', gap: 12 }, stat: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, padding: 16, alignItems: 'center' }, statValue: { fontSize: 25, fontWeight: 'bold', color: Colors.primary }, statLabel: { color: Colors.textMuted, marginTop: 4 }, quickRow: { flexDirection: 'row', gap: 10, marginVertical: 18 }, quick: { flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }, quickText: { color: '#fff', fontWeight: 'bold' }, sectionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }, sectionTitle: { fontSize: 17, fontWeight: 'bold' }, link: { color: Colors.primary, fontWeight: '600' }, card: { backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, padding: 14, marginBottom: 10 }, cardTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 }, cardTitle: { flex: 1, fontWeight: 'bold', fontSize: 15 }, badge: { color: Colors.primary, fontSize: 11, fontWeight: '600' }, meta: { color: Colors.textMuted, marginTop: 6 }, pending: { color: '#D97706', marginTop: 7, fontWeight: '600' }, empty: { textAlign: 'center', color: Colors.textMuted, marginTop: 30 } });

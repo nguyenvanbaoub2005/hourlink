@@ -35,6 +35,9 @@ public class WalletTransactionResponse {
     /** Tiêu đề lịch hẹn liên quan (nếu có) */
     String relatedAppointmentTitle;
 
+    String referenceType;
+    UUID referenceId;
+
     Instant createdAt;
 
     public static WalletTransactionResponse fromEntity(WalletTransaction tx) {
@@ -48,6 +51,8 @@ public class WalletTransactionResponse {
                         tx.getAppointment() != null ? tx.getAppointment().getId() : null)
                 .relatedAppointmentTitle(
                         tx.getAppointment() != null ? tx.getAppointment().getTitle() : null)
+                .referenceType(tx.getReferenceType())
+                .referenceId(tx.getReferenceId())
                 .createdAt(tx.getCreatedAt())
                 .build();
     }

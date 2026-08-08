@@ -25,7 +25,7 @@ export default function CreateHelpRequestScreen() {
       const res = await AiMatchingApi.predictCategory({ description });
       const data = res.data.data;
       if (data) {
-        setCategoryId(data.category_id);
+        setCategoryId(String(data.category_id));
         setCategoryName(data.category_name);
         Alert.alert('AI Phân loại', `Đã tự động chọn danh mục: ${data.category_name} (Độ tin cậy: ${(data.confidence * 100).toFixed(1)}%)`);
       }

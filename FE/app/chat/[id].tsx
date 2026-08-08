@@ -154,8 +154,6 @@ export default function ChatRoomScreen() {
 
   // Lấy thông tin invitation từ conversation để xác định provider/receiver
   const invitationId = conversation?.invitationId;
-  const convProviderId = conversation?.invitationProviderId; // nếu có
-  const convReceiverId = conversation?.invitationReceiverId; // nếu có
 
   const updateEndTime = (start: string, creditStr: string) => {
     try {
@@ -483,17 +481,14 @@ export default function ChatRoomScreen() {
     }
 
     // Xác định provider/receiver từ invitation (để đúng nghiệp vụ)
-    // conversation.invitationProviderId là người hỗ trợ (skill owner)
-    // Nếu không có thông tin này, dùng peerId làm provider (quy ước tạm)
-    const invData = conversation?.invitationSenderId;
-    const invRecv = conversation?.invitationReceiverId;
-    // Provider = người gửi lời mời (invitation sender = người offer kỹ năng)
-    // Receiver = người nhận lời mời
+    const invitationSenderId = conversation?.invitationSenderId;
+    const invitationReceiverId = conversation?.invitationReceiverId;
+    // Invitation sender là người cần hỗ trợ; invitation receiver là người cung cấp kỹ năng.
     let providerId = peerId;  // mặc định peer là provider
     let receiverId = user.id; // mặc định mình là receiver
-    if (invData && invRecv) {
-      providerId = invData; // sender invitation thường là người offer kỹ năng
-      receiverId = invRecv;
+    if (invitationSenderId && invitationReceiverId) {
+      providerId = invitationReceiverId;
+      receiverId = invitationSenderId;
     }
 
     setCreatingApt(true);

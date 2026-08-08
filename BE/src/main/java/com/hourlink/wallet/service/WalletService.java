@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.UUID;
 
 /**
  * WalletService — Business logic cho module Wallet (chức năng 9.16 & 9.17).
@@ -231,6 +232,39 @@ public class WalletService {
         recordTransaction(wallet, null, WalletTxType.BONUS, amount, wallet.getBalance(), description);
 
         log.info("COMMUNITY BONUS: +{} TC → user [{}] | reason: {}", amount, user.getId(), description);
+    }
+
+    /**
+     * Cộng thưởng hoạt động cộng đồng đúng một lần cho mỗi participant.
+     * Khóa ví và dùng idempotency key ở DB để chống hai request xác nhận đồng thời.
+     *
+     * @return true nếu giao dịch mới được tạo, false nếu đã thưởng trước đó
+     */
+    @Transactional
+    public boolean addCommunityCredit(User user, Double amount, String description,
+                                      UUID activityId, UUID participantId) {
+        String idempotencyKey = "COMMUNITY_PARTICIPANT:" + participantId;
+        Wallet wallet = walletRepository.findByUserIdForUpdate(user.getId())
+                .orElseGet(() -> initWallet(user));
+
+        if (txRepository.existsByIdempotencyKey(idempotencyKey)) return false;
+
+        wallet.setBalance(wallet.getBalance() + amount);
+        wallet.setTotalEarned(wallet.getTotalEarned() + amount);
+        walletRepository.save(wallet);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .wallet(wallet)
+                .type(WalletTxType.BONUS)
+                .amount(amount)
+                .balanceAfter(wallet.getBalance())
+                .description(description)
+                .referenceType("COMMUNITY_ACTIVITY")
+                .referenceId(activityId)
+                .idempotencyKey(idempotencyKey)
+                .build();
+        txRepository.save(transaction);
+        return true;
     }
 
     private User getCurrentUser() {
