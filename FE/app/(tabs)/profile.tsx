@@ -272,7 +272,7 @@ export default function ProfileScreen() {
             {badges.length > 0 ? (
               badges.slice(0, 3).map(b => (
                 <View key={b.id} style={styles.badgeCard}>
-                  <Text style={styles.badgeEmoji}>{b.iconUrl || '🏆'}</Text>
+                  <Ionicons name="ribbon-outline" size={28} color="#D97706" />
                   <Text style={styles.badgeLabel} numberOfLines={2}>{b.name}</Text>
                 </View>
               ))
@@ -434,7 +434,6 @@ const styles = StyleSheet.create({
   // Badges
   badgeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   badgeCard:    { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: Radius.lg, padding: Spacing.md, width: 100, borderWidth: 1, borderColor: Colors.border },
-  badgeEmoji:   { fontSize: 28, marginBottom: 6 },
   badgeLabel:   { fontSize: 12, color: Colors.textMuted, textAlign: 'center', lineHeight: 16 },
 
   // Menu
@@ -444,4 +443,3 @@ const styles = StyleSheet.create({
   menuLabel:    { flex: 1, fontSize: 15, fontWeight: '500', color: Colors.textPrimary },
   menuDivider:  { height: 1, backgroundColor: Colors.border, marginVertical: 8 },
 });
-

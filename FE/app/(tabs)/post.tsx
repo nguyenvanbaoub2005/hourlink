@@ -170,7 +170,7 @@ export default function PostScreen() {
         }
         
         if (filledFields.length > 0) {
-          Alert.alert('✨ AI Trợ lý', `Dựa vào mô tả của bạn, AI đã tự động điền:\n\n- ${filledFields.join('\n- ')}`);
+          Alert.alert('AI Trợ lý', `Dựa vào mô tả của bạn, AI đã tự động điền:\n\n- ${filledFields.join('\n- ')}`);
         }
       }
     } catch (e) {
@@ -199,7 +199,7 @@ export default function PostScreen() {
             region,
             categoryId:  category.id,
           });
-          Alert.alert('Thành công 🎉', 'Kỹ năng của bạn đã được cập nhật!');
+          Alert.alert('Thành công', 'Kỹ năng của bạn đã được cập nhật!');
         } else {
           await HelpRequestApi.updateRequest(editId, {
             title,
@@ -211,7 +211,7 @@ export default function PostScreen() {
             region,
             categoryId:  category.id,
           });
-          Alert.alert('Thành công 🎉', 'Yêu cầu hỗ trợ đã được cập nhật!');
+          Alert.alert('Thành công', 'Yêu cầu hỗ trợ đã được cập nhật!');
         }
       } else if (activeTab === 'shareSkill') {
         if (!level) return Alert.alert('Thiếu thông tin', 'Vui lòng chọn trình độ.');
@@ -225,7 +225,7 @@ export default function PostScreen() {
           region,
           categoryId:  category.id,
         });
-        Alert.alert('Thành công 🎉', 'Kỹ năng của bạn đã được đăng!');
+        Alert.alert('Thành công', 'Kỹ năng của bạn đã được đăng!');
       } else {
         await HelpRequestApi.createRequest({
           title,
@@ -237,7 +237,7 @@ export default function PostScreen() {
           region,
           categoryId:  category.id,
         });
-        Alert.alert('Thành công 🎉', 'Yêu cầu của bạn đã được đăng. AI sẽ tìm người phù hợp!');
+        Alert.alert('Thành công', 'Yêu cầu của bạn đã được đăng. AI sẽ tìm người phù hợp!');
       }
 
       // Reset
@@ -322,8 +322,13 @@ export default function PostScreen() {
               style={[styles.tab, activeTab === tab && styles.tabActive]}
               onPress={() => setActiveTab(tab)}
             >
+              <Ionicons
+                name={tab === 'needHelp' ? 'help-buoy-outline' : 'school-outline'}
+                size={17}
+                color={activeTab === tab ? Colors.primary : Colors.textMuted}
+              />
               <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'needHelp' ? '🙋 Cần hỗ trợ' : '🤝 Chia sẻ kỹ năng'}
+                {tab === 'needHelp' ? 'Cần hỗ trợ' : 'Chia sẻ kỹ năng'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -351,9 +356,10 @@ export default function PostScreen() {
           <View>
             <PickerRow label="Danh mục" value={category?.name ?? ''} onPress={() => setShowCatModal(true)} />
             {isPredictingCat && (
-               <Text style={{ fontSize: 12, color: Colors.primary, marginTop: 4, fontStyle: 'italic' }}>
-                 🤖 AI đang phân tích danh mục...
-               </Text>
+              <View style={styles.aiStatusRow}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.aiStatusText}>AI đang phân tích danh mục...</Text>
+              </View>
             )}
           </View>
         )}
@@ -413,9 +419,10 @@ export default function PostScreen() {
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text style={styles.label}>Time Credit</Text>
             <View style={[styles.picker, { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}>
-              <Text style={[styles.pickerText, { color: Colors.accent, fontWeight: 'bold' }]}>
-                ⏱ {selectedDur.credit} TC
-              </Text>
+              <View style={styles.creditValueRow}>
+                <Ionicons name="time-outline" size={17} color={Colors.accent} />
+                <Text style={[styles.pickerText, { color: Colors.accent, fontWeight: 'bold' }]}>{selectedDur.credit} TC</Text>
+              </View>
               <Text style={{ fontSize: 11, color: Colors.textMuted }}>tự động</Text>
             </View>
           </View>
@@ -458,9 +465,16 @@ export default function PostScreen() {
         >
           {submitting
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitBtnText}>
-                {editId ? '💾 Lưu thay đổi' : (activeTab === 'needHelp' ? '🤖 Đăng yêu cầu • AI tìm người' : '✨ Đăng kỹ năng')}
-              </Text>
+            : <View style={styles.submitContent}>
+                <Ionicons
+                  name={editId ? 'save-outline' : activeTab === 'needHelp' ? 'search-outline' : 'add-circle-outline'}
+                  size={19}
+                  color="#fff"
+                />
+                <Text style={styles.submitBtnText}>
+                  {editId ? 'Lưu thay đổi' : activeTab === 'needHelp' ? 'Đăng yêu cầu · AI tìm người' : 'Đăng kỹ năng'}
+                </Text>
+              </View>
           }
         </TouchableOpacity>
       </View>
@@ -494,7 +508,7 @@ const styles = StyleSheet.create({
   headerTitle:   { fontSize: 24, fontWeight: 'bold', color: Colors.textPrimary },
 
   tabBar:        { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12, gap: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: Colors.border },
-  tab:           { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: 10, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: 'transparent' },
+  tab:           { flex: 1, flexDirection: 'row', gap: 6, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: 'transparent' },
   tabActive:     { backgroundColor: '#fff', borderColor: Colors.border },
   tabText:       { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
   tabTextActive: { color: Colors.primary },
@@ -507,6 +521,9 @@ const styles = StyleSheet.create({
 
   picker:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12 },
   pickerText:    { fontSize: 15, color: Colors.textPrimary },
+  creditValueRow:{ flexDirection: 'row', alignItems: 'center', gap: 5 },
+  aiStatusRow:   { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6 },
+  aiStatusText:  { fontSize: 12, color: Colors.primary, fontStyle: 'italic' },
 
   row:           { flexDirection: 'row', marginTop: 4 },
 
@@ -518,6 +535,7 @@ const styles = StyleSheet.create({
 
   footer:        { padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: Colors.border },
   submitBtn:     { paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  submitContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 
   // Modal bottom sheet

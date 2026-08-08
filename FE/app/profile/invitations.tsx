@@ -23,10 +23,10 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; 
   RESCHEDULED: { label: 'Đề xuất đổi giờ', bg: '#EFF6FF', color: '#2563EB', icon: 'calendar-outline' },
 };
 
-const FORMAT_LABEL: Record<string, string> = {
-  ONLINE:  'Trực tuyến 💻',
-  OFFLINE: 'Trực tiếp 🤝',
-  BOTH:    'Cả hai 🌐',
+const FORMAT_CONFIG: Record<string, { label: string; icon: string }> = {
+  ONLINE:  { label: 'Trực tuyến', icon: 'videocam-outline' },
+  OFFLINE: { label: 'Trực tiếp', icon: 'people-outline' },
+  BOTH:    { label: 'Cả hai', icon: 'git-compare-outline' },
 };
 
 // Helper tạo danh sách 14 ngày tới
@@ -156,7 +156,7 @@ export default function InvitationsScreen() {
     try {
       await InvitationApi.respond(item.id, { action: 'ACCEPT' });
       setReceived(prev => prev.map(i => i.id === item.id ? { ...i, status: 'ACCEPTED' } : i));
-      Alert.alert('✅ Đã chấp nhận', 'Bạn đã chấp nhận lời mời. Hãy liên hệ với họ qua chat!');
+      Alert.alert('Đã chấp nhận', 'Bạn đã chấp nhận lời mời. Hãy liên hệ với họ qua chat!');
     } catch (err: any) {
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể chấp nhận lời mời');
     } finally {
@@ -220,7 +220,7 @@ export default function InvitationsScreen() {
           : i
       ));
       setRescheduleModal(false);
-      Alert.alert('📅 Đã gửi đề xuất', 'Người gửi sẽ nhận được thông báo đề xuất đổi lịch của bạn.');
+      Alert.alert('Đã gửi đề xuất', 'Người gửi sẽ nhận được thông báo đề xuất đổi lịch của bạn.');
     } catch (err: any) {
       Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể gửi đề xuất đổi giờ. Vui lòng thử lại.');
     } finally {
@@ -252,7 +252,7 @@ export default function InvitationsScreen() {
                 : { ...i, status: 'PENDING', rescheduleTime: undefined }
               : i));
             Alert.alert(
-              accept ? '✅ Đã đồng ý' : '↩️ Đã yêu cầu chọn lại',
+              accept ? 'Đã đồng ý' : 'Đã yêu cầu chọn lại',
               accept
                 ? 'Bạn có thể tạo lịch hẹn với thời gian mới.'
                 : 'Người nhận đã được thông báo để phản hồi lại.'
@@ -404,7 +404,10 @@ export default function InvitationsScreen() {
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.otherName}>{otherName}</Text>
             {item.skillName ? (
-              <Text style={styles.skillTag}>📚 {item.skillName}</Text>
+              <View style={styles.skillTagRow}>
+                <Ionicons name="book-outline" size={13} color={Colors.textMuted} />
+                <Text style={styles.skillTag}>{item.skillName}</Text>
+              </View>
             ) : null}
           </View>
 
@@ -427,8 +430,8 @@ export default function InvitationsScreen() {
         {/* Meta info */}
         <View style={styles.metaRow}>
           <View style={styles.metaPill}>
-            <Ionicons name="laptop-outline" size={13} color="#0284C7" />
-            <Text style={styles.metaText}>{FORMAT_LABEL[item.format] ?? item.format}</Text>
+            <Ionicons name={(FORMAT_CONFIG[item.format]?.icon ?? 'options-outline') as any} size={13} color="#0284C7" />
+            <Text style={styles.metaText}>{FORMAT_CONFIG[item.format]?.label ?? item.format}</Text>
           </View>
           {item.proposedTime ? (
             <View style={styles.metaPill}>
@@ -466,7 +469,8 @@ export default function InvitationsScreen() {
         {/* Reject reason */}
         {item.status === 'REJECTED' && item.rejectReason ? (
           <View style={styles.rejectBox}>
-            <Text style={styles.rejectText}>💬 Lý do: {item.rejectReason}</Text>
+            <Ionicons name="chatbubble-outline" size={14} color="#B91C1C" />
+            <Text style={styles.rejectText}>Lý do: {item.rejectReason}</Text>
           </View>
         ) : null}
 
@@ -763,7 +767,10 @@ export default function InvitationsScreen() {
             {/* Original proposed time */}
             {rescheduleTarget?.proposedTime ? (
               <View style={styles.originalTimeBox}>
-                <Text style={styles.originalTimeLabel}>⏰ Giờ đề xuất ban đầu:</Text>
+                <View style={styles.originalTimeTitleRow}>
+                  <Ionicons name="time-outline" size={14} color="#64748B" />
+                  <Text style={styles.originalTimeLabel}>Giờ đề xuất ban đầu:</Text>
+                </View>
                 <Text style={styles.originalTimeVal}>{rescheduleTarget.proposedTime}</Text>
               </View>
             ) : null}
@@ -782,9 +789,10 @@ export default function InvitationsScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={styles.inputHint}>
-              💡 Nhập thời gian bạn có thể, người gửi sẽ nhận được thông báo ngay.
-            </Text>
+            <View style={styles.inputHintRow}>
+              <Ionicons name="information-circle-outline" size={14} color="#64748B" />
+              <Text style={styles.inputHint}>Nhập thời gian bạn có thể, người gửi sẽ nhận được thông báo ngay.</Text>
+            </View>
 
             {/* Buttons */}
             <View style={styles.modalBtnRow}>
@@ -1017,7 +1025,8 @@ const styles = StyleSheet.create({
   },
   avatarLetter: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   otherName: { fontSize: 15, fontWeight: 'bold', color: '#0F172A' },
-  skillTag: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  skillTagRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  skillTag: { fontSize: 12, color: Colors.textMuted },
 
   statusBadge: {
     flexDirection: 'row', alignItems: 'center',
@@ -1055,6 +1064,7 @@ const styles = StyleSheet.create({
   rescheduleTime: { fontSize: 14, color: '#1D4ED8', fontWeight: 'bold', marginTop: 2 },
 
   rejectBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: '#FFF1F2', padding: 10, borderRadius: 10, marginBottom: 10,
     borderWidth: 1, borderColor: '#FECDD3',
   },
@@ -1120,7 +1130,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7ED', padding: 12, borderRadius: 12,
     borderWidth: 1, borderColor: '#FED7AA', marginBottom: 16,
   },
-  originalTimeLabel: { fontSize: 12, color: '#92400E', marginBottom: 4 },
+  originalTimeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  originalTimeLabel: { fontSize: 12, color: '#92400E' },
   originalTimeVal: { fontSize: 14, fontWeight: 'bold', color: '#92400E' },
 
   inputLabel: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 8 },
@@ -1130,7 +1141,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC', minHeight: 70,
     marginBottom: 10,
   },
-  inputHint: { fontSize: 12, color: '#94A3B8', lineHeight: 18, marginBottom: 20 },
+  inputHintRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginBottom: 20 },
+  inputHint: { flex: 1, fontSize: 12, color: '#94A3B8', lineHeight: 18 },
 
   modalBtnRow: { flexDirection: 'row', gap: 12, alignItems: 'center', marginTop: 4 },
   modalBtnCancel: {

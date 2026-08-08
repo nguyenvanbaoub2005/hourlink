@@ -456,7 +456,7 @@ export default function ChatRoomScreen() {
       setRescheduleVisible(false);
       setRescheduleTime('');
       await afterSend();
-      Alert.alert('📅 Đã gửi', 'Đề xuất đổi lịch đã được gửi tới người kia.');
+      Alert.alert('Đã gửi', 'Đề xuất đổi lịch đã được gửi tới người kia.');
     } catch (e: any) {
       handleError(e, 'Không gửi được đề xuất. Vui lòng thử lại.');
     } finally {
@@ -552,7 +552,7 @@ export default function ChatRoomScreen() {
       }
       setAptModalVisible(false);
       setAptLocation('');
-      Alert.alert('✅ Đã gửi đề xuất', 'Buổi học tiếp theo đã được gửi. Hãy đợi người kia xác nhận!', [
+      Alert.alert('Đã gửi đề xuất', 'Buổi học tiếp theo đã được gửi. Hãy đợi người kia xác nhận!', [
         { text: 'OK', style: 'default' }
       ]);
       if (!realtime) await fetchMessages();
@@ -603,7 +603,7 @@ export default function ChatRoomScreen() {
         description: reportNote.trim() || undefined,
       });
       setReportTarget(null);
-      Alert.alert('✅ Đã gửi báo cáo', 'Quản trị viên sẽ xem xét trong thời gian sớm nhất.');
+      Alert.alert('Đã gửi báo cáo', 'Quản trị viên sẽ xem xét trong thời gian sớm nhất.');
     } catch (e: any) {
       handleError(e, 'Không gửi được báo cáo. Vui lòng thử lại.');
     } finally {
@@ -626,7 +626,7 @@ export default function ChatRoomScreen() {
           onPress: async () => {
             try {
               await ChatApi.blockUser({ userId: peerId });
-              Alert.alert('🚫 Đã chặn', 'Bạn sẽ không nhận tin nhắn mới từ người này.', [
+              Alert.alert('Đã chặn', 'Bạn sẽ không nhận tin nhắn mới từ người này.', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
             } catch (e: any) {
@@ -825,7 +825,7 @@ export default function ChatRoomScreen() {
                       try {
                         await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CONFIRM' });
                         await fetchMessages();
-                        Alert.alert('✅ Đã xác nhận', 'Lịch hẹn đã được xác nhận thành công!');
+                        Alert.alert('Đã xác nhận', 'Lịch hẹn đã được xác nhận thành công!');
                       } catch (e: any) {
                         Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
                       }
@@ -1210,7 +1210,7 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.sheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.sheetTitle}>🚩 Báo cáo tin nhắn</Text>
+            <Text style={styles.sheetTitle}>Báo cáo tin nhắn</Text>
             <Text style={styles.sheetDesc}>Chọn lý do để quản trị viên xem xét</Text>
 
             {REPORT_REASONS.map((r) => (
@@ -1271,7 +1271,7 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.sheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.sheetTitle}>📅 Đề xuất đổi lịch</Text>
+            <Text style={styles.sheetTitle}>Đề xuất đổi lịch</Text>
             <Text style={styles.sheetDesc}>
               Thời gian đề xuất sẽ được gửi vào cuộc trò chuyện và cập nhật vào lời mời
             </Text>
@@ -1314,7 +1314,7 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.sheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.sheetTitle}>📎 Thêm nội dung</Text>
+            <Text style={styles.sheetTitle}>Thêm nội dung</Text>
             
             <View style={{ marginTop: 20, flexDirection: 'row', flexWrap: 'wrap', gap: 20, justifyContent: 'center' }}>
               <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); sendImage(); }}>
@@ -1430,7 +1430,7 @@ export default function ChatRoomScreen() {
         >
           <View style={styles.sheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.sheetTitle}>🔗 Gửi link phòng họp</Text>
+            <Text style={styles.sheetTitle}>Gửi link phòng họp</Text>
             <Text style={styles.sheetDesc}>Dán link Google Meet, Zoom hoặc nền tảng bạn dùng</Text>
             <TextInput
               style={styles.sheetInput}
@@ -1496,7 +1496,7 @@ export default function ChatRoomScreen() {
           <View style={[styles.sheet, { maxHeight: '90%', paddingBottom: 24 }]}>
             <View style={styles.modalHandle} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={styles.sheetTitle}>🗓️ Đề xuất lịch hẹn</Text>
+              <Text style={styles.sheetTitle}>Đề xuất lịch hẹn</Text>
               <TouchableOpacity onPress={() => setAptModalVisible(false)} style={{ padding: 4 }}>
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
@@ -1608,7 +1608,7 @@ export default function ChatRoomScreen() {
 
             {/* Link họp / Địa điểm */}
             <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>
-              {aptFormat === 'ONLINE' ? '🔗 Link họp *' : '📍 Địa điểm gặp mặt'}
+              {aptFormat === 'ONLINE' ? 'Link họp *' : 'Địa điểm gặp mặt'}
             </Text>
             <TextInput
               style={[styles.sheetInput, { marginBottom: aptFormat === 'OFFLINE' ? 8 : 16 }]}

@@ -111,16 +111,16 @@ export default function ReputationScreen() {
       {(item.punctualityScore !== undefined || item.attitudeScore !== undefined || item.communicationScore !== undefined || item.qualityScore !== undefined) && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
           {item.punctualityScore !== undefined && item.punctualityScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{item.punctualityScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="time-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Đúng giờ: <Text style={{ fontWeight: '600' }}>{item.punctualityScore}</Text></Text></View>
           )}
           {item.attitudeScore !== undefined && item.attitudeScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{item.attitudeScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="happy-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Thái độ: <Text style={{ fontWeight: '600' }}>{item.attitudeScore}</Text></Text></View>
           )}
           {item.communicationScore !== undefined && item.communicationScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{item.communicationScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="chatbubbles-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Giao tiếp: <Text style={{ fontWeight: '600' }}>{item.communicationScore}</Text></Text></View>
           )}
           {item.qualityScore !== undefined && item.qualityScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{item.qualityScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="school-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Chất lượng: <Text style={{ fontWeight: '600' }}>{item.qualityScore}</Text></Text></View>
           )}
         </View>
       )}
@@ -155,7 +155,7 @@ export default function ReputationScreen() {
     return (
       <View style={[styles.badgeCard, { opacity, borderColor, backgroundColor: status === 'EARNED' ? '#fff' : '#FAFAFA' }]}>
         <View style={[styles.badgeIconWrap, { backgroundColor: bgColor }]}>
-          <Text style={styles.badgeEmoji}>{item.iconUrl || '🏆'}</Text>
+          <Ionicons name="ribbon-outline" size={27} color={status === 'LOCKED' ? '#64748B' : '#D97706'} />
         </View>
         <View style={styles.badgeInfo}>
           <Text style={[styles.badgeName, status === 'LOCKED' && { color: Colors.textMuted }]}>
@@ -329,6 +329,8 @@ const styles = StyleSheet.create({
   ratingDate: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   starsWrap: { flexDirection: 'row' },
   ratingComment: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  metricItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metricText: { fontSize: 12, color: Colors.textSecondary },
 
   // Badge item
   badgeCard: {
@@ -345,7 +347,6 @@ const styles = StyleSheet.create({
     width: 50, height: 50, borderRadius: 25, backgroundColor: '#FEF3C7',
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  badgeEmoji: { fontSize: 24 },
   badgeInfo: { flex: 1 },
   badgeName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 2 },
   badgeDesc: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },

@@ -21,13 +21,13 @@ import { Colors } from '@constants/Colors';
 import { formatConversationTime } from '@utils/chatFormat';
 import type { Conversation, MessageType } from '@types';
 
-/** Icon đứng trước preview theo loại tin nhắn cuối */
-const PREVIEW_ICON: Partial<Record<MessageType, string>> = {
-  IMAGE: '🖼️',
-  DOCUMENT: '📄',
-  LOCATION: '📍',
-  MEETING_LINK: '🔗',
-  RESCHEDULE_PROPOSAL: '📅',
+/** Nhãn ngắn cho loại tin nhắn cuối. */
+const PREVIEW_LABEL: Partial<Record<MessageType, string>> = {
+  IMAGE: 'Ảnh',
+  DOCUMENT: 'Tài liệu',
+  LOCATION: 'Vị trí',
+  MEETING_LINK: 'Link họp',
+  RESCHEDULE_PROPOSAL: 'Đề xuất đổi lịch',
 };
 
 export default function ConversationListScreen() {
@@ -91,7 +91,7 @@ export default function ConversationListScreen() {
 
   const renderItem = ({ item }: { item: Conversation }) => {
     const unread = item.unreadCount > 0;
-    const icon = item.lastMessageType ? PREVIEW_ICON[item.lastMessageType] : undefined;
+    const previewLabel = item.lastMessageType ? PREVIEW_LABEL[item.lastMessageType] : undefined;
 
     return (
       <TouchableOpacity
@@ -143,7 +143,7 @@ export default function ConversationListScreen() {
             style={[styles.preview, unread && styles.previewUnread]}
             numberOfLines={1}
           >
-            {icon ? `${icon} ` : ''}
+            {previewLabel ? `[${previewLabel}] ` : ''}
             {item.lastMessagePreview ?? 'Bắt đầu cuộc trò chuyện'}
           </Text>
         </View>

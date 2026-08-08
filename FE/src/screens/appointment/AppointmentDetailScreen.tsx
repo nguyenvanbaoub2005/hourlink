@@ -478,16 +478,16 @@ export default function AppointmentDetailScreen() {
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 {partnerRating.punctualityScore !== undefined && partnerRating.punctualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{partnerRating.punctualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="time-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Đúng giờ: <Text style={{ fontWeight: '600' }}>{partnerRating.punctualityScore}</Text></Text></View>
                 )}
                 {partnerRating.attitudeScore !== undefined && partnerRating.attitudeScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{partnerRating.attitudeScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="happy-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Thái độ: <Text style={{ fontWeight: '600' }}>{partnerRating.attitudeScore}</Text></Text></View>
                 )}
                 {partnerRating.communicationScore !== undefined && partnerRating.communicationScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{partnerRating.communicationScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="chatbubbles-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Giao tiếp: <Text style={{ fontWeight: '600' }}>{partnerRating.communicationScore}</Text></Text></View>
                 )}
                 {partnerRating.qualityScore !== undefined && partnerRating.qualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{partnerRating.qualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="school-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Chất lượng: <Text style={{ fontWeight: '600' }}>{partnerRating.qualityScore}</Text></Text></View>
                 )}
               </View>
             </View>
@@ -531,16 +531,16 @@ export default function AppointmentDetailScreen() {
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 {myRating.punctualityScore !== undefined && myRating.punctualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="time-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text></View>
                 )}
                 {myRating.attitudeScore !== undefined && myRating.attitudeScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="happy-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text></View>
                 )}
                 {myRating.communicationScore !== undefined && myRating.communicationScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="chatbubbles-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text></View>
                 )}
                 {myRating.qualityScore !== undefined && myRating.qualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="school-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text></View>
                 )}
               </View>
             </View>
@@ -904,6 +904,7 @@ const styles = StyleSheet.create({
   tcValue: { fontSize: 16, fontWeight: '700', color: '#B45309' },
 
   sectionHeader: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 14 },
+  ratingMetric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   iconBox: {
     width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.bgCard,
