@@ -43,7 +43,15 @@ export default function CommunityHomeScreen() {
   const renderItem = ({ item }: { item: ActivityResponse }) => (
     <TouchableOpacity 
       style={styles.card}
-      onPress={() => router.push(`/community/${item.id}` as any)}
+      onPress={() => router.push(
+        item.registered
+          ? `/community/evidence/${item.id}` as any
+          : `/community/${item.id}` as any
+      )}
+      accessibilityRole="button"
+      accessibilityLabel={item.registered
+        ? `Mở minh chứng cho hoạt động ${item.title}`
+        : `Xem hoạt động ${item.title}`}
     >
       <View style={styles.cardHeader}>
         <View style={styles.orgInfo}>
@@ -84,14 +92,13 @@ export default function CommunityHomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.shortcutRow}>
-        <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/registrations' as any)}>
-          <Ionicons name="camera-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Đã đăng ký & minh chứng</Text>
-        </TouchableOpacity>
-        {canCreate && <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/mine' as any)}>
-          <Ionicons name="settings-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Quản lý</Text>
-        </TouchableOpacity>}
-      </View>
+      {canCreate && (
+        <View style={styles.shortcutRow}>
+          <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/mine' as any)}>
+            <Ionicons name="settings-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Quản lý</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {canCreate && (
         <TouchableOpacity 
           style={styles.createBtn}
