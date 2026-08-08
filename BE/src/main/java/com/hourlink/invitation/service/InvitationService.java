@@ -1,10 +1,15 @@
 package com.hourlink.invitation.service;
 
+import com.hourlink.appointment.entity.Appointment;
+import com.hourlink.appointment.enums.AppointmentStatus;
+import com.hourlink.appointment.repository.AppointmentRepository;
 import com.hourlink.chat.service.ChatService;
+import com.hourlink.chat.repository.UserBlockRepository;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
 import com.hourlink.helprequest.entity.HelpRequest;
+import com.hourlink.helprequest.enums.RequestStatus;
 import com.hourlink.helprequest.repository.HelpRequestRepository;
 import com.hourlink.invitation.dto.request.InvitationRequest;
 import com.hourlink.invitation.dto.request.RespondInvitationRequest;
@@ -15,6 +20,7 @@ import com.hourlink.invitation.repository.InvitationRepository;
 import com.hourlink.notification.enums.NotificationType;
 import com.hourlink.notification.service.NotificationService;
 import com.hourlink.skill.entity.Skill;
+import com.hourlink.skill.enums.SkillStatus;
 import com.hourlink.skill.repository.SkillRepository;
 import com.hourlink.user.entity.User;
 import com.hourlink.user.repository.UserRepository;
@@ -24,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,10 +43,21 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class InvitationService {
 
+    private static final List<AppointmentStatus> ACTIVE_APPOINTMENT_STATUSES = List.of(
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.UPCOMING,
+            AppointmentStatus.IN_PROGRESS,
+            AppointmentStatus.RESCHEDULED,
+            AppointmentStatus.DISPUTED
+    );
+
     private final InvitationRepository invitationRepository;
+    private final AppointmentRepository appointmentRepository;
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
     private final HelpRequestRepository helpRequestRepository;
+    private final UserBlockRepository userBlockRepository;
     private final ChatService chatService;
     private final NotificationService notificationService;
 
@@ -60,7 +78,14 @@ public class InvitationService {
 
         // Không được tự gửi lời mời cho chính mình
         if (sender.getId().equals(receiver.getId())) {
-            throw new AppException(ErrorCode.INVALID_REQUEST);
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Không thể gửi lời mời cho chính mình.");
+        }
+        if (receiver.isLocked()) {
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        }
+        if (userBlockRepository.existsBlockBetween(sender.getId(), receiver.getId())) {
+            throw new AppException(ErrorCode.USER_BLOCKED,
+                    "Không thể gửi lời mời vì một trong hai tài khoản đã chặn người kia.");
         }
 
         // Kiểm tra trùng lời mời PENDING (theo skill nếu có, không thì theo receiver)
@@ -83,6 +108,13 @@ public class InvitationService {
         if (request.getSkillId() != null) {
             skill = skillRepository.findById(request.getSkillId())
                     .orElseThrow(() -> new AppException(ErrorCode.SKILL_NOT_FOUND));
+            if (!skill.getUser().getId().equals(receiver.getId())) {
+                throw new AppException(ErrorCode.INVALID_REQUEST,
+                        "Kỹ năng được chọn không thuộc người nhận lời mời.");
+            }
+            if (skill.getStatus() != SkillStatus.VISIBLE) {
+                throw new AppException(ErrorCode.SKILL_ALREADY_INACTIVE);
+            }
         }
 
         // Tìm HelpRequest liên kết (tùy chọn)
@@ -90,6 +122,14 @@ public class InvitationService {
         if (request.getHelpRequestId() != null) {
             helpRequest = helpRequestRepository.findById(request.getHelpRequestId())
                     .orElseThrow(() -> new AppException(ErrorCode.REQUEST_NOT_FOUND));
+            if (!helpRequest.getRequester().getId().equals(sender.getId())) {
+                throw new AppException(ErrorCode.ACCESS_DENIED,
+                        "Bạn chỉ có thể liên kết lời mời với yêu cầu hỗ trợ của mình.");
+            }
+            if (helpRequest.getStatus() != RequestStatus.SEARCHING) {
+                throw new AppException(ErrorCode.INVALID_REQUEST,
+                        "Yêu cầu hỗ trợ này không còn nhận lời mời mới.");
+            }
         }
 
         Invitation invitation = Invitation.builder()
@@ -97,9 +137,9 @@ public class InvitationService {
                 .receiver(receiver)
                 .skill(skill)
                 .helpRequest(helpRequest)
-                .content(request.getContent())
-                .message(request.getMessage())
-                .proposedTime(request.getProposedTime())
+                .content(request.getContent().trim())
+                .message(trimToNull(request.getMessage()))
+                .proposedTime(trimToNull(request.getProposedTime()))
                 .duration(request.getDuration())
                 .format(request.getFormat())
                 .status(InvitationStatus.PENDING)
@@ -156,68 +196,27 @@ public class InvitationService {
     // ─── Phản hồi lời mời (helper) ────────────────────────────────────────────
 
     /**
-     * Helper phản hồi lời mời: ACCEPT, REJECT, RESCHEDULE.
+     * Receiver phản hồi lời mời PENDING; sender quyết định đề xuất RESCHEDULED.
      */
     @Transactional
     public InvitationResponse respondToInvitation(UUID id, RespondInvitationRequest request) {
         String email = SecurityUtil.getCurrentUserEmail();
-        Invitation inv = invitationRepository.findById(id)
+        Invitation inv = invitationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
+        String action = request.getAction().trim().toUpperCase(Locale.ROOT);
 
-        // Chỉ receiver mới được phản hồi
-        if (!inv.getReceiver().getEmail().equals(email)) {
-            throw new AppException(ErrorCode.ACCESS_DENIED);
-        }
-
-        // Chỉ PENDING mới được phản hồi
-        if (inv.getStatus() != InvitationStatus.PENDING) {
+        if (inv.getStatus() == InvitationStatus.PENDING) {
+            if (!inv.getReceiver().getEmail().equals(email)) {
+                throw new AppException(ErrorCode.ACCESS_DENIED);
+            }
+            respondToPendingInvitation(inv, request, action);
+        } else if (inv.getStatus() == InvitationStatus.RESCHEDULED) {
+            if (!inv.getSender().getEmail().equals(email)) {
+                throw new AppException(ErrorCode.ACCESS_DENIED);
+            }
+            decideRescheduledInvitation(inv, action);
+        } else {
             throw new AppException(ErrorCode.INVITATION_ALREADY_RESPONDED);
-        }
-
-        User sender   = inv.getSender();
-        User receiver = inv.getReceiver();
-        String skillName = inv.getSkill() != null ? inv.getSkill().getName() : "kỹ năng";
-
-        switch (request.getAction().toUpperCase()) {
-            case "ACCEPT" -> {
-                inv.setStatus(InvitationStatus.ACCEPTED);
-                // Thông báo cho sender
-                notificationService.createNotification(
-                        sender,
-                        receiver,
-                        NotificationType.INVITATION_ACCEPTED,
-                        "✅ Lời mời được chấp nhận",
-                        receiver.getFullName() + " đã chấp nhận lời mời hỗ trợ về " + skillName,
-                        inv.getId()
-                );
-            }
-            case "REJECT" -> {
-                inv.setStatus(InvitationStatus.REJECTED);
-                inv.setRejectReason(request.getRejectReason());
-                // Thông báo cho sender
-                notificationService.createNotification(
-                        sender,
-                        receiver,
-                        NotificationType.INVITATION_REJECTED,
-                        "❌ Lời mời bị từ chối",
-                        receiver.getFullName() + " đã từ chối lời mời về " + skillName,
-                        inv.getId()
-                );
-            }
-            case "RESCHEDULE" -> {
-                inv.setStatus(InvitationStatus.RESCHEDULED);
-                inv.setRescheduleTime(request.getRescheduleTime());
-                // Thông báo cho sender
-                notificationService.createNotification(
-                        sender,
-                        receiver,
-                        NotificationType.INVITATION_RESCHEDULED,
-                        "📅 Đề xuất đổi lịch",
-                        receiver.getFullName() + " đề xuất đổi sang: " + request.getRescheduleTime(),
-                        inv.getId()
-                );
-            }
-            default -> throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
         Invitation saved = invitationRepository.save(inv);
@@ -227,7 +226,7 @@ public class InvitationService {
             chatService.createConversationInternal(saved);
         }
 
-        log.info("Invitation {} responded with action={} by {}", id, request.getAction(), email);
+        log.info("Invitation {} responded with action={} by {}", id, action, email);
         return mapToResponse(saved);
     }
 
@@ -239,7 +238,7 @@ public class InvitationService {
     @Transactional
     public InvitationResponse cancelInvitation(UUID id) {
         String email = SecurityUtil.getCurrentUserEmail();
-        Invitation inv = invitationRepository.findById(id)
+        Invitation inv = invitationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
 
         // Chỉ sender mới được hủy
@@ -269,9 +268,100 @@ public class InvitationService {
         return mapToResponse(saved);
     }
 
+    private void respondToPendingInvitation(Invitation inv, RespondInvitationRequest request, String action) {
+        User sender = inv.getSender();
+        User receiver = inv.getReceiver();
+        String skillName = inv.getSkill() != null ? inv.getSkill().getName() : "kỹ năng";
+
+        switch (action) {
+            case "ACCEPT" -> {
+                inv.setStatus(InvitationStatus.ACCEPTED);
+                notificationService.createNotification(
+                        sender, receiver, NotificationType.INVITATION_ACCEPTED,
+                        "✅ Lời mời được chấp nhận",
+                        receiver.getFullName() + " đã chấp nhận lời mời hỗ trợ về " + skillName,
+                        inv.getId());
+            }
+            case "REJECT" -> {
+                String reason = requireText(request.getRejectReason(), "Vui lòng nhập lý do từ chối.");
+                inv.setStatus(InvitationStatus.REJECTED);
+                inv.setRejectReason(reason);
+                notificationService.createNotification(
+                        sender, receiver, NotificationType.INVITATION_REJECTED,
+                        "❌ Lời mời bị từ chối",
+                        receiver.getFullName() + " đã từ chối lời mời về " + skillName + ": " + reason,
+                        inv.getId());
+            }
+            case "RESCHEDULE" -> {
+                String newTime = requireText(request.getRescheduleTime(),
+                        "Vui lòng nhập thời gian đề xuất mới.");
+                inv.setStatus(InvitationStatus.RESCHEDULED);
+                inv.setRescheduleTime(newTime);
+                notificationService.createNotification(
+                        sender, receiver, NotificationType.INVITATION_RESCHEDULED,
+                        "📅 Đề xuất đổi lịch",
+                        receiver.getFullName() + " đề xuất đổi sang: " + newTime,
+                        inv.getId());
+            }
+            default -> throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Hành động này không hợp lệ với lời mời đang chờ phản hồi.");
+        }
+    }
+
+    private void decideRescheduledInvitation(Invitation inv, String action) {
+        User sender = inv.getSender();
+        User receiver = inv.getReceiver();
+
+        switch (action) {
+            case "ACCEPT_RESCHEDULE" -> {
+                String newTime = requireText(inv.getRescheduleTime(),
+                        "Lời mời chưa có thời gian mới để xác nhận.");
+                inv.setProposedTime(newTime);
+                inv.setStatus(InvitationStatus.ACCEPTED);
+                notificationService.createNotification(
+                        receiver, sender, NotificationType.INVITATION_RESCHEDULE_ACCEPTED,
+                        "✅ Thời gian mới đã được đồng ý",
+                        sender.getFullName() + " đã đồng ý thời gian: " + newTime,
+                        inv.getId());
+            }
+            case "REJECT_RESCHEDULE" -> {
+                inv.setStatus(InvitationStatus.PENDING);
+                inv.setRescheduleTime(null);
+                notificationService.createNotification(
+                        receiver, sender, NotificationType.INVITATION_RESCHEDULE_REJECTED,
+                        "↩️ Vui lòng chọn thời gian khác",
+                        sender.getFullName() + " chưa phù hợp với thời gian mới. Bạn có thể đề xuất lại.",
+                        inv.getId());
+            }
+            default -> throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Người gửi chỉ có thể đồng ý hoặc yêu cầu chọn lại thời gian mới.");
+        }
+    }
+
+    private String requireText(String value, String message) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, message);
+        }
+        return normalized;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     // ─── Mapper ───────────────────────────────────────────────────────────────
 
     private InvitationResponse mapToResponse(Invitation inv) {
+        Appointment activeAppointment = appointmentRepository
+                .findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+                        inv.getId(), ACTIVE_APPOINTMENT_STATUSES)
+                .orElse(null);
+
         return InvitationResponse.builder()
                 .id(inv.getId())
                 // Sender
@@ -298,6 +388,9 @@ public class InvitationService {
                 .status(inv.getStatus())
                 .rejectReason(inv.getRejectReason())
                 .rescheduleTime(inv.getRescheduleTime())
+                .activeAppointmentId(activeAppointment != null ? activeAppointment.getId() : null)
+                .activeAppointmentStatus(activeAppointment != null ? activeAppointment.getStatus() : null)
+                .canCreateAppointment(inv.getStatus() == InvitationStatus.ACCEPTED && activeAppointment == null)
                 // Timestamps
                 .createdAt(inv.getCreatedAt())
                 .updatedAt(inv.getUpdatedAt())

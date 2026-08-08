@@ -22,9 +22,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<?>> handleAppException(AppException ex) {
         ErrorCode errorCode = ex.getErrorCode();
+        String message = ex.getMessage() == null || ex.getMessage().isBlank()
+                ? errorCode.getMessage()
+                : ex.getMessage();
         return ResponseEntity
                 .status(errorCode.getStatusCode())
-                .body(ApiResponse.error(errorCode.getCode(), errorCode.getMessage()));
+                .body(ApiResponse.error(errorCode.getCode(), message));
     }
 
     /** Xử lý lỗi validate (@NotNull, @Size, @Email...) */

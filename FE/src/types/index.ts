@@ -226,6 +226,9 @@ export interface Conversation {
   invitationStatus?: string;
   invitationSenderId?: string;
   invitationReceiverId?: string;
+  activeAppointmentId?: string;
+  activeAppointmentStatus?: string;
+  canCreateAppointment?: boolean;
   skillName?: string;
   communityActivityId?: string;
   communityActivityTitle?: string;

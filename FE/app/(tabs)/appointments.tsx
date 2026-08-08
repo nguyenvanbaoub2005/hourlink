@@ -9,6 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
+import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import { useAuthStore } from '@store/authStore';
 import type { AppointmentItem } from '@types';
 
@@ -44,6 +45,7 @@ export default function AppointmentsScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; title: string } | null>(null);
 
   const fetchTabCounts = useCallback(async () => {
     const countEntries = await Promise.all(TABS.map(async ({ id: tabId }) => {
@@ -100,23 +102,25 @@ export default function AppointmentsScreen() {
   );
 
   const handleRespond = async (id: string, action: 'CONFIRM' | 'CANCEL', title: string) => {
-    const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
+    if (action === 'CANCEL') {
+      setCancelTarget({ id, title });
+      return;
+    }
     Alert.alert(
-      `${action === 'CONFIRM' ? 'Xác nhận' : 'Hủy'} lịch hẹn`,
-      `Bạn có chắc chắn muốn ${actionText} buổi hẹn "${title}" không?`,
+      'Xác nhận lịch hẹn',
+      `Bạn có chắc chắn muốn xác nhận buổi hẹn "${title}" không?`,
       [
         { text: 'Bỏ qua', style: 'cancel' },
         {
-          text: action === 'CONFIRM' ? 'Đồng ý' : 'Hủy lịch',
-          style: action === 'CANCEL' ? 'destructive' : 'default',
+          text: 'Đồng ý',
           onPress: async () => {
             try {
               setActionLoading(id);
-              await AppointmentApi.respond(id, { action, reason: action === 'CANCEL' ? 'Người dùng hủy lịch' : undefined });
-              Alert.alert('Thành công', `Đã ${actionText} lịch hẹn.`);
+              await AppointmentApi.respond(id, { action });
+              Alert.alert('Thành công', 'Đã xác nhận lịch hẹn.');
               fetchAppointments();
             } catch (err: any) {
-              Alert.alert('Lỗi', err?.response?.data?.message || `Không thể ${actionText} lịch hẹn.`);
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
             } finally {
               setActionLoading(null);
             }
@@ -126,13 +130,47 @@ export default function AppointmentsScreen() {
     );
   };
 
+  const submitCancellation = async (reason: string) => {
+    if (!cancelTarget) return;
+    try {
+      setActionLoading(cancelTarget.id);
+      await AppointmentApi.respond(cancelTarget.id, { action: 'CANCEL', reason });
+      setCancelTarget(null);
+      Alert.alert('Đã hủy lịch hẹn', 'Lý do hủy đã được gửi cho người còn lại.');
+      await fetchAppointments();
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lịch hẹn.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleVerify = (item: AppointmentItem) => {
     const isOffline = item.meetingType?.toUpperCase() === 'OFFLINE' || (item as any).format === 'offline';
-    if (isOffline) {
-      router.push(`/appointment/qr?id=${item.id}` as any);
-    } else {
-      router.push(`/appointment/otp?id=${item.id}` as any);
+    const openVerification = (allowEarlyStart: boolean) => router.push({
+      pathname: isOffline ? '/appointment/qr' : '/appointment/otp',
+      params: {
+        id: item.id,
+        allowEarlyStart: allowEarlyStart ? 'true' : 'false',
+      },
+    } as any);
+    const startAt = Date.parse(
+      `${item.appointmentDate}T${item.startTime?.slice(0, 8) || '00:00:00'}`,
+    );
+
+    if (Number.isFinite(startAt) && Date.now() < startAt) {
+      Alert.alert(
+        'Chưa tới giờ hẹn',
+        `Lịch bắt đầu lúc ${item.startTime?.slice(0, 5)} ngày ${item.appointmentDate}. Bạn vẫn muốn bắt đầu sớm?`,
+        [
+          { text: 'Chưa bắt đầu', style: 'cancel' },
+          { text: 'Vẫn bắt đầu', onPress: () => openVerification(true) },
+        ],
+      );
+      return;
     }
+
+    openVerification(false);
   };
 
   const renderCard = ({ item }: { item: AppointmentItem }) => {
@@ -352,6 +390,13 @@ export default function AppointmentsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <CancelAppointmentModal
+        visible={cancelTarget !== null}
+        appointmentTitle={cancelTarget?.title}
+        loading={cancelTarget !== null && actionLoading === cancelTarget.id}
+        onClose={() => setCancelTarget(null)}
+        onSubmit={submitCancellation}
+      />
     </SafeAreaView>
   );
 }

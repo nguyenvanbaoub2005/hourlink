@@ -113,7 +113,7 @@ public class WalletService {
     }
 
     /**
-     * HOOK: Appointment → COMPLETED (cả 2 bên đã xác nhận).
+     * HOOK: Appointment → COMPLETED (một trong hai người tham gia đã xác nhận).
      * Trừ Time Credit của Receiver (SPEND) và cộng cho Provider (EARN).
      */
     @Transactional

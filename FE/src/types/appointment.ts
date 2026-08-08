@@ -64,6 +64,7 @@ export interface RespondAppointmentPayload {
 
 export interface VerifyCodePayload {
   code: string;
+  allowEarlyStart?: boolean;
 }
 
 export interface ConfirmCompletionPayload {

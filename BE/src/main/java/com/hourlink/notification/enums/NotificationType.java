@@ -16,6 +16,12 @@ public enum NotificationType {
     /** Người nhận đề xuất đổi thời gian */
     INVITATION_RESCHEDULED,
 
+    /** Người gửi đồng ý với thời gian mới do người nhận đề xuất */
+    INVITATION_RESCHEDULE_ACCEPTED,
+
+    /** Người gửi chưa đồng ý và yêu cầu người nhận chọn lại thời gian */
+    INVITATION_RESCHEDULE_REJECTED,
+
     /** Lời mời bị hủy bởi người gửi */
     INVITATION_CANCELLED,
 

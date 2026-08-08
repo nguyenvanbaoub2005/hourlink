@@ -28,12 +28,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -47,6 +49,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AppointmentService {
+
+    private static final int MAX_CANCEL_REASON_LENGTH = 500;
+    private static final int REMINDER_LEAD_MINUTES = 30;
+    private static final String AUTO_EXPIRED_REASON = "Lịch hẹn đã tự động hủy vì quá thời gian diễn ra.";
+
+    private static final List<AppointmentStatus> BLOCKING_NEXT_SESSION_STATUSES = List.of(
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.UPCOMING,
+            AppointmentStatus.IN_PROGRESS,
+            AppointmentStatus.RESCHEDULED,
+            AppointmentStatus.DISPUTED
+    );
+
+    private static final List<AppointmentStatus> LIFECYCLE_STATUSES = List.of(
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.UPCOMING,
+            AppointmentStatus.RESCHEDULED
+    );
 
     private final AppointmentRepository appointmentRepository;
     private final AppointmentVerificationRepository verificationRepository;
@@ -81,8 +103,10 @@ public class AppointmentService {
             invitation = invitationRepository.findByIdForUpdate(req.getInvitationId())
                     .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
             validateInvitationForAppointment(invitation, provider, receiver);
-            if (appointmentRepository.findByInvitationId(invitation.getId()).isPresent()) {
-                throw new AppException(ErrorCode.INVALID_REQUEST, "Lời mời này đã được tạo lịch hẹn.");
+            if (appointmentRepository.findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+                    invitation.getId(), BLOCKING_NEXT_SESSION_STATUSES).isPresent()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST,
+                        "Hai bạn đang có một lịch hẹn chưa kết thúc. Hãy hoàn thành hoặc hủy lịch đó trước khi tạo buổi tiếp theo.");
             }
         }
 
@@ -141,7 +165,9 @@ public class AppointmentService {
 
         // Gửi card lịch hẹn vào chat để bên kia có thể phản hồi trực tiếp
         try {
-            UUID conversationId = chatService.findConversationIdByUsers(provider.getId(), receiver.getId());
+            UUID conversationId = invitation != null
+                    ? chatService.findConversationIdByInvitation(invitation.getId())
+                    : chatService.findConversationIdByUsers(provider.getId(), receiver.getId());
             if (conversationId != null) {
                 String aptData = buildAppointmentCardData(appointment);
                 chatService.sendAppointmentCardInternal(conversationId, appointment.getId(), aptData, currentUser);
@@ -159,18 +185,30 @@ public class AppointmentService {
         return String.format(
             "{\"id\":\"%s\",\"title\":\"%s\",\"date\":\"%s\",\"start\":\"%s\",\"end\":\"%s\"," +
             "\"meetingType\":\"%s\",\"locationOrLink\":\"%s\",\"timeCreditAmount\":%s," +
-            "\"status\":\"%s\",\"proposedById\":\"%s\"}",
+            "\"status\":\"%s\",\"proposedById\":\"%s\",\"cancelReason\":\"%s\"}",
             apt.getId(),
-            apt.getTitle() != null ? apt.getTitle().replace("\"", "'") : "",
+            escapeJson(apt.getTitle()),
             apt.getAppointmentDate(),
             apt.getStartTime(),
             apt.getEndTime(),
             apt.getMeetingType(),
-            apt.getLocationOrLink() != null ? apt.getLocationOrLink().replace("\"", "'") : "",
+            escapeJson(apt.getLocationOrLink()),
             apt.getTimeCreditAmount(),
             apt.getStatus(),
-            apt.getProposedBy() != null ? apt.getProposedBy().getId() : ""
+            apt.getProposedBy() != null ? apt.getProposedBy().getId() : "",
+            escapeJson(apt.getCancelReason())
         );
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     // ─── 2. Quản lý lịch cá nhân (9.12) ──────────────────────────────────────
@@ -208,6 +246,93 @@ public class AppointmentService {
         Appointment appointment = getAppointmentById(id);
         checkUserAccess(appointment);
         return AppointmentResponse.fromEntity(appointment);
+    }
+
+    /**
+     * Đồng bộ vòng đời lịch hẹn mỗi phút: nhắc trước 30 phút, chuyển UPCOMING và
+     * tự hủy lịch đã quá giờ mà chưa bắt đầu. Không phụ thuộc người dùng mở app.
+     */
+    @Scheduled(fixedDelayString = "${appointment.lifecycle-delay-ms:60000}")
+    @Transactional
+    public void synchronizeLifecycle() {
+        synchronizeLifecycleAt(LocalDateTime.now());
+    }
+
+    void synchronizeLifecycleAt(LocalDateTime now) {
+        List<Appointment> candidates = appointmentRepository.findLifecycleCandidatesForUpdate(
+                LIFECYCLE_STATUSES, now.toLocalDate().plusDays(1));
+        int upcomingCount = 0;
+        int reminderCount = 0;
+        int expiredCount = 0;
+
+        for (Appointment appointment : candidates) {
+            LocalDateTime startAt = LocalDateTime.of(
+                    appointment.getAppointmentDate(), appointment.getStartTime());
+            LocalDateTime endAt = LocalDateTime.of(
+                    appointment.getAppointmentDate(), appointment.getEndTime());
+            AppointmentStatus previousStatus = appointment.getStatus();
+
+            if (now.isAfter(endAt)) {
+                appointment.setStatus(AppointmentStatus.CANCELLED);
+                appointment.setCancelReason(AUTO_EXPIRED_REASON);
+                if (previousStatus == AppointmentStatus.CONFIRMED
+                        || previousStatus == AppointmentStatus.UPCOMING) {
+                    walletService.releaseCredit(appointment);
+                }
+                notificationService.createNotification(
+                        appointment.getProvider(), null, NotificationType.APPOINTMENT_CANCELLED,
+                        "Lịch hẹn đã quá hạn",
+                        AUTO_EXPIRED_REASON + " " + appointment.getTitle(), appointment.getId());
+                notificationService.createNotification(
+                        appointment.getReceiver(), null, NotificationType.APPOINTMENT_CANCELLED,
+                        "Lịch hẹn đã quá hạn",
+                        AUTO_EXPIRED_REASON + " " + appointment.getTitle(), appointment.getId());
+                appointmentRepository.save(appointment);
+                updateAppointmentCardFailSoft(appointment);
+                expiredCount++;
+                continue;
+            }
+
+            LocalDateTime reminderAt = startAt.minusMinutes(REMINDER_LEAD_MINUTES);
+            boolean inReminderWindow = !now.isBefore(reminderAt) && now.isBefore(endAt);
+            boolean changed = false;
+
+            if (appointment.getStatus() == AppointmentStatus.CONFIRMED && inReminderWindow) {
+                appointment.setStatus(AppointmentStatus.UPCOMING);
+                upcomingCount++;
+                changed = true;
+            }
+
+            if ((appointment.getStatus() == AppointmentStatus.CONFIRMED
+                    || appointment.getStatus() == AppointmentStatus.UPCOMING)
+                    && appointment.getReminderSentAt() == null
+                    && inReminderWindow) {
+                String title = now.isBefore(startAt)
+                        ? "Lịch hẹn sắp bắt đầu"
+                        : "Lịch hẹn đã đến giờ";
+                String body = appointment.getTitle() + " diễn ra lúc "
+                        + appointment.getStartTime() + " ngày " + appointment.getAppointmentDate() + ".";
+                notificationService.createNotification(
+                        appointment.getProvider(), null, NotificationType.APPOINTMENT_REMINDER,
+                        title, body, appointment.getId());
+                notificationService.createNotification(
+                        appointment.getReceiver(), null, NotificationType.APPOINTMENT_REMINDER,
+                        title, body, appointment.getId());
+                appointment.setReminderSentAt(now.atZone(ZoneId.systemDefault()).toInstant());
+                reminderCount++;
+                changed = true;
+            }
+
+            if (changed) {
+                appointmentRepository.save(appointment);
+                updateAppointmentCardFailSoft(appointment);
+            }
+        }
+
+        if (upcomingCount > 0 || reminderCount > 0 || expiredCount > 0) {
+            log.info("Appointment lifecycle synchronized: upcoming={}, reminders={}, expired={}",
+                    upcomingCount, reminderCount, expiredCount);
+        }
     }
 
     // ─── 3. Phản hồi lịch hẹn (Xác nhận, Đổi, Hủy) ──────────────────────────
@@ -254,9 +379,17 @@ public class AppointmentService {
                     AppointmentStatus.CONFIRMED, AppointmentStatus.UPCOMING).contains(appointment.getStatus())) {
                 throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
             }
+            String cancelReason = req.getReason() != null ? req.getReason().trim() : "";
+            if (cancelReason.isEmpty()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST, "Vui lòng nhập lý do hủy lịch hẹn.");
+            }
+            if (cancelReason.length() > MAX_CANCEL_REASON_LENGTH) {
+                throw new AppException(ErrorCode.INVALID_REQUEST,
+                        "Lý do hủy không được vượt quá " + MAX_CANCEL_REASON_LENGTH + " ký tự.");
+            }
             AppointmentStatus previousStatus = appointment.getStatus();
             appointment.setStatus(AppointmentStatus.CANCELLED);
-            appointment.setCancelReason(req.getReason());
+            appointment.setCancelReason(cancelReason);
             // Wallet Hook: Hoàn trả Time Credit nếu trước đó đã CONFIRMED/UPCOMING/IN_PROGRESS (đã hold)
             if (previousStatus == AppointmentStatus.CONFIRMED
                     || previousStatus == AppointmentStatus.UPCOMING
@@ -266,7 +399,7 @@ public class AppointmentService {
 
             notificationService.createNotification(targetUser, currentUser, NotificationType.APPOINTMENT_CANCELLED,
                     "Lịch hẹn đã bị hủy",
-                    currentUser.getFullName() + " đã hủy lịch hẹn. Lý do: " + (req.getReason() != null ? req.getReason() : "Không có"),
+                    currentUser.getFullName() + " đã hủy lịch hẹn. Lý do: " + cancelReason,
                     appointment.getId());
         } else if ("RESCHEDULE".equals(action)) {
             if (!List.of(AppointmentStatus.PENDING, AppointmentStatus.RESCHEDULED,
@@ -287,6 +420,7 @@ public class AppointmentService {
             appointment.setEndTime(req.getNewEndTime());
             appointment.setStatus(AppointmentStatus.RESCHEDULED);
             appointment.setProposedBy(currentUser);
+            appointment.setReminderSentAt(null);
             String proposedTime = req.getNewAppointmentDate() + " "
                     + req.getNewStartTime() + "-" + req.getNewEndTime();
             appointment.setRescheduleProposedTime(proposedTime);
@@ -356,6 +490,18 @@ public class AppointmentService {
             throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
         }
 
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startAt = LocalDateTime.of(appointment.getAppointmentDate(), appointment.getStartTime());
+        LocalDateTime endAt = LocalDateTime.of(appointment.getAppointmentDate(), appointment.getEndTime());
+        if (now.isAfter(endAt)) {
+            throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS,
+                    "Lịch hẹn đã quá thời gian diễn ra.");
+        }
+        if (now.isBefore(startAt) && !Boolean.TRUE.equals(req.getAllowEarlyStart())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Chưa tới giờ hẹn. Vui lòng xác nhận nếu hai bạn muốn bắt đầu sớm.");
+        }
+
         AppointmentVerification verification = verificationRepository.findByAppointmentIdAndCode(id, req.getCode().trim())
                 .orElseThrow(() -> new AppException(ErrorCode.VERIFICATION_INVALID));
 
@@ -418,13 +564,10 @@ public class AppointmentService {
                 .build();
         completionRepository.save(completion);
 
-        List<AppointmentCompletion> allCompletions = completionRepository.findByAppointmentId(id);
-
-        boolean anyIssue = allCompletions.stream().anyMatch(c -> Boolean.TRUE.equals(c.getHasIssue()));
-        if (anyIssue) {
+        if (Boolean.TRUE.equals(completion.getHasIssue())) {
             appointment.setStatus(AppointmentStatus.DISPUTED);
-        } else if (allCompletions.size() >= 2) {
-            // Cả hai bên đều đã xác nhận hoàn thành không có vấn đề
+        } else {
+            // Chỉ cần một trong hai người tham gia xác nhận hoàn thành không có vấn đề.
             appointment.setStatus(AppointmentStatus.COMPLETED);
             
             // Cập nhật số buổi hỗ trợ (hoàn thành) cho cả 2 user
@@ -442,11 +585,11 @@ public class AppointmentService {
             walletService.transferCredit(appointment);
             notificationService.createNotification(appointment.getProvider(), null, NotificationType.APPOINTMENT_COMPLETED,
                     "Buổi hỗ trợ hoàn thành!",
-                    "Cả hai bên đã xác nhận hoàn thành buổi hẹn: " + appointment.getTitle() + ". Time Credit đã được chuyển.",
+                    "Buổi hẹn " + appointment.getTitle() + " đã được xác nhận hoàn thành. Time Credit đã được chuyển.",
                     appointment.getId());
             notificationService.createNotification(appointment.getReceiver(), null, NotificationType.APPOINTMENT_COMPLETED,
                     "Buổi hỗ trợ hoàn thành!",
-                    "Cả hai bên đã xác nhận hoàn thành buổi hẹn: " + appointment.getTitle() + ". Time Credit đã được chuyển.",
+                    "Buổi hẹn " + appointment.getTitle() + " đã được xác nhận hoàn thành. Time Credit đã được chuyển.",
                     appointment.getId());
         }
 

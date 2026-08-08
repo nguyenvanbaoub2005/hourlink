@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Linking, Modal, TextInput, Switch
+  ActivityIndicator, Alert, Linking, Modal, TextInput, Switch,
+  Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,7 @@ import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
 import RatingApi from '@api/rating';
 import Avatar from '@components/Avatar';
+import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import DateTimePickerModal from '@components/DateTimePickerModal';
 import { useAuthStore } from '@store/authStore';
 import type { AppointmentItem, RatingResponse } from '@types';
@@ -82,6 +84,7 @@ export default function AppointmentDetailScreen() {
 
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleStart, setRescheduleStart] = useState('');
@@ -90,7 +93,11 @@ export default function AppointmentDetailScreen() {
 
   const handleRespond = async (action: 'CONFIRM' | 'CANCEL', link?: string) => {
     if (!id || !appointment) return;
-    const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
+
+    if (action === 'CANCEL') {
+      setShowCancelModal(true);
+      return;
+    }
 
     // Nếu là xác nhận và là Online, kiểm tra link
     if (action === 'CONFIRM' && (appointment.meetingType?.toUpperCase() === 'ONLINE' || (appointment as any).format === 'online')) {
@@ -102,26 +109,24 @@ export default function AppointmentDetailScreen() {
     }
 
     Alert.alert(
-      `${action === 'CONFIRM' ? 'Xác nhận' : 'Hủy'} lịch hẹn`,
-      `Bạn có chắc chắn muốn ${actionText} lịch hẹn này?`,
+      'Xác nhận lịch hẹn',
+      'Bạn có chắc chắn muốn xác nhận lịch hẹn này?',
       [
         { text: 'Bỏ qua', style: 'cancel' },
         {
-          text: action === 'CONFIRM' ? 'Đồng ý' : 'Hủy lịch',
-          style: action === 'CANCEL' ? 'destructive' : 'default',
+          text: 'Đồng ý',
           onPress: async () => {
             try {
               setActionLoading(true);
               await AppointmentApi.respond(id, {
                 action,
-                reason: action === 'CANCEL' ? 'Người dùng hủy từ màn chi tiết' : undefined,
                 locationOrLink: link
               });
-              Alert.alert('Thành công', `Đã ${actionText} lịch hẹn.`);
+              Alert.alert('Thành công', 'Đã xác nhận lịch hẹn.');
               setShowLinkModal(false);
               fetchDetail();
             } catch (err: any) {
-              Alert.alert('Lỗi', err?.response?.data?.message || `Không thể ${actionText} lịch hẹn.`);
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
             } finally {
               setActionLoading(false);
             }
@@ -129,6 +134,21 @@ export default function AppointmentDetailScreen() {
         },
       ]
     );
+  };
+
+  const submitCancellation = async (reason: string) => {
+    if (!id) return;
+    try {
+      setActionLoading(true);
+      await AppointmentApi.respond(id, { action: 'CANCEL', reason });
+      setShowCancelModal(false);
+      Alert.alert('Đã hủy lịch hẹn', 'Lý do hủy đã được gửi cho người còn lại.');
+      await fetchDetail();
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lịch hẹn.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const openRescheduleModal = () => {
@@ -173,11 +193,30 @@ export default function AppointmentDetailScreen() {
   const handleVerify = () => {
     if (!appointment) return;
     const isOffline = appointment.meetingType?.toUpperCase() === 'OFFLINE' || (appointment as any).format === 'offline';
-    if (isOffline) {
-      router.push(`/appointment/qr?id=${appointment.id}` as any);
-    } else {
-      router.push(`/appointment/otp?id=${appointment.id}` as any);
+    const openVerification = (allowEarlyStart: boolean) => router.push({
+      pathname: isOffline ? '/appointment/qr' : '/appointment/otp',
+      params: {
+        id: appointment.id,
+        allowEarlyStart: allowEarlyStart ? 'true' : 'false',
+      },
+    } as any);
+    const startAt = Date.parse(
+      `${appointment.appointmentDate}T${appointment.startTime?.slice(0, 8) || '00:00:00'}`,
+    );
+
+    if (Number.isFinite(startAt) && Date.now() < startAt) {
+      Alert.alert(
+        'Chưa tới giờ hẹn',
+        `Lịch bắt đầu lúc ${appointment.startTime?.slice(0, 5)} ngày ${appointment.appointmentDate}. Bạn vẫn muốn bắt đầu sớm?`,
+        [
+          { text: 'Chưa bắt đầu', style: 'cancel' },
+          { text: 'Vẫn bắt đầu', onPress: () => openVerification(true) },
+        ],
+      );
+      return;
     }
+
+    openVerification(false);
   };
 
   const submitCompletion = async () => {
@@ -200,7 +239,12 @@ export default function AppointmentDetailScreen() {
         hasIssue,
         issueDescription: hasIssue ? issueDescription.trim() : undefined,
       });
-      Alert.alert('Thành công', 'Đã gửi xác nhận hoàn thành buổi hỗ trợ.');
+      Alert.alert(
+        hasIssue ? 'Đã gửi báo cáo' : 'Hoàn thành',
+        hasIssue
+          ? 'Lịch hẹn đã chuyển sang tranh chấp và Time Credit chưa được chuyển.'
+          : 'Buổi hỗ trợ đã hoàn thành và Time Credit đã được chuyển.',
+      );
       setShowModal(false);
       fetchDetail();
     } catch (err: any) {
@@ -614,65 +658,83 @@ export default function AppointmentDetailScreen() {
       )}
 
       {/* Completion Modal */}
+      <CancelAppointmentModal
+        visible={showCancelModal}
+        appointmentTitle={appointment.title}
+        loading={actionLoading}
+        onClose={() => setShowCancelModal(false)}
+        onSubmit={submitCancellation}
+      />
+
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Xác Nhận Hoàn Thành</Text>
-            <Text style={styles.modalSub}>Vui lòng xác nhận thời lượng và kết quả buổi trao đổi kỹ năng.</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Xác Nhận Hoàn Thành</Text>
+              <Text style={styles.modalSub}>
+                {hasIssue
+                  ? 'Lịch hẹn sẽ chuyển sang tranh chấp và Time Credit chưa được chuyển.'
+                  : 'Chỉ cần một người xác nhận. Lịch hẹn sẽ hoàn thành và Time Credit được chuyển ngay.'}
+              </Text>
 
-            <Text style={styles.inputLabel}>Thời lượng thực tế (phút):</Text>
-            <TextInput
-              style={styles.input}
-              value={actualDuration}
-              onChangeText={setActualDuration}
-              keyboardType="numeric"
-              placeholder="Ví dụ: 60"
-            />
+              <Text style={styles.inputLabel}>Thời lượng thực tế (phút):</Text>
+              <TextInput
+                style={styles.input}
+                value={actualDuration}
+                onChangeText={setActualDuration}
+                keyboardType="numeric"
+                placeholder="Ví dụ: 60"
+              />
 
-            <Text style={styles.inputLabel}>Nội dung đã hoàn thành / trao đổi:</Text>
-            <TextInput
-              style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
-              value={contentCompleted}
-              onChangeText={setContentCompleted}
-              multiline
-              placeholder="Mô tả tóm tắt những gì hai bên đã trao đổi..."
-            />
+              <Text style={styles.inputLabel}>Nội dung đã hoàn thành / trao đổi:</Text>
+              <TextInput
+                style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
+                value={contentCompleted}
+                onChangeText={setContentCompleted}
+                multiline
+                placeholder="Mô tả tóm tắt những gì hai bên đã trao đổi..."
+              />
 
-            <View style={styles.switchRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Có tranh chấp / vấn đề phát sinh?</Text>
-                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Bật nếu buổi hỗ trợ không đạt chất lượng hoặc vi phạm</Text>
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Có tranh chấp / vấn đề phát sinh?</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Bật nếu buổi hỗ trợ không đạt chất lượng hoặc vi phạm</Text>
+                </View>
+                <Switch value={hasIssue} onValueChange={setHasIssue} trackColor={{ false: '#CBD5E1', true: '#FECACA' }} thumbColor={hasIssue ? '#DC2626' : '#F8FAFC'} />
               </View>
-              <Switch value={hasIssue} onValueChange={setHasIssue} trackColor={{ false: '#CBD5E1', true: '#FECACA' }} thumbColor={hasIssue ? '#DC2626' : '#F8FAFC'} />
-            </View>
 
-            {hasIssue && (
-              <>
-                <Text style={[styles.inputLabel, { color: '#DC2626' }]}>Mô tả chi tiết vấn đề:</Text>
-                <TextInput
-                  style={[styles.input, { height: 70, textAlignVertical: 'top', borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
-                  value={issueDescription}
-                  onChangeText={setIssueDescription}
-                  multiline
-                  placeholder="Vui lòng ghi rõ lý do để admin hỗ trợ giải quyết tranh chấp..."
-                />
-              </>
-            )}
+              {hasIssue && (
+                <>
+                  <Text style={[styles.inputLabel, { color: '#DC2626' }]}>Mô tả chi tiết vấn đề:</Text>
+                  <TextInput
+                    style={[styles.input, { height: 70, textAlignVertical: 'top', borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
+                    value={issueDescription}
+                    onChangeText={setIssueDescription}
+                    multiline
+                    placeholder="Vui lòng ghi rõ lý do để admin hỗ trợ giải quyết tranh chấp..."
+                  />
+                </>
+              )}
 
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.bgCard }]} onPress={() => setShowModal(false)}>
-                <Text style={{ color: Colors.textPrimary, fontWeight: '600' }}>Hủy</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: hasIssue ? '#DC2626' : Colors.primary }]}
-                onPress={submitCompletion}
-                disabled={actionLoading}
-              >
-                {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnTextWhite}>Gửi Xác Nhận</Text>}
-              </TouchableOpacity>
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.bgCard }]} onPress={() => setShowModal(false)}>
+                  <Text style={{ color: Colors.textPrimary, fontWeight: '600' }}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: hasIssue ? '#DC2626' : Colors.primary }]}
+                  onPress={submitCompletion}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.btnTextWhite}>{hasIssue ? 'Gửi Báo Cáo' : 'Hoàn Tất'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Reschedule Modal */}

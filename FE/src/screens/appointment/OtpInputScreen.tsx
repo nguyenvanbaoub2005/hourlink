@@ -12,7 +12,13 @@ import type { AppointmentVerificationItem } from '@types';
 
 export default function OtpInputScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, allowEarlyStart } = useLocalSearchParams<{
+    id: string;
+    allowEarlyStart?: string | string[];
+  }>();
+  const allowEarlyStartConfirmed = (Array.isArray(allowEarlyStart)
+    ? allowEarlyStart[0]
+    : allowEarlyStart) === 'true';
 
   const [mode, setMode] = useState<'INPUT' | 'VIEW'>('INPUT');
   const [verification, setVerification] = useState<AppointmentVerificationItem | null>(null);
@@ -48,7 +54,10 @@ export default function OtpInputScreen() {
 
     try {
       setVerifying(true);
-      await AppointmentApi.verifyCode(id, { code: otpCode.trim() });
+      await AppointmentApi.verifyCode(id, {
+        code: otpCode.trim(),
+        allowEarlyStart: allowEarlyStartConfirmed,
+      });
       Alert.alert('Thành công', 'Xác thực OTP thành công! Buổi hỗ trợ chính thức bắt đầu.', [
         { text: 'Đồng ý', onPress: () => router.back() }
       ]);

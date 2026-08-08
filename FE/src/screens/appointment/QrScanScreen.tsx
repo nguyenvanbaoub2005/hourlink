@@ -13,7 +13,13 @@ import type { AppointmentVerificationItem } from '@types';
 
 export default function QrScanScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, allowEarlyStart } = useLocalSearchParams<{
+    id: string;
+    allowEarlyStart?: string | string[];
+  }>();
+  const allowEarlyStartConfirmed = (Array.isArray(allowEarlyStart)
+    ? allowEarlyStart[0]
+    : allowEarlyStart) === 'true';
 
   const [mode, setMode] = useState<'VIEW' | 'SCAN'>('VIEW');
   const [verification, setVerification] = useState<AppointmentVerificationItem | null>(null);
@@ -53,7 +59,10 @@ export default function QrScanScreen() {
 
     try {
       setVerifying(true);
-      await AppointmentApi.verifyCode(id, { code: codeToVerify.trim() });
+      await AppointmentApi.verifyCode(id, {
+        code: codeToVerify.trim(),
+        allowEarlyStart: allowEarlyStartConfirmed,
+      });
       Alert.alert('Thành công', 'Xác thực buổi hỗ trợ thành công! Trạng thái chuyển thành Đang diễn ra.', [
         { 
           text: 'Đồng ý', 

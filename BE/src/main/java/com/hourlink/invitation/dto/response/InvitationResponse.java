@@ -1,5 +1,6 @@
 package com.hourlink.invitation.dto.response;
 
+import com.hourlink.appointment.enums.AppointmentStatus;
 import com.hourlink.invitation.enums.InvitationStatus;
 import com.hourlink.skill.enums.SessionFormat;
 import lombok.*;
@@ -46,6 +47,11 @@ public class InvitationResponse {
     InvitationStatus status;
     String rejectReason;
     String rescheduleTime;
+
+    /** Lịch chưa kết thúc của lời mời, nếu có. */
+    UUID activeAppointmentId;
+    AppointmentStatus activeAppointmentStatus;
+    boolean canCreateAppointment;
 
     Instant createdAt;
     Instant updatedAt;
