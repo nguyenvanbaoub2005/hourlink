@@ -26,12 +26,30 @@ export function notificationTarget(
       : { pathname: '/chat' };
   }
 
-  if (type.startsWith('INVITATION_')) {
-    return { pathname: '/profile/invitations' };
+  if (['INVITATION_ACCEPTED', 'INVITATION_REJECTED', 'INVITATION_RESCHEDULED'].includes(type)) {
+    return { pathname: '/profile/invitations', params: { tab: 'SENT' } };
   }
 
-  if (type === 'APPOINTMENT_REMINDER') {
-    return { pathname: '/(tabs)/appointments' };
+  if ([
+    'INVITATION_RECEIVED',
+    'INVITATION_CANCELLED',
+    'INVITATION_RESCHEDULE_ACCEPTED',
+    'INVITATION_RESCHEDULE_REJECTED',
+  ].includes(type)) {
+    return { pathname: '/profile/invitations', params: { tab: 'RECEIVED' } };
+  }
+
+  if ([
+    'APPOINTMENT_CREATED',
+    'APPOINTMENT_CONFIRMED',
+    'APPOINTMENT_CANCELLED',
+    'APPOINTMENT_RESCHEDULED',
+    'APPOINTMENT_COMPLETED',
+    'APPOINTMENT_REMINDER',
+  ].includes(type)) {
+    return referenceId
+      ? { pathname: '/appointment/[id]', params: { id: referenceId } }
+      : { pathname: '/(tabs)/appointments' };
   }
 
   if (['COMMUNITY_CREDIT_AWARDED', 'COMMUNITY_PARTICIPANT_ABSENT', 'COMMUNITY_ACTIVITY_CANCELLED', 'COMMUNITY_NEW_ACTIVITY'].includes(type)) {

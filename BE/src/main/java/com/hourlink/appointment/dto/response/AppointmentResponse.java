@@ -25,6 +25,9 @@ public class AppointmentResponse {
     String receiverName;
     String receiverAvatarUrl;
 
+    UUID proposedById;
+    String proposedByName;
+
     UUID invitationId;
     UUID skillId;
     String skillName;
@@ -56,6 +59,8 @@ public class AppointmentResponse {
                 .receiverId(a.getReceiver().getId())
                 .receiverName(a.getReceiver().getFullName())
                 .receiverAvatarUrl(a.getReceiver().getAvatarUrl())
+                .proposedById(a.getProposedBy() != null ? a.getProposedBy().getId() : null)
+                .proposedByName(a.getProposedBy() != null ? a.getProposedBy().getFullName() : null)
                 .invitationId(a.getInvitation() != null ? a.getInvitation().getId() : null)
                 .skillId(a.getSkill() != null ? a.getSkill().getId() : null)
                 .skillName(a.getSkill() != null ? a.getSkill().getName() : null)

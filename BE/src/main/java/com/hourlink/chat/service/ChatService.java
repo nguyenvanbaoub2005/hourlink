@@ -1,5 +1,8 @@
 package com.hourlink.chat.service;
 
+import com.hourlink.appointment.entity.Appointment;
+import com.hourlink.appointment.enums.AppointmentStatus;
+import com.hourlink.appointment.repository.AppointmentRepository;
 import com.hourlink.chat.dto.request.BlockUserRequest;
 import com.hourlink.chat.dto.request.ProposeRescheduleRequest;
 import com.hourlink.chat.dto.request.ReportMessageRequest;
@@ -76,6 +79,15 @@ public class ChatService {
     private static final String CLOUDINARY_FOLDER = "chat_attachments";
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20MB
 
+    private static final List<AppointmentStatus> ACTIVE_APPOINTMENT_STATUSES = List.of(
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.UPCOMING,
+            AppointmentStatus.IN_PROGRESS,
+            AppointmentStatus.RESCHEDULED,
+            AppointmentStatus.DISPUTED
+    );
+
     private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
             "image/jpeg", "image/png", "image/gif", "image/webp");
 
@@ -91,6 +103,7 @@ public class ChatService {
     private final UserBlockRepository userBlockRepository;
     private final ChatReportRepository chatReportRepository;
     private final InvitationRepository invitationRepository;
+    private final AppointmentRepository appointmentRepository;
     private final CommunityActivityRepository communityActivityRepository;
     private final ActivityParticipantRepository activityParticipantRepository;
     private final UserRepository userRepository;
@@ -405,8 +418,8 @@ public class ChatService {
 
     /**
      * Đề xuất đổi lịch ngay trong cuộc trò chuyện.
-     * Cập nhật luôn Invitation gắn với hội thoại (module Appointment 9.11 chưa
-     * triển khai nên thời gian đề xuất được giữ ở Invitation.rescheduleTime).
+     * Đây là tin nhắn thương lượng. Trạng thái Invitation/Appointment chỉ được
+     * thay đổi qua workflow tương ứng để không làm một lời mời ACCEPTED bị kẹt.
      */
     @Transactional
     public ChatMessageResponse proposeReschedule(UUID conversationId, ProposeRescheduleRequest request) {
@@ -417,13 +430,9 @@ public class ChatService {
 
         requireNotBlocked(sender, receiver);
 
-        Invitation invitation = conv.getInvitation();
-        if (invitation == null) {
+        if (conv.getInvitation() == null) {
             throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
         }
-        invitation.setStatus(InvitationStatus.RESCHEDULED);
-        invitation.setRescheduleTime(request.getProposedTime());
-        invitationRepository.save(invitation);
 
         ChatMessage saved = chatMessageRepository.save(ChatMessage.builder()
                 .conversation(conv)
@@ -495,12 +504,12 @@ public class ChatService {
      */
     @Transactional
     public void updateAppointmentCardData(UUID appointmentId, String newAptData) {
-        int updated = chatMessageRepository.updateAppointmentData(appointmentId, newAptData);
-        if (updated > 0 && firebaseService.isEnabled()) {
-            // Push 1 sự kiện giả để trigger realtime message refetch trên client
-            // Cách đơn giản nhất là đẩy vào 1 node update_trigger nào đó, 
-            // hoặc vì client tự động getMessages nếu mở chat nên chỉ cần DB update là đủ.
-            log.info("Updated appointment card data for appointment {} ({} messages)", appointmentId, updated);
+        List<ChatMessage> cards = chatMessageRepository.findAllByAppointmentId(appointmentId);
+        cards.forEach(card -> card.setAppointmentData(newAptData));
+        chatMessageRepository.saveAll(cards);
+        cards.forEach(card -> mirrorMessage(card.getConversation(), card));
+        if (!cards.isEmpty()) {
+            log.info("Updated appointment card data for appointment {} ({} messages)", appointmentId, cards.size());
         }
     }
 
@@ -516,6 +525,13 @@ public class ChatService {
                         || (c.getUserOne().getId().equals(userId2) && c.getUserTwo().getId().equals(userId1)))
                 .map(c -> c.getId())
                 .findFirst()
+                .orElse(null);
+    }
+
+    /** Tìm đúng cuộc trò chuyện gắn với lời mời, tránh nhầm khi hai người có nhiều lời mời. */
+    public UUID findConversationIdByInvitation(UUID invitationId) {
+        return conversationRepository.findByInvitation_Id(invitationId)
+                .map(Conversation::getId)
                 .orElse(null);
     }
 
@@ -914,6 +930,10 @@ public class ChatService {
 
         Invitation invitation = conv.getInvitation();
         CommunityActivity activity = conv.getCommunityActivity();
+        Appointment activeAppointment = invitation == null ? null : appointmentRepository
+                .findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+                        invitation.getId(), ACTIVE_APPOINTMENT_STATUSES)
+                .orElse(null);
 
         return ConversationResponse.builder()
                 .id(conv.getId())
@@ -922,6 +942,11 @@ public class ChatService {
                 .invitationStatus(invitation != null ? invitation.getStatus() : null)
                 .invitationSenderId(invitation != null ? invitation.getSender().getId() : null)
                 .invitationReceiverId(invitation != null ? invitation.getReceiver().getId() : null)
+                .activeAppointmentId(activeAppointment != null ? activeAppointment.getId() : null)
+                .activeAppointmentStatus(activeAppointment != null ? activeAppointment.getStatus() : null)
+                .canCreateAppointment(invitation != null
+                        && invitation.getStatus() == InvitationStatus.ACCEPTED
+                        && activeAppointment == null)
                 .skillName(invitation != null && invitation.getSkill() != null
                         ? invitation.getSkill().getName() : null)
                 .communityActivityId(activity != null ? activity.getId() : null)

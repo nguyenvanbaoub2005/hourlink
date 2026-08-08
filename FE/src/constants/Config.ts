@@ -1,6 +1,6 @@
 const ENV = {
 	dev: {
-		API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.5:8085/api',
+		API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8085/api',
 	},
 	prod: {
 		API_URL: process.env.EXPO_PUBLIC_API_URL || 'https://api.hourlink.vn/api',

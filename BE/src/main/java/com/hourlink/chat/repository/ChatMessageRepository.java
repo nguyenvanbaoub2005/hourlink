@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
+import java.util.List;
 
 /**
  * ChatMessageRepository — Truy vấn DB cho tin nhắn (chức năng 9.10).
@@ -53,14 +54,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     int markAllReadInConversation(@Param("conversationId") UUID conversationId,
                                   @Param("email") String email);
 
-    /** Cập nhật nội dung thẻ lịch hẹn trong tin nhắn (khi lịch thay đổi trạng thái) */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            UPDATE ChatMessage m SET m.appointmentData = :appointmentData
-            WHERE m.appointmentId = :appointmentId
-            """)
-    int updateAppointmentData(@Param("appointmentId") UUID appointmentId, 
-                              @Param("appointmentData") String appointmentData);
+    /** Lấy các card của một lịch hẹn để cập nhật cả MySQL và Firebase. */
+    List<ChatMessage> findAllByAppointmentId(UUID appointmentId);
 
     /**
      * Lấy tin nhắn mới nhất còn hiển thị với một user cụ thể trong hội thoại.

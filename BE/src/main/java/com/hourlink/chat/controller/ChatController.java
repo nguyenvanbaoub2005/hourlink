@@ -113,7 +113,7 @@ public class ChatController {
     }
 
     @Operation(summary = "Đề xuất đổi lịch trong cuộc trò chuyện",
-            description = "Cập nhật luôn trạng thái lời mời sang RESCHEDULED")
+            description = "Gửi đề xuất để hai bên thương lượng; không thay đổi trạng thái lời mời hoặc lịch hẹn")
     @PostMapping("/conversations/{id}/reschedule")
     public ApiResponse<ChatMessageResponse> proposeReschedule(
             @PathVariable UUID id,

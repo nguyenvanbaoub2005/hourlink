@@ -80,8 +80,10 @@ export default function SendInvitationScreen() {
           {
             text: 'Xem lời mời đã gửi',
             onPress: () => {
-              router.back();
-              router.push('/profile/invitations' as any);
+              router.replace({
+                pathname: '/profile/invitations',
+                params: { tab: 'SENT' },
+              });
             }
           },
           { text: 'OK', onPress: () => router.back() },
@@ -144,6 +146,7 @@ export default function SendInvitationScreen() {
               multiline
               value={content}
               onChangeText={setContent}
+              maxLength={500}
               textAlignVertical="top"
             />
             <Text style={styles.charCount}>{content.length} / 500</Text>
@@ -196,6 +199,7 @@ export default function SendInvitationScreen() {
               placeholderTextColor={Colors.textMuted}
               value={proposedTime}
               onChangeText={setProposedTime}
+              maxLength={200}
             />
             {/* Gợi ý nhanh */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
@@ -225,6 +229,7 @@ export default function SendInvitationScreen() {
               multiline
               value={message}
               onChangeText={setMessage}
+              maxLength={500}
               textAlignVertical="top"
             />
           </View>

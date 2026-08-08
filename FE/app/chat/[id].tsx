@@ -26,6 +26,7 @@ import * as Clipboard from 'expo-clipboard';
 import ChatApi from '@api/chat';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
+import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import UserProfileSheet from '@components/UserProfileSheet';
 import DateTimePickerModal from '@components/DateTimePickerModal';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -40,6 +41,7 @@ import {
   formatBytes,
   fileIconOf,
 } from '@utils/chatFormat';
+import { formatLocalDateInput, getNextAppointmentSlot } from '@utils/dateTime';
 import type { ChatMessage, ChatReportReason, Conversation } from '@types';
 
 /** Lý do báo cáo tin nhắn — khớp enum ChatReportReason ở backend */
@@ -64,7 +66,7 @@ const getNextDays = (count = 14) => {
   for (let i = 0; i < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = formatLocalDateInput(d);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
     let label = dayNames[d.getDay()];
     if (i === 0) label = 'Hôm nay';
@@ -141,13 +143,15 @@ export default function ChatRoomScreen() {
   const [profileVisible, setProfileVisible] = useState(false);
   const [aptDetailsModalVisible, setAptDetailsModalVisible] = useState(false);
   const [selectedAptDetails, setSelectedAptDetails] = useState<any>(null);
+  const [cancelAppointmentTarget, setCancelAppointmentTarget] = useState<{ id: string; title: string } | null>(null);
+  const [cancellingAppointment, setCancellingAppointment] = useState(false);
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
 
   // Modal Tạo lịch hẹn
   const [aptModalVisible, setAptModalVisible] = useState(false);
   const [aptTitle, setAptTitle] = useState('');
-  const [aptDate, setAptDate] = useState(new Date().toISOString().slice(0, 10));
-  const [aptStart, setAptStart] = useState('09:00');
+  const [aptDate, setAptDate] = useState(() => getNextAppointmentSlot().date);
+  const [aptStart, setAptStart] = useState(() => getNextAppointmentSlot().time);
   const [aptEnd, setAptEnd] = useState('10:00');
   const [aptFormat, setAptFormat] = useState<'ONLINE' | 'OFFLINE'>('ONLINE');
   const [aptCredit, setAptCredit] = useState('1');
@@ -284,7 +288,18 @@ export default function ChatRoomScreen() {
   useFocusEffect(
     useCallback(() => {
       markRead();
-    }, [markRead])
+      let cancelled = false;
+      if (id) {
+        ChatApi.getConversation(id)
+          .then(res => {
+            if (!cancelled) setConversation(res.data?.data ?? null);
+          })
+          .catch(() => undefined);
+      }
+      return () => {
+        cancelled = true;
+      };
+    }, [id, markRead])
   );
 
   // ─── Gửi tin nhắn ───────────────────────────────────────────────────────
@@ -451,6 +466,15 @@ export default function ChatRoomScreen() {
 
   const openCreateAppointmentModal = () => {
     if (isCommunityChat) return;
+    if (conversation?.activeAppointmentId) {
+      router.push(`/appointment/${conversation.activeAppointmentId}` as any);
+      return;
+    }
+
+    const nextSlot = getNextAppointmentSlot();
+    setAptDate(nextSlot.date);
+    setAptStart(nextSlot.time);
+    updateEndTime(nextSlot.time, aptCredit);
     setAptTitle(peerSkill ? `Hỗ trợ: ${peerSkill}` : 'Buổi hỗ trợ kỹ năng');
 
     // Tìm tin nhắn chứa link họp gần nhất (MEETING_LINK) để điền tự động
@@ -484,6 +508,10 @@ export default function ChatRoomScreen() {
       Alert.alert('Thiếu thông tin', 'Hình thức Online yêu cầu cung cấp link họp (Google Meet, Zoom...).');
       return;
     }
+    if (aptFormat === 'ONLINE' && !/^https?:\/\//i.test(aptLocation.trim())) {
+      Alert.alert('Link chưa hợp lệ', 'Link họp phải bắt đầu bằng http:// hoặc https://');
+      return;
+    }
 
     // Xác định provider/receiver từ invitation (để đúng nghiệp vụ)
     const invitationSenderId = conversation?.invitationSenderId;
@@ -512,10 +540,19 @@ export default function ChatRoomScreen() {
           : aptLocation.trim(),
         timeCreditAmount: parseFloat(aptCredit) || 1,
       };
-      await AppointmentApi.create(payload);
+      const response = await AppointmentApi.create(payload);
+      const created = response.data?.data;
+      if (created?.id) {
+        setConversation(prev => prev ? {
+          ...prev,
+          activeAppointmentId: created.id,
+          activeAppointmentStatus: created.status,
+          canCreateAppointment: false,
+        } : prev);
+      }
       setAptModalVisible(false);
       setAptLocation('');
-      Alert.alert('✅ Đã gửi đề xuất', 'Lịch hẹn đã được gửi vào cuộc trò chuyện. Hãy đợi người kia xác nhận!', [
+      Alert.alert('✅ Đã gửi đề xuất', 'Buổi học tiếp theo đã được gửi. Hãy đợi người kia xác nhận!', [
         { text: 'OK', style: 'default' }
       ]);
       if (!realtime) await fetchMessages();
@@ -529,6 +566,27 @@ export default function ChatRoomScreen() {
   // ─── Menu đính kèm ──────────────────────────────────────────────────────
   const openAttachMenu = () => {
     setAttachSheetVisible(true);
+  };
+
+  const submitAppointmentCancellation = async (reason: string) => {
+    if (!cancelAppointmentTarget) return;
+    try {
+      setCancellingAppointment(true);
+      await AppointmentApi.respond(cancelAppointmentTarget.id, { action: 'CANCEL', reason });
+      setCancelAppointmentTarget(null);
+      setConversation((current) => current ? {
+        ...current,
+        activeAppointmentId: undefined,
+        activeAppointmentStatus: undefined,
+        canCreateAppointment: true,
+      } : current);
+      await fetchMessages();
+      Alert.alert('Đã hủy lịch hẹn', 'Lý do hủy đã được gửi cho người còn lại.');
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể hủy lịch hẹn.');
+    } finally {
+      setCancellingAppointment(false);
+    }
   };
 
   // ─── Báo cáo & chặn ─────────────────────────────────────────────────────
@@ -713,8 +771,13 @@ export default function ChatRoomScreen() {
         {item.type === 'APPOINTMENT_CARD' && (() => {
           let aptData: any = {};
           try { aptData = item.appointmentData ? JSON.parse(item.appointmentData) : {}; } catch {}
-          const isPending = aptData.status === 'PENDING';
-          const isOtherPerson = !isMine; // người không tạo lịch
+          const isAwaitingResponse = aptData.status === 'PENDING' || aptData.status === 'RESCHEDULED';
+          const canRespond = aptData.proposedById
+            ? aptData.proposedById !== user?.id
+            : !isMine;
+          const endAt = Date.parse(`${aptData.date}T${aptData.end?.slice(0, 8) || '00:00:00'}`);
+          const isExpired = Number.isFinite(endAt) && endAt < Date.now();
+          const canAccept = canRespond && !isExpired;
           return (
             <View style={{
               backgroundColor: isMine ? '#F0FDFA' : '#FFFFFF',
@@ -747,11 +810,18 @@ export default function ChatRoomScreen() {
                   </Text>
                 </View>
               </View>
-              {isPending && isOtherPerson && item.appointmentId && (
+              {isAwaitingResponse && canAccept && item.appointmentId && (
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity
                     style={{ flex: 1, backgroundColor: '#0D9488', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}
                     onPress={async () => {
+                      if (aptData.meetingType === 'ONLINE' && !/^https?:\/\//i.test(aptData.locationOrLink || '')) {
+                        Alert.alert('Thiếu link họp', 'Mở chi tiết lịch hẹn để bổ sung link trước khi chấp nhận.', [
+                          { text: 'Để sau', style: 'cancel' },
+                          { text: 'Mở chi tiết', onPress: () => router.push(`/appointment/${item.appointmentId}` as any) },
+                        ]);
+                        return;
+                      }
                       try {
                         await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CONFIRM' });
                         await fetchMessages();
@@ -766,24 +836,24 @@ export default function ChatRoomScreen() {
                   <TouchableOpacity
                     style={{ flex: 1, backgroundColor: '#FEE2E2', borderRadius: 8, paddingVertical: 7, alignItems: 'center', borderWidth: 1, borderColor: '#FECACA' }}
                     onPress={() => {
-                      Alert.alert('Từ chối lịch hẹn', 'Bạn có chắc muốn từ chối lịch hẹn này?', [
-                        { text: 'Không', style: 'cancel' },
-                        { text: 'Từ chối', style: 'destructive', onPress: async () => {
-                          try {
-                            await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CANCEL', reason: 'Từ chối lịch hẹn' });
-                            await fetchMessages();
-                          } catch (e: any) {
-                            Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể từ chối lịch hẹn.');
-                          }
-                        }}
-                      ]);
+                      setCancelAppointmentTarget({
+                        id: item.appointmentId!.toString(),
+                        title: aptData.title || 'Lịch hẹn',
+                      });
                     }}
                   >
                     <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 12 }}>✗ Từ chối</Text>
                   </TouchableOpacity>
                 </View>
               )}
-              {!isPending && (
+              {isAwaitingResponse && !canAccept && (
+                <View style={{ backgroundColor: '#FEF3C7', borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309' }}>
+                    {isExpired ? 'Đã quá giờ · mở chi tiết để đổi lịch' : 'Đang chờ người còn lại phản hồi'}
+                  </Text>
+                </View>
+              )}
+              {!isAwaitingResponse && (
                 <View style={{ backgroundColor: aptData.status === 'CONFIRMED' ? '#DCFCE7' : '#FEE2E2', borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, alignItems: 'center' }}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: aptData.status === 'CONFIRMED' ? '#15803D' : '#DC2626' }}>
                     {aptData.status === 'CONFIRMED' ? '✓ Đã xác nhận' : aptData.status === 'CANCELLED' ? '✗ Đã hủy' : aptData.status}
@@ -905,7 +975,11 @@ export default function ChatRoomScreen() {
             style={styles.headerBtn}
             onPress={openCreateAppointmentModal}
           >
-            <Ionicons name="calendar-outline" size={23} color={Colors.primary} />
+            <Ionicons
+              name={conversation?.activeAppointmentId ? 'calendar' : 'calendar-outline'}
+              size={23}
+              color={Colors.primary}
+            />
           </TouchableOpacity>
         )}
         <TouchableOpacity style={styles.headerBtn} onPress={() => setMeetingVisible(true)}>
@@ -979,6 +1053,15 @@ export default function ChatRoomScreen() {
       </KeyboardAvoidingView>
 
       {/* ── Modal Chi tiết lịch hẹn ────────────────────────────────────── */}
+      <CancelAppointmentModal
+        visible={cancelAppointmentTarget !== null}
+        appointmentTitle={cancelAppointmentTarget?.title}
+        loading={cancellingAppointment}
+        submitLabel="Xác nhận từ chối"
+        onClose={() => setCancelAppointmentTarget(null)}
+        onSubmit={submitAppointmentCancellation}
+      />
+
       <Modal visible={aptDetailsModalVisible} transparent animationType="slide">
         <View style={styles.overlay}>
           <TouchableOpacity style={{ flex: 1 }} onPress={() => setAptDetailsModalVisible(false)} />
@@ -1030,6 +1113,18 @@ export default function ChatRoomScreen() {
                      selectedAptDetails.status}
                   </Text>
                 </View>
+
+                {!!selectedAptDetails.cancelReason && (
+                  <View style={{ marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' }}>
+                    <Text style={{ color: '#991B1B', fontSize: 13, fontWeight: '700', marginBottom: 5 }}>
+                      Thông tin phản hồi
+                    </Text>
+                    <Text style={{ color: '#DC2626', fontSize: 13, lineHeight: 19 }}>
+                      <Text style={{ fontWeight: '700' }}>Lý do hủy: </Text>
+                      {selectedAptDetails.cancelReason}
+                    </Text>
+                  </View>
+                )}
               </ScrollView>
             )}
             <View style={styles.sheetActions}>
@@ -1073,7 +1168,9 @@ export default function ChatRoomScreen() {
                   }}
                 >
                   <Ionicons name="calendar" size={22} color={Colors.primary} />
-                  <Text style={[styles.menuText, { color: Colors.primary, fontWeight: '700' }]}>Tạo lịch hẹn mới</Text>
+                  <Text style={[styles.menuText, { color: Colors.primary, fontWeight: '700' }]}>
+                    {conversation?.activeAppointmentId ? 'Xem lịch hẹn hiện tại' : 'Tạo buổi học tiếp theo'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.menuItem}
@@ -1253,7 +1350,9 @@ export default function ChatRoomScreen() {
                   <View style={[styles.attachOptionIcon, { backgroundColor: '#FEF9C3' }]}>
                     <Ionicons name="calendar" size={26} color="#CA8A04" />
                   </View>
-                  <Text style={styles.attachOptionText}>Lịch hẹn</Text>
+                  <Text style={styles.attachOptionText}>
+                    {conversation?.activeAppointmentId ? 'Xem lịch' : 'Buổi tiếp'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>

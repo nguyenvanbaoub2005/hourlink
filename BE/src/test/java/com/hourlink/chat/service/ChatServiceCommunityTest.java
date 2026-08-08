@@ -1,5 +1,6 @@
 package com.hourlink.chat.service;
 
+import com.hourlink.appointment.repository.AppointmentRepository;
 import com.hourlink.chat.dto.request.ProposeRescheduleRequest;
 import com.hourlink.chat.entity.ChatMessage;
 import com.hourlink.chat.entity.Conversation;
@@ -53,6 +54,7 @@ class ChatServiceCommunityTest {
     @Mock UserBlockRepository userBlockRepository;
     @Mock ChatReportRepository chatReportRepository;
     @Mock InvitationRepository invitationRepository;
+    @Mock AppointmentRepository appointmentRepository;
     @Mock CommunityActivityRepository communityActivityRepository;
     @Mock ActivityParticipantRepository activityParticipantRepository;
     @Mock UserRepository userRepository;

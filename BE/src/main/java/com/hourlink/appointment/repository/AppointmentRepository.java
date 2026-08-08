@@ -5,12 +5,15 @@ import com.hourlink.appointment.enums.AppointmentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDate;
 
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, UUID> {
@@ -24,5 +27,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     @Query("SELECT a FROM Appointment a WHERE (a.provider.id = :userId OR a.receiver.id = :userId) AND a.status = :status")
     Page<Appointment> findByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") AppointmentStatus status, Pageable pageable);
 
-    Optional<Appointment> findByInvitationId(UUID invitationId);
+    Optional<Appointment> findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+            UUID invitationId, List<AppointmentStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Appointment a WHERE a.id = :id")
+    Optional<Appointment> findByIdForUpdate(@Param("id") UUID id);
+
+    /** Các lịch cần đồng bộ trạng thái theo thời gian, khóa để tránh scheduler xử lý trùng. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT a FROM Appointment a
+            WHERE a.status IN :statuses AND a.appointmentDate <= :latestDate
+            """)
+    List<Appointment> findLifecycleCandidatesForUpdate(
+            @Param("statuses") List<AppointmentStatus> statuses,
+            @Param("latestDate") LocalDate latestDate);
 }

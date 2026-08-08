@@ -8,12 +8,14 @@ import lombok.experimental.FieldDefaults;
 import java.time.LocalDateTime;
 
 /**
- * AppointmentCompletion — Ghi nhận xác nhận hoàn thành buổi hỗ trợ từ mỗi bên (chức năng 9.15).
+ * AppointmentCompletion — Ghi nhận người tham gia đã xác nhận kết thúc buổi hỗ trợ (chức năng 9.15).
  */
 @Entity
 @Table(name = "appointment_completion", indexes = {
         @Index(name = "idx_completion_appointment", columnList = "appointment_id"),
         @Index(name = "idx_completion_user", columnList = "user_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uq_completion_appointment_user", columnNames = {"appointment_id", "user_id"})
 })
 @Getter @Setter @Builder @AllArgsConstructor @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)

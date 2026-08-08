@@ -5,33 +5,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
-import InvitationApi from '@api/invitation';
+import InvitationApi, { type InvitationResponse as InvitationType } from '@api/invitation';
 import AppointmentApi from '@api/appointment';
 import { openChatFromInvitation } from '@utils/chatNav';
+import { formatDateTimeVi, formatLocalDateInput, getNextAppointmentSlot } from '@utils/dateTime';
 import DateTimePickerModal from '@components/DateTimePickerModal';
-
-type InvitationType = {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderAvatarUrl?: string;
-  receiverId: string;
-  receiverName: string;
-  receiverAvatarUrl?: string;
-  skillId?: string;
-  skillName?: string;
-  content: string;
-  message?: string;
-  proposedTime?: string;
-  duration?: number;
-  format: string;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'RESCHEDULED';
-  rejectReason?: string;
-  rescheduleTime?: string;
-  createdAt: string;
-};
 
 type TabType = 'RECEIVED' | 'SENT';
 
@@ -57,7 +37,7 @@ const getNextDays = (count = 14) => {
   for (let i = 0; i < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
+    const iso = formatLocalDateInput(d);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
     let label = dayNames[d.getDay()];
     if (i === 0) label = 'Hôm nay';
@@ -78,10 +58,18 @@ const CREDIT_OPTIONS = [
 
 export default function InvitationsScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('RECEIVED');
+  const { tab } = useLocalSearchParams<{ tab?: string | string[] }>();
+  const requestedTab = Array.isArray(tab) ? tab[0] : tab;
+  const [activeTab, setActiveTab] = useState<TabType>(requestedTab === 'SENT' ? 'SENT' : 'RECEIVED');
   const [received, setReceived] = useState<InvitationType[]>([]);
   const [sent, setSent] = useState<InvitationType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Modal nhập lý do từ chối
+  const [rejectModal, setRejectModal] = useState(false);
+  const [rejectTarget, setRejectTarget] = useState<InvitationType | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Modal đề xuất đổi giờ
   const [rescheduleModal, setRescheduleModal] = useState(false);
@@ -93,13 +81,18 @@ export default function InvitationsScreen() {
   const [aptModalVisible, setAptModalVisible] = useState(false);
   const [aptTarget, setAptTarget] = useState<InvitationType | null>(null);
   const [aptTitle, setAptTitle] = useState('');
-  const [aptDate, setAptDate] = useState('');
-  const [aptStart, setAptStart] = useState('09:00');
+  const [aptDate, setAptDate] = useState(() => getNextAppointmentSlot().date);
+  const [aptStart, setAptStart] = useState(() => getNextAppointmentSlot().time);
   const [aptEnd, setAptEnd] = useState('10:00');
   const [aptFormat, setAptFormat] = useState<'ONLINE' | 'OFFLINE'>('ONLINE');
+  const [aptLocation, setAptLocation] = useState('');
   const [aptCredit, setAptCredit] = useState('1');
   const [creatingApt, setCreatingApt] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+
+  useEffect(() => {
+    setActiveTab(requestedTab === 'SENT' ? 'SENT' : 'RECEIVED');
+  }, [requestedTab]);
 
   const updateEndTime = (start: string, creditStr: string) => {
     try {
@@ -141,11 +134,15 @@ export default function InvitationsScreen() {
       {
         text: 'Hủy lời mời', style: 'destructive',
         onPress: async () => {
+          if (actionLoadingId === item.id) return;
+          setActionLoadingId(item.id);
           try {
             await InvitationApi.cancel(item.id);
             setSent(prev => prev.map(i => i.id === item.id ? { ...i, status: 'CANCELLED' } : i));
-          } catch {
-            Alert.alert('Lỗi', 'Không thể hủy lời mời');
+          } catch (err: any) {
+            Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lời mời');
+          } finally {
+            setActionLoadingId(null);
           }
         }
       }
@@ -154,30 +151,47 @@ export default function InvitationsScreen() {
 
   // ── Helper: Respond lời mời nhận được ──────────────────────────────────────
   const handleAccept = async (item: InvitationType) => {
+    if (actionLoadingId === item.id) return;
+    setActionLoadingId(item.id);
     try {
       await InvitationApi.respond(item.id, { action: 'ACCEPT' });
       setReceived(prev => prev.map(i => i.id === item.id ? { ...i, status: 'ACCEPTED' } : i));
       Alert.alert('✅ Đã chấp nhận', 'Bạn đã chấp nhận lời mời. Hãy liên hệ với họ qua chat!');
-    } catch {
-      Alert.alert('Lỗi', 'Không thể chấp nhận lời mời');
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể chấp nhận lời mời');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
-  const handleReject = (item: InvitationType) => {
-    Alert.alert('Từ chối lời mời', 'Bạn có chắc muốn từ chối lời mời này?', [
-      { text: 'Không', style: 'cancel' },
-      {
-        text: 'Từ chối', style: 'destructive',
-        onPress: async () => {
-          try {
-            await InvitationApi.respond(item.id, { action: 'REJECT', rejectReason: 'Không phù hợp lịch' });
-            setReceived(prev => prev.map(i => i.id === item.id ? { ...i, status: 'REJECTED' } : i));
-          } catch {
-            Alert.alert('Lỗi', 'Không thể từ chối lời mời');
-          }
-        }
-      }
-    ]);
+  const openReject = (item: InvitationType) => {
+    setRejectTarget(item);
+    setRejectReason('');
+    setRejectModal(true);
+  };
+
+  const handleReject = async () => {
+    if (!rejectTarget || actionLoadingId === rejectTarget.id) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập lý do từ chối.');
+      return;
+    }
+
+    setActionLoadingId(rejectTarget.id);
+    try {
+      await InvitationApi.respond(rejectTarget.id, { action: 'REJECT', rejectReason: reason });
+      setReceived(prev => prev.map(i => i.id === rejectTarget.id
+        ? { ...i, status: 'REJECTED', rejectReason: reason }
+        : i));
+      setRejectModal(false);
+      setRejectTarget(null);
+      setRejectReason('');
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể từ chối lời mời');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   // ── Helper: Mở modal đề xuất đổi giờ ──────────────────────────────────────
@@ -207,19 +221,59 @@ export default function InvitationsScreen() {
       ));
       setRescheduleModal(false);
       Alert.alert('📅 Đã gửi đề xuất', 'Người gửi sẽ nhận được thông báo đề xuất đổi lịch của bạn.');
-    } catch {
-      Alert.alert('Lỗi', 'Không thể gửi đề xuất đổi giờ. Vui lòng thử lại.');
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể gửi đề xuất đổi giờ. Vui lòng thử lại.');
     } finally {
       setRescheduleLoading(false);
     }
   };
 
+  const handleRescheduleDecision = (item: InvitationType, accept: boolean) => {
+    const title = accept ? 'Đồng ý thời gian mới' : 'Yêu cầu chọn lại';
+    const message = accept
+      ? `Xác nhận thời gian "${item.rescheduleTime}" và tiếp tục tạo lịch hẹn?`
+      : 'Lời mời sẽ quay về trạng thái chờ để người nhận đề xuất thời gian khác.';
+
+    Alert.alert(title, message, [
+      { text: 'Đóng', style: 'cancel' },
+      {
+        text: accept ? 'Đồng ý' : 'Chọn lại',
+        style: accept ? 'default' : 'destructive',
+        onPress: async () => {
+          if (actionLoadingId === item.id) return;
+          setActionLoadingId(item.id);
+          try {
+            await InvitationApi.respond(item.id, {
+              action: accept ? 'ACCEPT_RESCHEDULE' : 'REJECT_RESCHEDULE',
+            });
+            setSent(prev => prev.map(i => i.id === item.id
+              ? accept
+                ? { ...i, status: 'ACCEPTED', proposedTime: i.rescheduleTime }
+                : { ...i, status: 'PENDING', rescheduleTime: undefined }
+              : i));
+            Alert.alert(
+              accept ? '✅ Đã đồng ý' : '↩️ Đã yêu cầu chọn lại',
+              accept
+                ? 'Bạn có thể tạo lịch hẹn với thời gian mới.'
+                : 'Người nhận đã được thông báo để phản hồi lại.'
+            );
+          } catch (err: any) {
+            Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể xử lý thời gian đề xuất.');
+          } finally {
+            setActionLoadingId(null);
+          }
+        },
+      },
+    ]);
+  };
+
   const openCreateAptModal = (item: InvitationType) => {
     setAptTarget(item);
     setAptTitle(item.skillName ? `Hỗ trợ: ${item.skillName}` : 'Buổi hỗ trợ kỹ năng');
+    const fallbackSlot = getNextAppointmentSlot();
 
     // Extract valid date YYYY-MM-DD
-    let validDate = new Date().toISOString().slice(0, 10);
+    let validDate = fallbackSlot.date;
     if (item.proposedTime) {
       const isoMatch = item.proposedTime.match(/\b(\d{4}-\d{2}-\d{2})\b/);
       if (isoMatch) {
@@ -228,23 +282,24 @@ export default function InvitationsScreen() {
         const dmyMatch = item.proposedTime.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
         if (dmyMatch) {
           validDate = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
-        } else {
-          const tmr = new Date();
-          tmr.setDate(tmr.getDate() + 1);
-          validDate = tmr.toISOString().slice(0, 10);
         }
       }
     }
-    setAptDate(validDate);
 
     // Extract time HH:MM
-    let startT = '09:00';
+    let startT = fallbackSlot.time;
     if (item.proposedTime) {
       const tMatch = item.proposedTime.match(/\b(\d{1,2}:\d{2})\b/);
       if (tMatch) {
         startT = tMatch[1].padStart(5, '0');
       }
     }
+    const candidateStart = new Date(`${validDate}T${startT}:00`);
+    if (Number.isNaN(candidateStart.getTime()) || candidateStart.getTime() <= Date.now()) {
+      validDate = fallbackSlot.date;
+      startT = fallbackSlot.time;
+    }
+    setAptDate(validDate);
     setAptStart(startT);
 
     // Chuẩn hóa duration từ phút sang Time Credit (1 TC = 60 phút, hỗ trợ mốc 0.5 TC = 30 phút)
@@ -254,6 +309,7 @@ export default function InvitationsScreen() {
     updateEndTime(startT, tc.toString());
 
     setAptFormat((item.format?.toUpperCase() === 'OFFLINE' ? 'OFFLINE' : 'ONLINE') as any);
+    setAptLocation('');
     setAptModalVisible(true);
   };
 
@@ -267,6 +323,17 @@ export default function InvitationsScreen() {
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(aptStart.trim()) || !timeRegex.test(aptEnd.trim())) {
       Alert.alert('Lỗi định dạng', 'Vui lòng nhập giờ theo định dạng HH:MM (ví dụ: 09:00, 14:30)');
+      return;
+    }
+    const location = aptLocation.trim();
+    if (!location) {
+      Alert.alert('Thiếu thông tin', aptFormat === 'ONLINE'
+        ? 'Vui lòng nhập link Google Meet, Zoom hoặc phòng họp trực tuyến.'
+        : 'Vui lòng nhập địa điểm gặp mặt.');
+      return;
+    }
+    if (aptFormat === 'ONLINE' && !/^https?:\/\//i.test(location)) {
+      Alert.alert('Link chưa hợp lệ', 'Link họp phải bắt đầu bằng http:// hoặc https://');
       return;
     }
 
@@ -283,12 +350,25 @@ export default function InvitationsScreen() {
         startTime: `${aptStart.trim()}:00`,
         endTime: `${aptEnd.trim()}:00`,
         meetingType: aptFormat,
-        locationOrLink: aptFormat === 'OFFLINE' ? 'Gặp mặt trực tiếp' : 'Online Video Call',
+        locationOrLink: location,
         timeCreditAmount: parseFloat(aptCredit) || 1,
       };
-      await AppointmentApi.create(payload);
+      const response = await AppointmentApi.create(payload);
+      const created = response.data?.data;
+      if (created?.id) {
+        const markActive = (i: InvitationType): InvitationType => i.id === aptTarget.id
+          ? {
+              ...i,
+              activeAppointmentId: created.id,
+              activeAppointmentStatus: created.status,
+              canCreateAppointment: false,
+            }
+          : i;
+        setReceived(prev => prev.map(markActive));
+        setSent(prev => prev.map(markActive));
+      }
       setAptModalVisible(false);
-      Alert.alert('Thành công', 'Đã tạo lịch hẹn mới từ lời mời!', [
+      Alert.alert('Thành công', 'Đã tạo buổi học tiếp theo!', [
         { text: 'Xem lịch hẹn', onPress: () => router.push(`/(tabs)/appointments` as any) },
         { text: 'Đóng', style: 'cancel' }
       ]);
@@ -307,6 +387,7 @@ export default function InvitationsScreen() {
     const otherLetter = otherName ? otherName.charAt(0).toUpperCase() : '?';
     const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.PENDING;
     const isPending = item.status === 'PENDING';
+    const isBusy = actionLoadingId === item.id;
 
     return (
       <View style={styles.card}>
@@ -331,6 +412,13 @@ export default function InvitationsScreen() {
             <Ionicons name={cfg.icon as any} size={13} color={cfg.color} style={{ marginRight: 3 }} />
             <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
+        </View>
+
+        <View style={styles.createdTimeRow}>
+          <Ionicons name={isSentTab ? 'send-outline' : 'time-outline'} size={14} color="#64748B" />
+          <Text style={styles.createdTimeText}>
+            {isSentTab ? 'Đã gửi lúc' : 'Nhận lúc'} {formatDateTimeVi(item.createdAt)}
+          </Text>
         </View>
 
         {/* Content */}
@@ -385,35 +473,87 @@ export default function InvitationsScreen() {
         {/* Action Buttons — Receiver tab PENDING */}
         {isPending && activeTab === 'RECEIVED' && (
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.btnReject} onPress={() => handleReject(item)}>
+            <TouchableOpacity
+              style={[styles.btnReject, isBusy && styles.btnDisabled]}
+              onPress={() => openReject(item)}
+              disabled={isBusy}
+            >
               <Ionicons name="close" size={15} color="#DC2626" />
               <Text style={styles.btnRejectText}>Từ chối</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnReschedule} onPress={() => openReschedule(item)}>
+            <TouchableOpacity
+              style={[styles.btnReschedule, isBusy && styles.btnDisabled]}
+              onPress={() => openReschedule(item)}
+              disabled={isBusy}
+            >
               <Ionicons name="calendar-outline" size={15} color="#2563EB" />
               <Text style={styles.btnRescheduleText}>Đổi giờ</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btnAccept} onPress={() => handleAccept(item)}>
-              <Ionicons name="checkmark" size={15} color="#fff" />
-              <Text style={styles.btnAcceptText}>Chấp nhận</Text>
+            <TouchableOpacity
+              style={[styles.btnAccept, isBusy && styles.btnDisabled]}
+              onPress={() => handleAccept(item)}
+              disabled={isBusy}
+            >
+              {isBusy ? <ActivityIndicator size="small" color="#fff" /> : (
+                <>
+                  <Ionicons name="checkmark" size={15} color="#fff" />
+                  <Text style={styles.btnAcceptText}>Chấp nhận</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         )}
 
         {/* Action Buttons — Sender tab PENDING */}
         {isPending && activeTab === 'SENT' && (
-          <TouchableOpacity style={styles.btnCancel} onPress={() => handleCancel(item)}>
-            <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-            <Text style={styles.btnCancelText}>Hủy lời mời</Text>
+          <TouchableOpacity
+            style={[styles.btnCancel, isBusy && styles.btnDisabled]}
+            onPress={() => handleCancel(item)}
+            disabled={isBusy}
+          >
+            {isBusy ? <ActivityIndicator size="small" color="#DC2626" /> : (
+              <>
+                <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+                <Text style={styles.btnCancelText}>Hủy lời mời</Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
 
-        {/* Sender nhận RESCHEDULED → có thể hủy */}
+        {/* Sender quyết định thời gian mới */}
         {item.status === 'RESCHEDULED' && activeTab === 'SENT' && (
-          <TouchableOpacity style={styles.btnCancel} onPress={() => handleCancel(item)}>
-            <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-            <Text style={styles.btnCancelText}>Hủy lời mời</Text>
-          </TouchableOpacity>
+          <>
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.btnReschedule, isBusy && styles.btnDisabled]}
+                onPress={() => handleRescheduleDecision(item, false)}
+                disabled={isBusy}
+              >
+                <Ionicons name="refresh-outline" size={15} color="#2563EB" />
+                <Text style={styles.btnRescheduleText}>Chọn giờ khác</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnAccept, isBusy && styles.btnDisabled]}
+                onPress={() => handleRescheduleDecision(item, true)}
+                disabled={isBusy}
+              >
+                {isBusy ? <ActivityIndicator size="small" color="#fff" /> : (
+                  <>
+                    <Ionicons name="checkmark" size={15} color="#fff" />
+                    <Text style={styles.btnAcceptText}>Đồng ý giờ mới</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.btnCancel, isBusy && styles.btnDisabled]}
+              onPress={() => handleCancel(item)}
+              disabled={isBusy}
+            >
+              <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+              <Text style={styles.btnCancelText}>Hủy lời mời</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         {/* Lời mời đã chấp nhận → mở cuộc trò chuyện & tạo lịch hẹn */}
@@ -426,15 +566,23 @@ export default function InvitationsScreen() {
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#0D9488" />
               <Text style={styles.btnOpenChatText}>Nhắn tin</Text>
             </TouchableOpacity>
-            {item.status === 'ACCEPTED' && (
+            {item.status === 'ACCEPTED' && item.activeAppointmentId ? (
+              <TouchableOpacity
+                style={[styles.btnOpenChat, { flex: 1, marginTop: 0, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
+                onPress={() => router.push(`/appointment/${item.activeAppointmentId}` as any)}
+              >
+                <Ionicons name="calendar" size={16} color="#2563EB" />
+                <Text style={[styles.btnOpenChatText, { color: '#2563EB' }]}>Xem lịch hẹn</Text>
+              </TouchableOpacity>
+            ) : item.status === 'ACCEPTED' ? (
               <TouchableOpacity
                 style={[styles.btnOpenChat, { flex: 1, marginTop: 0, backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}
                 onPress={() => openCreateAptModal(item)}
               >
                 <Ionicons name="calendar-outline" size={16} color="#2563EB" />
-                <Text style={[styles.btnOpenChatText, { color: '#2563EB' }]}>Tạo lịch hẹn</Text>
+                <Text style={[styles.btnOpenChatText, { color: '#2563EB' }]}>Tạo buổi học</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
         )}
       </View>
@@ -523,6 +671,67 @@ export default function InvitationsScreen() {
         />
       )}
 
+      {/* ── Modal nhập lý do từ chối ──────────────────────────────────── */}
+      <Modal
+        visible={rejectModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRejectModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.rescheduleModalBox}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalTitleRow}>
+              <Ionicons name="close-circle-outline" size={22} color="#DC2626" style={{ marginRight: 8 }} />
+              <Text style={styles.modalTitle}>Từ chối lời mời</Text>
+            </View>
+            <Text style={styles.modalSubtitle}>
+              Hãy cho {rejectTarget?.senderName ?? 'người gửi'} biết lý do để họ có thể điều chỉnh yêu cầu.
+            </Text>
+            <Text style={styles.inputLabel}>Lý do từ chối *</Text>
+            <TextInput
+              style={styles.rescheduleInput}
+              placeholder="Ví dụ: Tôi chưa sắp xếp được thời gian phù hợp..."
+              placeholderTextColor="#94A3B8"
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              maxLength={500}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+            <Text style={styles.charCount}>{rejectReason.length} / 500</Text>
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setRejectModal(false)}
+                disabled={Boolean(rejectTarget && actionLoadingId === rejectTarget.id)}
+              >
+                <Text style={styles.modalBtnCancelText}>Đóng</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtnConfirm,
+                  { backgroundColor: '#DC2626' },
+                  rejectTarget && actionLoadingId === rejectTarget.id && styles.btnDisabled,
+                ]}
+                onPress={handleReject}
+                disabled={Boolean(rejectTarget && actionLoadingId === rejectTarget.id)}
+              >
+                {rejectTarget && actionLoadingId === rejectTarget.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalBtnConfirmText}>Xác nhận từ chối</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ── Modal Đề xuất đổi giờ ──────────────────────────────────────── */}
       <Modal
         visible={rescheduleModal}
@@ -567,6 +776,7 @@ export default function InvitationsScreen() {
               placeholderTextColor="#94A3B8"
               value={rescheduleTime}
               onChangeText={setRescheduleTime}
+              maxLength={200}
               multiline
               numberOfLines={2}
               textAlignVertical="top"
@@ -622,6 +832,8 @@ export default function InvitationsScreen() {
             <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
               Chọn nhanh ngày giờ bên dưới để tạo lịch hẹn chính xác tuyệt đối.
             </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
 
             <Text style={styles.inputLabel}>Tiêu đề lịch hẹn *</Text>
             <TextInput
@@ -697,6 +909,20 @@ export default function InvitationsScreen() {
                 Khung giờ hỗ trợ: <Text style={{ fontWeight: 'bold', color: '#0D9488' }}>{aptStart} ➔ {aptEnd}</Text> ({aptCredit} Time Credit)
               </Text>
             </View>
+
+            <Text style={styles.inputLabel}>
+              {aptFormat === 'ONLINE' ? 'Link họp trực tuyến *' : 'Địa điểm gặp mặt *'}
+            </Text>
+            <TextInput
+              style={[styles.rescheduleInput, { height: 46, minHeight: 46, marginBottom: 12 }]}
+              placeholder={aptFormat === 'ONLINE' ? 'https://meet.google.com/...' : 'Nhập địa chỉ gặp mặt'}
+              placeholderTextColor="#94A3B8"
+              value={aptLocation}
+              onChangeText={setAptLocation}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            </ScrollView>
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
@@ -799,6 +1025,9 @@ const styles = StyleSheet.create({
   },
   statusText: { fontSize: 11, fontWeight: '600' },
 
+  createdTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },
+  createdTimeText: { fontSize: 12, color: '#64748B', fontWeight: '500' },
+
   content: { fontSize: 14, color: '#334155', lineHeight: 21, marginBottom: 10 },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
@@ -830,8 +1059,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#FECDD3',
   },
   rejectText: { fontSize: 13, color: '#BE123C' },
+  charCount: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: -4, marginBottom: 14 },
 
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  btnDisabled: { opacity: 0.55 },
 
   btnReject: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

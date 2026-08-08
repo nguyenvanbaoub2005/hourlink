@@ -38,6 +38,11 @@ public class AppointmentVerification extends BaseEntity {
     @Column(name = "expires_at", nullable = false)
     LocalDateTime expiresAt;
 
+    /** Người tạo/hiển thị mã; người này không được tự xác minh mã của mình. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "generated_by")
+    User generatedBy;
+
     /** Thời gian mã đã được sử dụng/xác minh thành công */
     @Column(name = "verified_at")
     LocalDateTime verifiedAt;
