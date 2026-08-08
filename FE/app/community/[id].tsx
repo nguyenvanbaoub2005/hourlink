@@ -7,6 +7,7 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import CommunityApi from '@api/community';
 import type { ActivityResponse } from '@types';
 import { useAuthStore } from '@store/authStore';
+import { openChatWithUser } from '@utils/chatNav';
 
 export default function ActivityDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -86,12 +87,22 @@ export default function ActivityDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{activity.title}</Text>
         
-        <View style={styles.orgRow}>
+        <TouchableOpacity
+          style={styles.orgRow}
+          onPress={() => openChatWithUser(router, activity.organizerId, activity.organizerName)}
+          disabled={isOrganizer}
+          accessibilityRole="button"
+          accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
+        >
           <View style={styles.avatar}>
             <Text style={styles.avatarLetter}>{activity.organizerName.charAt(0).toUpperCase()}</Text>
           </View>
-          <Text style={styles.orgName}>{activity.organizerName}</Text>
-        </View>
+          <View style={styles.orgText}>
+            <Text style={styles.orgName}>{activity.organizerName}</Text>
+            {!isOrganizer && <Text style={styles.chatLabel}>Nhấn để nhắn tin với người tổ chức</Text>}
+          </View>
+          {!isOrganizer && <Ionicons name="chatbubble-ellipses-outline" size={22} color={Colors.primary} />}
+        </TouchableOpacity>
 
         <View style={styles.infoBox}>
           <View style={styles.infoRow}>
@@ -202,7 +213,9 @@ const styles = StyleSheet.create({
   orgRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   avatarLetter: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  orgText: { flex: 1 },
   orgName: { fontSize: 16, fontWeight: '500', color: Colors.textPrimary },
+  chatLabel: { color: Colors.primary, fontSize: 12, marginTop: 3 },
   
   infoBox: { backgroundColor: '#fff', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },

@@ -6,6 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import CommunityApi from '@api/community';
 import type { ActivityResponse } from '@types';
 import { useAuthStore } from '@store/authStore';
+import { openChatWithUser } from '@utils/chatNav';
 
 export default function CommunityHomeScreen() {
   const router = useRouter();
@@ -54,12 +55,24 @@ export default function CommunityHomeScreen() {
         : `Xem hoạt động ${item.title}`}
     >
       <View style={styles.cardHeader}>
-        <View style={styles.orgInfo}>
+        <TouchableOpacity
+          style={styles.orgInfo}
+          disabled={!user?.id || user.id === item.organizerId}
+          onPress={(event) => {
+            event.stopPropagation();
+            openChatWithUser(router, item.organizerId, item.organizerName);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Nhắn tin với ${item.organizerName}`}
+        >
           <View style={styles.avatar}>
             <Text style={styles.avatarLetter}>{item.organizerName.charAt(0).toUpperCase()}</Text>
           </View>
           <Text style={styles.orgName}>{item.organizerName}</Text>
-        </View>
+          {!!user?.id && user.id !== item.organizerId && (
+            <Ionicons name="chatbubble-ellipses-outline" size={17} color={Colors.primary} style={styles.chatIcon} />
+          )}
+        </TouchableOpacity>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>~{item.creditReward} TC</Text>
         </View>
@@ -157,6 +170,7 @@ const styles = StyleSheet.create({
   avatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
   avatarLetter: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   orgName: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  chatIcon: { marginLeft: 7 },
   badge: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   badgeText: { color: '#D97706', fontSize: 12, fontWeight: 'bold' },
   
