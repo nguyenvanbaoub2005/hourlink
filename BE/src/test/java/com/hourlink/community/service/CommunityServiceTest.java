@@ -140,11 +140,11 @@ class CommunityServiceTest {
     }
 
     @Test
-    void submitEvidence_validImages_replacesPreviousEvidence() throws Exception {
+    void submitEvidence_confirmedParticipant_replacesPreviousEvidence() throws Exception {
         CommunityActivity activity = futureActivity(user("org@hourlink.vn"));
         activity.setStartTime(Instant.now().minusSeconds(7200));
         activity.setEndTime(Instant.now().minusSeconds(3600));
-        ActivityParticipant participant = participant(activity, currentUser, ActivityParticipantStatus.REGISTERED);
+        ActivityParticipant participant = participant(activity, currentUser, ActivityParticipantStatus.CONFIRMED);
         ActivityEvidence previous = ActivityEvidence.builder()
                 .participant(participant).fileUrl("https://old").publicId("old-public-id").build();
         participant.getEvidence().add(previous);

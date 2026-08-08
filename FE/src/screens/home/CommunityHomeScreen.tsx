@@ -86,7 +86,7 @@ export default function CommunityHomeScreen() {
     <View style={styles.container}>
       <View style={styles.shortcutRow}>
         <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/registrations' as any)}>
-          <Ionicons name="bookmark-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Đã đăng ký</Text>
+          <Ionicons name="camera-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Đã đăng ký & minh chứng</Text>
         </TouchableOpacity>
         {canCreate && <TouchableOpacity style={styles.shortcut} onPress={() => router.push('/community/mine' as any)}>
           <Ionicons name="settings-outline" size={18} color={Colors.primary} /><Text style={styles.shortcutText}>Quản lý</Text>

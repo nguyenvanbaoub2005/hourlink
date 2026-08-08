@@ -39,7 +39,7 @@ export default function MyRegistrationsScreen() {
 
   const renderItem = ({ item }: { item: ParticipantResponse }) => {
     const hasEnded = new Date(item.activityEndTime) <= new Date();
-    const canSubmitEvidence = item.status === 'REGISTERED' && hasEnded;
+    const canSubmitEvidence = item.status !== 'CANCELLED' && hasEnded;
     const evidenceCount = item.evidence?.length ?? 0;
 
     return (
@@ -54,7 +54,7 @@ export default function MyRegistrationsScreen() {
           <Text style={styles.credit}>+{item.activityCreditReward} TC {item.creditAwarded ? '· Đã nhận' : '· Chờ xác nhận'}</Text>
         </TouchableOpacity>
 
-        {(canSubmitEvidence || evidenceCount > 0) && (
+        {item.status !== 'CANCELLED' && (
           <TouchableOpacity
             style={styles.evidenceButton}
             onPress={() => router.push(`/community/evidence/${item.activityId}` as any)}
@@ -63,7 +63,7 @@ export default function MyRegistrationsScreen() {
             <Text style={styles.evidenceText}>
               {evidenceCount
                 ? `Đã gửi ${evidenceCount} ảnh · ${canSubmitEvidence ? 'Xem hoặc cập nhật' : 'Xem minh chứng'}`
-                : 'Gửi ảnh minh chứng tham gia'}
+                : canSubmitEvidence ? 'Gửi ảnh minh chứng tham gia' : 'Minh chứng · Gửi sau khi kết thúc'}
             </Text>
             <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
           </TouchableOpacity>

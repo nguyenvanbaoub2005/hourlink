@@ -369,8 +369,8 @@ public class CommunityService {
     }
 
     /**
-     * Gửi mới hoặc thay toàn bộ ảnh minh chứng. Người dùng chỉ được gửi sau khi
-     * hoạt động kết thúc và trước khi tổ chức xác nhận.
+     * Gửi mới hoặc thay toàn bộ ảnh minh chứng sau khi hoạt động kết thúc.
+     * Minh chứng vẫn có thể bổ sung sau xác nhận để lưu hồ sơ và phục vụ đối soát.
      */
     @Transactional
     public ParticipantResponse submitEvidence(UUID activityId, List<MultipartFile> files, String note) {
@@ -379,7 +379,7 @@ public class CommunityService {
                 .findByActivityIdAndUserId(activityId, currentUser.getId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-        if (participant.getStatus() != ActivityParticipantStatus.REGISTERED ||
+        if (participant.getStatus() == ActivityParticipantStatus.CANCELLED ||
                 Instant.now().isBefore(participant.getActivity().getEndTime())) {
             throw new AppException(ErrorCode.EVIDENCE_NOT_ALLOWED);
         }
@@ -522,8 +522,12 @@ public class CommunityService {
 
     private ActivityResponse toResponse(CommunityActivity activity, User currentUser) {
         long count = participantRepo.countByActivityIdAndStatus(activity.getId(), ActivityParticipantStatus.REGISTERED);
-        boolean registered = currentUser != null && participantRepo.existsByActivityIdAndUserIdAndStatus(
-                activity.getId(), currentUser.getId(), ActivityParticipantStatus.REGISTERED);
+        boolean registered = false;
+        if (currentUser != null) {
+            registered = participantRepo.findByActivityIdAndUserId(activity.getId(), currentUser.getId())
+                    .map(p -> p.getStatus() != ActivityParticipantStatus.CANCELLED)
+                    .orElse(false);
+        }
         return ActivityResponse.fromEntity(activity, count, registered);
     }
 

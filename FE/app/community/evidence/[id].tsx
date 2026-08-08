@@ -100,7 +100,9 @@ export default function ActivityEvidenceScreen() {
       const response = await CommunityApi.submitEvidence(id, formData);
       setParticipant(response.data.data);
       setSelected([]);
-      Alert.alert('Đã gửi minh chứng', 'Tổ chức có thể xem ảnh trước khi xác nhận số giờ.');
+      Alert.alert('Đã gửi minh chứng', participant?.status === 'CONFIRMED'
+        ? 'Minh chứng đã được bổ sung vào hồ sơ hoạt động.'
+        : 'Tổ chức có thể xem ảnh trước khi xác nhận số giờ.');
     } catch (error: any) {
       Alert.alert('Không thể gửi', error?.response?.data?.message ?? 'Vui lòng thử lại.');
     } finally {
@@ -112,7 +114,8 @@ export default function ActivityEvidenceScreen() {
     return <SafeAreaView style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></SafeAreaView>;
   }
 
-  const canSubmit = participant.status === 'REGISTERED' && new Date(participant.activityEndTime) <= new Date();
+  const hasEnded = new Date(participant.activityEndTime) <= new Date();
+  const canSubmit = participant.status !== 'CANCELLED' && hasEnded;
   const images = selected.length > 0
     ? selected.map((asset, index) => ({ id: `${asset.uri}-${index}`, url: asset.uri }))
     : (participant.evidence ?? []).map(item => ({ id: item.id, url: item.fileUrl }));
@@ -135,10 +138,17 @@ export default function ActivityEvidenceScreen() {
           <View style={styles.notice}>
             <Ionicons name="information-circle-outline" size={20} color="#92400E" />
             <Text style={styles.noticeText}>
-              {participant.status === 'CONFIRMED'
-                ? 'Bạn đã được xác nhận nên minh chứng không thể chỉnh sửa.'
+              {participant.status === 'CANCELLED'
+                ? 'Đăng ký này đã bị hủy nên không thể gửi minh chứng.'
                 : 'Bạn chỉ có thể gửi minh chứng sau khi hoạt động kết thúc.'}
             </Text>
+          </View>
+        )}
+
+        {participant.status === 'CONFIRMED' && (
+          <View style={styles.confirmedNotice}>
+            <Ionicons name="checkmark-circle-outline" size={20} color="#047857" />
+            <Text style={styles.confirmedNoticeText}>Bạn đã được xác nhận và nhận Credit. Minh chứng gửi thêm sẽ được lưu vào hồ sơ hoạt động.</Text>
           </View>
         )}
 
@@ -219,6 +229,8 @@ const styles = StyleSheet.create({
   meta: { color: Colors.textMuted, marginTop: 6, marginBottom: 18 },
   notice: { flexDirection: 'row', gap: 8, padding: 12, backgroundColor: '#FEF3C7', borderRadius: Radius.md, marginBottom: 18 },
   noticeText: { flex: 1, color: '#92400E', lineHeight: 19 },
+  confirmedNotice: { flexDirection: 'row', gap: 8, padding: 12, backgroundColor: '#D1FAE5', borderRadius: Radius.md, marginBottom: 18 },
+  confirmedNoticeText: { flex: 1, color: '#047857', lineHeight: 19 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginTop: 12, marginBottom: 8 },
   changeText: { color: Colors.primary, fontWeight: '700', marginTop: 12 },
