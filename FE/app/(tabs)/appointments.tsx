@@ -23,8 +23,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   RESCHEDULED: { label: 'Đề xuất đổi lịch', color: '#F97316', bg: '#FFEDD5', icon: 'repeat-outline' },
 };
 
-const TABS = [
-  { id: 'ALL', label: 'Tất cả' },
+type AppointmentTab = 'UPCOMING' | 'IN_PROGRESS' | 'HISTORY';
+
+const TABS: { id: AppointmentTab; label: string }[] = [
   { id: 'UPCOMING', label: 'Sắp tới' },
   { id: 'IN_PROGRESS', label: 'Đang diễn ra' },
   { id: 'HISTORY', label: 'Lịch sử' },
@@ -33,17 +34,47 @@ const TABS = [
 export default function AppointmentsScreen() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
-  const [activeTab, setActiveTab] = useState<string>('UPCOMING');
+  const [activeTab, setActiveTab] = useState<AppointmentTab>('UPCOMING');
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [tabCounts, setTabCounts] = useState<Record<AppointmentTab, number>>({
+    UPCOMING: 0,
+    IN_PROGRESS: 0,
+    HISTORY: 0,
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchTabCounts = useCallback(async () => {
+    const countEntries = await Promise.all(TABS.map(async ({ id: tabId }) => {
+      try {
+        const response = await AppointmentApi.getMyAppointments(tabId, 0, 1);
+        const pageData = response.data?.data;
+        const count = Array.isArray(pageData)
+          ? pageData.length
+          : pageData?.totalElements ?? pageData?.content?.length ?? 0;
+        return [tabId, count] as const;
+      } catch (error) {
+        console.error(`Failed to fetch ${tabId} appointment count:`, error);
+        return null;
+      }
+    }));
+
+    setTabCounts((current) => {
+      const next = { ...current };
+      countEntries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+      return next;
+    });
+  }, []);
 
   const fetchAppointments = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
     try {
+      const countsPromise = fetchTabCounts();
       const res = await AppointmentApi.getMyAppointments(activeTab, 0, 50);
       if (res.data?.data?.content) {
         setAppointments(res.data.data.content);
@@ -52,6 +83,7 @@ export default function AppointmentsScreen() {
       } else {
         setAppointments([]);
       }
+      await countsPromise;
     } catch (error: any) {
       console.error('Failed to fetch appointments:', error);
       Alert.alert('Lỗi', 'Không thể tải danh sách lịch hẹn. Vui lòng thử lại.');
@@ -59,7 +91,7 @@ export default function AppointmentsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab]);
+  }, [activeTab, fetchTabCounts]);
 
   useFocusEffect(
     useCallback(() => {
@@ -274,30 +306,28 @@ export default function AppointmentsScreen() {
 
       {/* Filter Tabs */}
       <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'UPCOMING' && styles.tabItemActive]}
-          onPress={() => setActiveTab('UPCOMING')}
-        >
-          <Text style={[styles.tabText, activeTab === 'UPCOMING' && styles.tabTextActive]}>
-            Sắp tới
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'IN_PROGRESS' && styles.tabItemActive]}
-          onPress={() => setActiveTab('IN_PROGRESS')}
-        >
-          <Text style={[styles.tabText, activeTab === 'IN_PROGRESS' && styles.tabTextActive]}>
-            Đang diễn ra
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'HISTORY' && styles.tabItemActive]}
-          onPress={() => setActiveTab('HISTORY')}
-        >
-          <Text style={[styles.tabText, activeTab === 'HISTORY' && styles.tabTextActive]}>
-            Lịch sử
-          </Text>
-        </TouchableOpacity>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const count = tabCounts[tab.id];
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tabItem, isActive && styles.tabItemActive]}
+              onPress={() => setActiveTab(tab.id)}
+            >
+              <View style={styles.tabLabelRow}>
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
+                {count > 0 && (
+                  <View style={[styles.tabCountBadge, isActive && styles.tabCountBadgeActive]}>
+                    <Text style={[styles.tabCountText, isActive && styles.tabCountTextActive]}>
+                      {count > 99 ? '99+' : count}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Content */}
@@ -354,8 +384,16 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabItemActive: { borderBottomColor: Colors.primary },
+  tabLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   tabText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
   tabTextActive: { color: Colors.primary },
+  tabCountBadge: {
+    minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0',
+  },
+  tabCountBadgeActive: { backgroundColor: Colors.primary },
+  tabCountText: { fontSize: 10, lineHeight: 12, fontWeight: '700', color: Colors.textSecondary },
+  tabCountTextActive: { color: '#FFF' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: Colors.textSecondary, fontSize: 14 },
