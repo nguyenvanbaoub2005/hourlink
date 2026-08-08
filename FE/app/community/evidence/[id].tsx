@@ -17,7 +17,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import CommunityApi from '@api/community';
 import { Colors, Radius, Spacing } from '@constants/Colors';
-import type { ParticipantResponse } from '@types';
+import type { ActivityResponse, ParticipantResponse } from '@types';
+import { openChatWithUser } from '@utils/chatNav';
 
 const MAX_IMAGES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -26,6 +27,7 @@ export default function ActivityEvidenceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [participant, setParticipant] = useState<ParticipantResponse | null>(null);
+  const [activity, setActivity] = useState<ActivityResponse | null>(null);
   const [selected, setSelected] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
@@ -34,10 +36,14 @@ export default function ActivityEvidenceScreen() {
 
   const load = async () => {
     try {
-      const response = await CommunityApi.getMyParticipation(id);
-      const data = response.data.data;
-      setParticipant(data);
-      setNote(data.evidenceNote ?? '');
+      const [participationResponse, activityResponse] = await Promise.all([
+        CommunityApi.getMyParticipation(id),
+        CommunityApi.getActivityDetail(id),
+      ]);
+      const participation = participationResponse.data.data;
+      setParticipant(participation);
+      setActivity(activityResponse.data.data);
+      setNote(participation.evidenceNote ?? '');
     } catch (error: any) {
       Alert.alert('Lỗi', error?.response?.data?.message ?? 'Không thể tải thông tin tham gia.');
       router.back();
@@ -134,6 +140,24 @@ export default function ActivityEvidenceScreen() {
         <Text style={styles.activityTitle}>{participant.activityTitle}</Text>
         <Text style={styles.meta}>Kết thúc: {new Date(participant.activityEndTime).toLocaleString('vi-VN')}</Text>
 
+        {!!activity && (
+          <TouchableOpacity
+            style={styles.chatButton}
+            onPress={() => openChatWithUser(router, activity.organizerId, activity.organizerName)}
+            accessibilityRole="button"
+            accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
+          >
+            <View style={styles.chatAvatar}>
+              <Text style={styles.chatAvatarText}>{activity.organizerName.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.chatBody}>
+              <Text style={styles.chatTitle}>Chat với người tổ chức</Text>
+              <Text style={styles.chatName}>{activity.organizerName}</Text>
+            </View>
+            <Ionicons name="chatbubble-ellipses-outline" size={23} color={Colors.primary} />
+          </TouchableOpacity>
+        )}
+
         {!canSubmit && (
           <View style={styles.notice}>
             <Ionicons name="information-circle-outline" size={20} color="#92400E" />
@@ -229,6 +253,12 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.md, paddingBottom: 36 },
   activityTitle: { fontSize: 21, fontWeight: '700', color: Colors.textPrimary },
   meta: { color: Colors.textMuted, marginTop: 6, marginBottom: 18 },
+  chatButton: { flexDirection: 'row', alignItems: 'center', padding: 12, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, backgroundColor: '#FFFFFF', marginBottom: 18 },
+  chatAvatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary, marginRight: 10 },
+  chatAvatarText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+  chatBody: { flex: 1 },
+  chatTitle: { color: Colors.textPrimary, fontWeight: '700', fontSize: 14 },
+  chatName: { color: Colors.textMuted, fontSize: 12, marginTop: 2 },
   notice: { flexDirection: 'row', gap: 8, padding: 12, backgroundColor: '#FEF3C7', borderRadius: Radius.md, marginBottom: 18 },
   noticeText: { flex: 1, color: '#92400E', lineHeight: 19 },
   confirmedNotice: { flexDirection: 'row', gap: 8, padding: 12, backgroundColor: '#D1FAE5', borderRadius: Radius.md, marginBottom: 18 },
