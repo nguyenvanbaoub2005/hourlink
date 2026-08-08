@@ -484,6 +484,10 @@ export default function ChatRoomScreen() {
       Alert.alert('Thiếu thông tin', 'Hình thức Online yêu cầu cung cấp link họp (Google Meet, Zoom...).');
       return;
     }
+    if (aptFormat === 'ONLINE' && !/^https?:\/\//i.test(aptLocation.trim())) {
+      Alert.alert('Link chưa hợp lệ', 'Link họp phải bắt đầu bằng http:// hoặc https://');
+      return;
+    }
 
     // Xác định provider/receiver từ invitation (để đúng nghiệp vụ)
     const invitationSenderId = conversation?.invitationSenderId;
@@ -713,8 +717,13 @@ export default function ChatRoomScreen() {
         {item.type === 'APPOINTMENT_CARD' && (() => {
           let aptData: any = {};
           try { aptData = item.appointmentData ? JSON.parse(item.appointmentData) : {}; } catch {}
-          const isPending = aptData.status === 'PENDING';
-          const isOtherPerson = !isMine; // người không tạo lịch
+          const isAwaitingResponse = aptData.status === 'PENDING' || aptData.status === 'RESCHEDULED';
+          const canRespond = aptData.proposedById
+            ? aptData.proposedById !== user?.id
+            : !isMine;
+          const endAt = Date.parse(`${aptData.date}T${aptData.end?.slice(0, 8) || '00:00:00'}`);
+          const isExpired = Number.isFinite(endAt) && endAt < Date.now();
+          const canAccept = canRespond && !isExpired;
           return (
             <View style={{
               backgroundColor: isMine ? '#F0FDFA' : '#FFFFFF',
@@ -747,11 +756,18 @@ export default function ChatRoomScreen() {
                   </Text>
                 </View>
               </View>
-              {isPending && isOtherPerson && item.appointmentId && (
+              {isAwaitingResponse && canAccept && item.appointmentId && (
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity
                     style={{ flex: 1, backgroundColor: '#0D9488', borderRadius: 8, paddingVertical: 7, alignItems: 'center' }}
                     onPress={async () => {
+                      if (aptData.meetingType === 'ONLINE' && !/^https?:\/\//i.test(aptData.locationOrLink || '')) {
+                        Alert.alert('Thiếu link họp', 'Mở chi tiết lịch hẹn để bổ sung link trước khi chấp nhận.', [
+                          { text: 'Để sau', style: 'cancel' },
+                          { text: 'Mở chi tiết', onPress: () => router.push(`/appointment/${item.appointmentId}` as any) },
+                        ]);
+                        return;
+                      }
                       try {
                         await AppointmentApi.respond(item.appointmentId!.toString(), { action: 'CONFIRM' });
                         await fetchMessages();
@@ -783,7 +799,14 @@ export default function ChatRoomScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {!isPending && (
+              {isAwaitingResponse && !canAccept && (
+                <View style={{ backgroundColor: '#FEF3C7', borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309' }}>
+                    {isExpired ? 'Đã quá giờ · mở chi tiết để đổi lịch' : 'Đang chờ người còn lại phản hồi'}
+                  </Text>
+                </View>
+              )}
+              {!isAwaitingResponse && (
                 <View style={{ backgroundColor: aptData.status === 'CONFIRMED' ? '#DCFCE7' : '#FEE2E2', borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, alignItems: 'center' }}>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: aptData.status === 'CONFIRMED' ? '#15803D' : '#DC2626' }}>
                     {aptData.status === 'CONFIRMED' ? '✓ Đã xác nhận' : aptData.status === 'CANCELLED' ? '✗ Đã hủy' : aptData.status}

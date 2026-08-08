@@ -9,6 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
+import { useAuthStore } from '@store/authStore';
 import type { AppointmentItem } from '@types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -31,6 +32,7 @@ const TABS = [
 
 export default function AppointmentsScreen() {
   const router = useRouter();
+  const currentUser = useAuthStore((state) => state.user);
   const [activeTab, setActiveTab] = useState<string>('UPCOMING');
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -108,6 +110,10 @@ export default function AppointmentsScreen() {
     const titleStr = item.title || (item as any).content || 'Buổi hỗ trợ kỹ năng';
     const tcAmount = item.timeCreditAmount || (item as any).timeCredit || 1;
     const isOffline = item.meetingType?.toUpperCase() === 'OFFLINE' || (item as any).format === 'offline';
+    const canRespond = !item.proposedById || item.proposedById !== currentUser?.id;
+    const endAt = Date.parse(`${item.appointmentDate}T${item.endTime?.slice(0, 8) || '00:00:00'}`);
+    const isExpired = Number.isFinite(endAt) && endAt < Date.now();
+    const canAccept = canRespond && !isExpired;
 
     return (
       <TouchableOpacity
@@ -182,11 +188,26 @@ export default function AppointmentsScreen() {
 
         {/* Actions Row */}
         <View style={styles.actionsContainer}>
-          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && (
+          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && canAccept && (
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.btn, styles.btnConfirm]}
-                onPress={() => handleRespond(item.id, 'CONFIRM', titleStr)}
+                onPress={() => {
+                  const location = item.locationOrLink?.trim() || '';
+                  const validLocation = isOffline ? location.length > 0 : /^https?:\/\//i.test(location);
+                  if (!validLocation) {
+                    Alert.alert(
+                      isOffline ? 'Thiếu địa điểm' : 'Thiếu link họp',
+                      `Mở chi tiết lịch hẹn để bổ sung ${isOffline ? 'địa điểm' : 'link họp'} trước khi chấp nhận.`,
+                      [
+                        { text: 'Để sau', style: 'cancel' },
+                        { text: 'Mở chi tiết', onPress: () => router.push(`/appointment/${item.id}` as any) },
+                      ]
+                    );
+                    return;
+                  }
+                  handleRespond(item.id, 'CONFIRM', titleStr);
+                }}
                 disabled={isLoading}
               >
                 {isLoading ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.btnTextWhite}>Chấp nhận</Text>}
@@ -198,6 +219,15 @@ export default function AppointmentsScreen() {
               >
                 <Text style={styles.btnTextCancel}>Từ chối</Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && !canAccept && (
+            <View style={styles.waitingBox}>
+              <Ionicons name={isExpired ? 'alert-circle-outline' : 'hourglass-outline'} size={15} color="#B45309" />
+              <Text style={styles.waitingText}>
+                {isExpired ? 'Đã quá giờ · mở chi tiết để đổi lịch' : 'Đang chờ người còn lại phản hồi'}
+              </Text>
             </View>
           )}
 
@@ -438,6 +468,12 @@ const styles = StyleSheet.create({
   btnVerify: { backgroundColor: '#0D9488' },
   btnComplete: { backgroundColor: '#9333EA' },
   btnDetail: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: Colors.border },
+  waitingBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+    paddingVertical: 10, borderRadius: Radius.md,
+  },
+  waitingText: { color: '#B45309', fontSize: 13, fontWeight: '600' },
 
   btnTextWhite: { color: '#FFF', fontWeight: '600', fontSize: 13 },
   btnTextCancel: { color: '#DC2626', fontWeight: '600', fontSize: 13 },

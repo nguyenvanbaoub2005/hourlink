@@ -3,6 +3,8 @@ package com.hourlink.appointment.dto.request;
 import com.hourlink.skill.enums.SessionFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import java.time.LocalDate;
@@ -43,6 +45,8 @@ public class CreateAppointmentRequest {
     @NotBlank(message = "Địa điểm hoặc link họp không được để trống")
     String locationOrLink;
 
+    @DecimalMin(value = "0.5", message = "Time Credit tối thiểu là 0.5 TC")
+    @DecimalMax(value = "24.0", message = "Time Credit tối đa là 24 TC")
     Double timeCreditAmount;
 
     String notes;

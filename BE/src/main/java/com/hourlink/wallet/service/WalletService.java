@@ -95,7 +95,7 @@ public class WalletService {
      */
     @Transactional
     public void holdCredit(User receiver, Double amount, Appointment appointment) {
-        Wallet wallet = getWalletByUser(receiver);
+        Wallet wallet = getLockedWalletByUser(receiver);
 
         if (wallet.getBalance() < amount) {
             throw new AppException(ErrorCode.INSUFFICIENT_CREDIT);
@@ -123,7 +123,7 @@ public class WalletService {
         Double amount  = appointment.getTimeCreditAmount();
 
         // --- Receiver: release hold → SPEND ---
-        Wallet receiverWallet = getWalletByUser(receiver);
+        Wallet receiverWallet = getLockedWalletByUser(receiver);
         if (receiverWallet.getHeldAmount() < amount) {
             // Fallback: trừ thẳng balance nếu chưa hold (trường hợp bất thường)
             log.warn("transferCredit: held_amount < amount for receiver [{}]. Deducting from balance.", receiver.getId());
@@ -142,7 +142,7 @@ public class WalletService {
                 "Thanh toán cho lịch hẹn: " + appointment.getTitle());
 
         // --- Provider: EARN ---
-        Wallet providerWallet = getWalletByUser(provider);
+        Wallet providerWallet = getLockedWalletByUser(provider);
         providerWallet.setBalance(providerWallet.getBalance() + amount);
         providerWallet.setTotalEarned(providerWallet.getTotalEarned() + amount);
         walletRepository.save(providerWallet);
@@ -164,7 +164,7 @@ public class WalletService {
         User receiver = appointment.getReceiver();
         Double amount  = appointment.getTimeCreditAmount();
 
-        Wallet wallet = getWalletByUser(receiver);
+        Wallet wallet = getLockedWalletByUser(receiver);
 
         // Chỉ release nếu thực sự đang hold
         if (wallet.getHeldAmount() <= 0) {
@@ -191,6 +191,11 @@ public class WalletService {
     /** Tìm ví theo user; tự động tạo nếu chưa có (dành cho acc cũ). */
     public Wallet getWalletByUser(User user) {
         return walletRepository.findByUserId(user.getId())
+                .orElseGet(() -> initWallet(user));
+    }
+
+    private Wallet getLockedWalletByUser(User user) {
+        return walletRepository.findByUserIdForUpdate(user.getId())
                 .orElseGet(() -> initWallet(user));
     }
 

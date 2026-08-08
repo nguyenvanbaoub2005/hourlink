@@ -305,6 +305,8 @@ export interface Appointment {
   receiverId?: string;
   receiverName?: string;
   receiverAvatarUrl?: string;
+  proposedById?: string;
+  proposedByName?: string;
   invitationId?: string;
   skillId?: string;
   skillName?: string;
@@ -341,6 +343,7 @@ export interface AppointmentVerification {
   method: VerificationMethod;
   code: string;
   expiresAt?: string;
+  generatedById?: string;
   verifiedAt?: string;
   verifiedById?: string;
   createdAt?: string;

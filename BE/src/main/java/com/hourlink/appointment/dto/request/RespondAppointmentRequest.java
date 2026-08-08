@@ -4,6 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 @Getter @Setter @Builder @AllArgsConstructor @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class RespondAppointmentRequest {
@@ -14,6 +17,12 @@ public class RespondAppointmentRequest {
     String reason;
 
     String newTime;
+
+    LocalDate newAppointmentDate;
+
+    LocalTime newStartTime;
+
+    LocalTime newEndTime;
 
     String locationOrLink;
 }

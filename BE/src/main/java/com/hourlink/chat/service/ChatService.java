@@ -495,12 +495,12 @@ public class ChatService {
      */
     @Transactional
     public void updateAppointmentCardData(UUID appointmentId, String newAptData) {
-        int updated = chatMessageRepository.updateAppointmentData(appointmentId, newAptData);
-        if (updated > 0 && firebaseService.isEnabled()) {
-            // Push 1 sự kiện giả để trigger realtime message refetch trên client
-            // Cách đơn giản nhất là đẩy vào 1 node update_trigger nào đó, 
-            // hoặc vì client tự động getMessages nếu mở chat nên chỉ cần DB update là đủ.
-            log.info("Updated appointment card data for appointment {} ({} messages)", appointmentId, updated);
+        List<ChatMessage> cards = chatMessageRepository.findAllByAppointmentId(appointmentId);
+        cards.forEach(card -> card.setAppointmentData(newAptData));
+        chatMessageRepository.saveAll(cards);
+        cards.forEach(card -> mirrorMessage(card.getConversation(), card));
+        if (!cards.isEmpty()) {
+            log.info("Updated appointment card data for appointment {} ({} messages)", appointmentId, cards.size());
         }
     }
 

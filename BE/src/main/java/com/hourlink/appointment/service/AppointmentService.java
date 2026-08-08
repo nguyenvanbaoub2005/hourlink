@@ -12,6 +12,7 @@ import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.util.SecurityUtil;
 import com.hourlink.invitation.entity.Invitation;
+import com.hourlink.invitation.enums.InvitationStatus;
 import com.hourlink.invitation.repository.InvitationRepository;
 import com.hourlink.notification.enums.NotificationType;
 import com.hourlink.notification.service.NotificationService;
@@ -30,8 +31,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 import java.util.UUID;
 
@@ -68,23 +72,37 @@ public class AppointmentService {
         User receiver = userRepository.findById(req.getReceiverId())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (provider.getId().equals(receiver.getId())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Người hỗ trợ và người nhận phải là hai người khác nhau.");
+        }
+
         Invitation invitation = null;
         if (req.getInvitationId() != null) {
-            invitation = invitationRepository.findById(req.getInvitationId())
+            invitation = invitationRepository.findByIdForUpdate(req.getInvitationId())
                     .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
+            validateInvitationForAppointment(invitation, provider, receiver);
+            if (appointmentRepository.findByInvitationId(invitation.getId()).isPresent()) {
+                throw new AppException(ErrorCode.INVALID_REQUEST, "Lời mời này đã được tạo lịch hẹn.");
+            }
         }
 
         Skill skill = null;
         if (req.getSkillId() != null) {
             skill = skillRepository.findById(req.getSkillId())
                     .orElseThrow(() -> new AppException(ErrorCode.SKILL_NOT_FOUND));
+            if (invitation != null && invitation.getSkill() != null
+                    && !invitation.getSkill().getId().equals(skill.getId())) {
+                throw new AppException(ErrorCode.INVALID_REQUEST, "Kỹ năng của lịch hẹn không khớp với lời mời.");
+            }
+        } else if (invitation != null) {
+            skill = invitation.getSkill();
         }
 
-        // Validate: nếu hình thức Online thì người tạo phải cung cấp link họp
-        if (req.getMeetingType() == SessionFormat.ONLINE) {
-            if (req.getLocationOrLink() == null || req.getLocationOrLink().trim().isEmpty()) {
-                throw new AppException(ErrorCode.INVALID_REQUEST, "Hình thức Online yêu cầu cung cấp link họp.");
-            }
+        validateSchedule(req.getAppointmentDate(), req.getStartTime(), req.getEndTime());
+        validateMeetingDetails(req.getMeetingType(), req.getLocationOrLink());
+        if (req.getTimeCreditAmount() != null
+                && (req.getTimeCreditAmount() < 0.5 || req.getTimeCreditAmount() > 24.0)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Time Credit phải nằm trong khoảng 0.5 đến 24 TC.");
         }
 
         // Validate: người tạo phải là 1 trong 2 bên
@@ -97,6 +115,7 @@ public class AppointmentService {
         Appointment appointment = Appointment.builder()
                 .provider(provider)
                 .receiver(receiver)
+                .proposedBy(currentUser)
                 .invitation(invitation)
                 .skill(skill)
                 .title(req.getTitle())
@@ -139,7 +158,8 @@ public class AppointmentService {
     private String buildAppointmentCardData(Appointment apt) {
         return String.format(
             "{\"id\":\"%s\",\"title\":\"%s\",\"date\":\"%s\",\"start\":\"%s\",\"end\":\"%s\"," +
-            "\"meetingType\":\"%s\",\"locationOrLink\":\"%s\",\"timeCreditAmount\":%s,\"status\":\"%s\"}",
+            "\"meetingType\":\"%s\",\"locationOrLink\":\"%s\",\"timeCreditAmount\":%s," +
+            "\"status\":\"%s\",\"proposedById\":\"%s\"}",
             apt.getId(),
             apt.getTitle() != null ? apt.getTitle().replace("\"", "'") : "",
             apt.getAppointmentDate(),
@@ -148,7 +168,8 @@ public class AppointmentService {
             apt.getMeetingType(),
             apt.getLocationOrLink() != null ? apt.getLocationOrLink().replace("\"", "'") : "",
             apt.getTimeCreditAmount(),
-            apt.getStatus()
+            apt.getStatus(),
+            apt.getProposedBy() != null ? apt.getProposedBy().getId() : ""
         );
     }
 
@@ -159,7 +180,10 @@ public class AppointmentService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("appointmentDate").descending().and(Sort.by("startTime").descending()));
+        Sort sort = "UPCOMING".equalsIgnoreCase(tab)
+                ? Sort.by("appointmentDate").ascending().and(Sort.by("startTime").ascending())
+                : Sort.by("appointmentDate").descending().and(Sort.by("startTime").descending());
+        Pageable pageable = PageRequest.of(page, size, sort);
         UUID userId = currentUser.getId();
 
         Page<Appointment> appointmentPage;
@@ -190,27 +214,35 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse respondAppointment(UUID id, RespondAppointmentRequest req) {
-        Appointment appointment = getAppointmentById(id);
+        Appointment appointment = getAppointmentByIdForUpdate(id);
         User currentUser = checkUserAccess(appointment);
         User targetUser = currentUser.getId().equals(appointment.getProvider().getId())
                 ? appointment.getReceiver() : appointment.getProvider();
 
-        String action = req.getAction() != null ? req.getAction().toUpperCase() : "";
+        String action = req.getAction() != null ? req.getAction().trim().toUpperCase(Locale.ROOT) : "";
 
         if ("CONFIRM".equals(action)) {
-            // Cả hai bên đều có thể xác nhận lịch hẹn (người không tạo thì xác nhận đồng ý)
             if (appointment.getStatus() != AppointmentStatus.PENDING && appointment.getStatus() != AppointmentStatus.RESCHEDULED) {
                 throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
             }
-            if (appointment.getMeetingType() == SessionFormat.ONLINE) {
-                if (appointment.getLocationOrLink() == null || appointment.getLocationOrLink().trim().isEmpty()) {
-                    if (req.getLocationOrLink() == null || req.getLocationOrLink().trim().isEmpty()) {
-                        throw new AppException(ErrorCode.INVALID_REQUEST, "Hình thức Online yêu cầu cung cấp link họp khi xác nhận.");
-                    }
-                    appointment.setLocationOrLink(req.getLocationOrLink());
-                }
+            if (LocalDateTime.of(appointment.getAppointmentDate(), appointment.getEndTime())
+                    .isBefore(LocalDateTime.now())) {
+                throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS,
+                        "Lịch hẹn đã quá giờ. Vui lòng đề xuất thời gian mới trước khi chấp nhận.");
             }
+            if (appointment.getProposedBy() != null
+                    && appointment.getProposedBy().getId().equals(currentUser.getId())) {
+                throw new AppException(ErrorCode.ACCESS_DENIED, "Người tạo đề xuất không thể tự chấp nhận lịch hẹn.");
+            }
+            String currentLocation = appointment.getLocationOrLink();
+            boolean needsOnlineLink = appointment.getMeetingType() == SessionFormat.ONLINE
+                    && (isBlank(currentLocation) || !currentLocation.trim().matches("(?i)^https?://.+"));
+            String locationOrLink = isBlank(currentLocation) || needsOnlineLink
+                    ? req.getLocationOrLink() : currentLocation;
+            validateMeetingDetails(appointment.getMeetingType(), locationOrLink);
+            appointment.setLocationOrLink(locationOrLink.trim());
             appointment.setStatus(AppointmentStatus.CONFIRMED);
+            appointment.setRescheduleProposedTime(null);
             // Wallet Hook: Tạm giữ Time Credit của receiver khi xác nhận lịch
             walletService.holdCredit(appointment.getReceiver(), appointment.getTimeCreditAmount(), appointment);
             notificationService.createNotification(targetUser, currentUser, NotificationType.APPOINTMENT_CONFIRMED,
@@ -218,7 +250,8 @@ public class AppointmentService {
                     currentUser.getFullName() + " đã xác nhận lịch hẹn: " + appointment.getTitle(),
                     appointment.getId());
         } else if ("CANCEL".equals(action)) {
-            if (appointment.getStatus() == AppointmentStatus.COMPLETED) {
+            if (!List.of(AppointmentStatus.PENDING, AppointmentStatus.RESCHEDULED,
+                    AppointmentStatus.CONFIRMED, AppointmentStatus.UPCOMING).contains(appointment.getStatus())) {
                 throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
             }
             AppointmentStatus previousStatus = appointment.getStatus();
@@ -236,34 +269,56 @@ public class AppointmentService {
                     currentUser.getFullName() + " đã hủy lịch hẹn. Lý do: " + (req.getReason() != null ? req.getReason() : "Không có"),
                     appointment.getId());
         } else if ("RESCHEDULE".equals(action)) {
+            if (!List.of(AppointmentStatus.PENDING, AppointmentStatus.RESCHEDULED,
+                    AppointmentStatus.CONFIRMED, AppointmentStatus.UPCOMING).contains(appointment.getStatus())) {
+                throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
+            }
+            if (req.getNewAppointmentDate() == null || req.getNewStartTime() == null || req.getNewEndTime() == null) {
+                throw new AppException(ErrorCode.INVALID_REQUEST,
+                        "Vui lòng cung cấp đầy đủ ngày, giờ bắt đầu và giờ kết thúc mới.");
+            }
+            validateSchedule(req.getNewAppointmentDate(), req.getNewStartTime(), req.getNewEndTime());
+            AppointmentStatus previousStatus = appointment.getStatus();
+            if (previousStatus == AppointmentStatus.CONFIRMED || previousStatus == AppointmentStatus.UPCOMING) {
+                walletService.releaseCredit(appointment);
+            }
+            appointment.setAppointmentDate(req.getNewAppointmentDate());
+            appointment.setStartTime(req.getNewStartTime());
+            appointment.setEndTime(req.getNewEndTime());
             appointment.setStatus(AppointmentStatus.RESCHEDULED);
-            appointment.setRescheduleProposedTime(req.getNewTime());
+            appointment.setProposedBy(currentUser);
+            String proposedTime = req.getNewAppointmentDate() + " "
+                    + req.getNewStartTime() + "-" + req.getNewEndTime();
+            appointment.setRescheduleProposedTime(proposedTime);
             notificationService.createNotification(targetUser, currentUser, NotificationType.APPOINTMENT_RESCHEDULED,
                     "Đề xuất đổi thời gian lịch hẹn",
-                    currentUser.getFullName() + " đề xuất đổi thời gian thành: " + req.getNewTime(),
+                    currentUser.getFullName() + " đề xuất đổi thời gian thành: " + proposedTime,
                     appointment.getId());
         } else {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
 
         Appointment saved = appointmentRepository.save(appointment);
-        try {
-            chatService.updateAppointmentCardData(saved.getId(), buildAppointmentCardData(saved));
-        } catch (Exception e) {
-            log.warn("Failed to update chat appointment card for apt {}", saved.getId(), e);
-        }
-        return AppointmentResponse.fromEntity(saved);
+        AppointmentResponse response = AppointmentResponse.fromEntity(saved);
+        updateAppointmentCardFailSoft(saved);
+        return response;
     }
 
     // ─── 4. Xác nhận bằng QR hoặc OTP (9.14) ────────────────────────────────
 
     @Transactional
     public AppointmentVerificationResponse generateVerificationCode(UUID id) {
-        Appointment appointment = getAppointmentById(id);
-        checkUserAccess(appointment);
+        Appointment appointment = getAppointmentByIdForUpdate(id);
+        User currentUser = checkUserAccess(appointment);
 
         if (appointment.getStatus() != AppointmentStatus.CONFIRMED && appointment.getStatus() != AppointmentStatus.UPCOMING) {
             throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
+        }
+
+        var existing = verificationRepository.findTopByAppointmentIdOrderByCreatedAtDesc(id);
+        if (existing.isPresent() && existing.get().getVerifiedAt() == null
+                && LocalDateTime.now().isBefore(existing.get().getExpiresAt())) {
+            return AppointmentVerificationResponse.fromEntity(existing.get());
         }
 
         VerificationMethod method = (appointment.getMeetingType() == SessionFormat.OFFLINE)
@@ -283,6 +338,7 @@ public class AppointmentService {
                 .method(method)
                 .code(code)
                 .expiresAt(appointmentEndDateTime.plusHours(1)) // Hết hạn sau 1 tiếng kể từ lúc lịch hẹn kết thúc
+                .generatedBy(currentUser)
                 .build();
 
         verification = verificationRepository.save(verification);
@@ -292,14 +348,24 @@ public class AppointmentService {
 
     @Transactional
     public AppointmentResponse verifyCode(UUID id, VerifyCodeRequest req) {
-        Appointment appointment = getAppointmentById(id);
+        Appointment appointment = getAppointmentByIdForUpdate(id);
         User currentUser = checkUserAccess(appointment);
+
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED
+                && appointment.getStatus() != AppointmentStatus.UPCOMING) {
+            throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
+        }
 
         AppointmentVerification verification = verificationRepository.findByAppointmentIdAndCode(id, req.getCode().trim())
                 .orElseThrow(() -> new AppException(ErrorCode.VERIFICATION_INVALID));
 
-        if (LocalDateTime.now().isAfter(verification.getExpiresAt())) {
+        if (verification.getVerifiedAt() != null || LocalDateTime.now().isAfter(verification.getExpiresAt())) {
             throw new AppException(ErrorCode.VERIFICATION_INVALID);
+        }
+        if (verification.getGeneratedBy() != null
+                && verification.getGeneratedBy().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.ACCESS_DENIED,
+                    "Bạn không thể tự xác minh mã do chính mình tạo. Hãy để người còn lại quét hoặc nhập mã.");
         }
 
         verification.setVerifiedAt(LocalDateTime.now());
@@ -307,7 +373,7 @@ public class AppointmentService {
         verificationRepository.save(verification);
 
         appointment.setStatus(AppointmentStatus.IN_PROGRESS);
-        appointmentRepository.save(appointment);
+        Appointment saved = appointmentRepository.save(appointment);
 
         User targetUser = currentUser.getId().equals(appointment.getProvider().getId())
                 ? appointment.getReceiver() : appointment.getProvider();
@@ -317,18 +383,24 @@ public class AppointmentService {
                 appointment.getId());
 
         log.info("Verified appointment ID [{}] successfully by user [{}]", id, currentUser.getEmail());
-        return AppointmentResponse.fromEntity(appointment);
+        AppointmentResponse response = AppointmentResponse.fromEntity(saved);
+        updateAppointmentCardFailSoft(saved);
+        return response;
     }
 
     // ─── 5. Xác nhận kết thúc và chuyển Time Credit (9.15) ──────────────────
 
     @Transactional
     public AppointmentResponse confirmCompletion(UUID id, ConfirmCompletionRequest req) {
-        Appointment appointment = getAppointmentById(id);
+        Appointment appointment = getAppointmentByIdForUpdate(id);
         User currentUser = checkUserAccess(appointment);
 
-        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS && appointment.getStatus() != AppointmentStatus.CONFIRMED) {
+        if (appointment.getStatus() != AppointmentStatus.IN_PROGRESS) {
             throw new AppException(ErrorCode.APPOINTMENT_INVALID_STATUS);
+        }
+
+        if (Boolean.TRUE.equals(req.getHasIssue()) && isBlank(req.getIssueDescription())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Vui lòng mô tả vấn đề phát sinh.");
         }
 
         if (completionRepository.existsByAppointmentIdAndUserId(id, currentUser.getId())) {
@@ -347,7 +419,6 @@ public class AppointmentService {
         completionRepository.save(completion);
 
         List<AppointmentCompletion> allCompletions = completionRepository.findByAppointmentId(id);
-        allCompletions.add(completion); // bao gồm cả bản ghi vừa thêm
 
         boolean anyIssue = allCompletions.stream().anyMatch(c -> Boolean.TRUE.equals(c.getHasIssue()));
         if (anyIssue) {
@@ -379,7 +450,13 @@ public class AppointmentService {
                     appointment.getId());
         }
 
-        return AppointmentResponse.fromEntity(appointmentRepository.save(appointment));
+        Appointment saved = appointmentRepository.save(appointment);
+        AppointmentResponse response = AppointmentResponse.fromEntity(saved);
+        if (saved.getStatus() == AppointmentStatus.COMPLETED
+                || saved.getStatus() == AppointmentStatus.DISPUTED) {
+            updateAppointmentCardFailSoft(saved);
+        }
+        return response;
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -387,6 +464,60 @@ public class AppointmentService {
     private Appointment getAppointmentById(UUID id) {
         return appointmentRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.APPOINTMENT_NOT_FOUND));
+    }
+
+    private Appointment getAppointmentByIdForUpdate(UUID id) {
+        return appointmentRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new AppException(ErrorCode.APPOINTMENT_NOT_FOUND));
+    }
+
+    private void validateInvitationForAppointment(Invitation invitation, User provider, User receiver) {
+        if (invitation.getStatus() != InvitationStatus.ACCEPTED) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Chỉ có thể tạo lịch từ lời mời đã được chấp nhận.");
+        }
+        if (!invitation.getReceiver().getId().equals(provider.getId())
+                || !invitation.getSender().getId().equals(receiver.getId())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Người hỗ trợ/người nhận không khớp với lời mời.");
+        }
+    }
+
+    private void validateSchedule(LocalDate date, LocalTime startTime, LocalTime endTime) {
+        if (date == null || startTime == null || endTime == null || !endTime.isAfter(startTime)) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Giờ kết thúc phải sau giờ bắt đầu.");
+        }
+        if (LocalDateTime.of(date, endTime).isBefore(LocalDateTime.now())) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Không thể tạo hoặc đổi sang lịch hẹn đã kết thúc.");
+        }
+    }
+
+    private void validateMeetingDetails(SessionFormat meetingType, String locationOrLink) {
+        if (meetingType == null || meetingType == SessionFormat.BOTH) {
+            throw new AppException(ErrorCode.INVALID_REQUEST, "Vui lòng chọn hình thức ONLINE hoặc OFFLINE.");
+        }
+        if (isBlank(locationOrLink)) {
+            String message = meetingType == SessionFormat.ONLINE
+                    ? "Hình thức Online yêu cầu cung cấp link họp."
+                    : "Hình thức Offline yêu cầu cung cấp địa điểm.";
+            throw new AppException(ErrorCode.INVALID_REQUEST, message);
+        }
+        if (meetingType == SessionFormat.ONLINE
+                && !locationOrLink.trim().matches("(?i)^https?://.+")) {
+            throw new AppException(ErrorCode.INVALID_REQUEST,
+                    "Link họp Online phải bắt đầu bằng http:// hoặc https://.");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private void updateAppointmentCardFailSoft(Appointment appointment) {
+        try {
+            chatService.updateAppointmentCardData(appointment.getId(), buildAppointmentCardData(appointment));
+        } catch (Exception e) {
+            log.warn("Failed to update chat appointment card for apt {}", appointment.getId(), e);
+        }
     }
 
     private User checkUserAccess(Appointment appointment) {

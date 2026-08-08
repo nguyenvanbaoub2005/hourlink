@@ -37,6 +37,11 @@ public class Appointment extends BaseEntity {
     @JoinColumn(name = "receiver_id", nullable = false)
     User receiver;
 
+    /** Người đưa ra lịch/khung giờ hiện tại; bên còn lại mới được chấp nhận. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_by")
+    User proposedBy;
+
     /** Lời mời gốc tạo nên lịch hẹn này (nullable nếu tạo trực tiếp) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "invitation_id")

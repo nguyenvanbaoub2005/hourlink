@@ -13,6 +13,8 @@ export interface AppointmentItem {
   receiverId: string;
   receiverName: string;
   receiverAvatarUrl?: string;
+  proposedById?: string;
+  proposedByName?: string;
   invitationId?: string;
   skillId?: string;
   skillName?: string;
@@ -52,6 +54,10 @@ export interface CreateAppointmentPayload {
 export interface RespondAppointmentPayload {
   action: 'CONFIRM' | 'CANCEL' | 'RESCHEDULE';
   reason?: string;
+  newAppointmentDate?: string;
+  newStartTime?: string;
+  newEndTime?: string;
+  /** @deprecated Chỉ giữ để tương thích với phiên bản API cũ. */
   newTime?: string;
   locationOrLink?: string;
 }
@@ -73,6 +79,7 @@ export interface AppointmentVerificationItem {
   method: VerificationMethodType;
   code: string;
   expiresAt: string;
+  generatedById?: string;
   verifiedAt?: string;
   verifiedById?: string;
   createdAt: string;

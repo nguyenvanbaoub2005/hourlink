@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 @Table(name = "appointment_completion", indexes = {
         @Index(name = "idx_completion_appointment", columnList = "appointment_id"),
         @Index(name = "idx_completion_user", columnList = "user_id")
+}, uniqueConstraints = {
+        @UniqueConstraint(name = "uq_completion_appointment_user", columnNames = {"appointment_id", "user_id"})
 })
 @Getter @Setter @Builder @AllArgsConstructor @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)

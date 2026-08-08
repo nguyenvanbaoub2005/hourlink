@@ -97,6 +97,7 @@ export default function InvitationsScreen() {
   const [aptStart, setAptStart] = useState('09:00');
   const [aptEnd, setAptEnd] = useState('10:00');
   const [aptFormat, setAptFormat] = useState<'ONLINE' | 'OFFLINE'>('ONLINE');
+  const [aptLocation, setAptLocation] = useState('');
   const [aptCredit, setAptCredit] = useState('1');
   const [creatingApt, setCreatingApt] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
@@ -158,8 +159,8 @@ export default function InvitationsScreen() {
       await InvitationApi.respond(item.id, { action: 'ACCEPT' });
       setReceived(prev => prev.map(i => i.id === item.id ? { ...i, status: 'ACCEPTED' } : i));
       Alert.alert('✅ Đã chấp nhận', 'Bạn đã chấp nhận lời mời. Hãy liên hệ với họ qua chat!');
-    } catch {
-      Alert.alert('Lỗi', 'Không thể chấp nhận lời mời');
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể chấp nhận lời mời');
     }
   };
 
@@ -172,8 +173,8 @@ export default function InvitationsScreen() {
           try {
             await InvitationApi.respond(item.id, { action: 'REJECT', rejectReason: 'Không phù hợp lịch' });
             setReceived(prev => prev.map(i => i.id === item.id ? { ...i, status: 'REJECTED' } : i));
-          } catch {
-            Alert.alert('Lỗi', 'Không thể từ chối lời mời');
+          } catch (err: any) {
+            Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể từ chối lời mời');
           }
         }
       }
@@ -207,8 +208,8 @@ export default function InvitationsScreen() {
       ));
       setRescheduleModal(false);
       Alert.alert('📅 Đã gửi đề xuất', 'Người gửi sẽ nhận được thông báo đề xuất đổi lịch của bạn.');
-    } catch {
-      Alert.alert('Lỗi', 'Không thể gửi đề xuất đổi giờ. Vui lòng thử lại.');
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể gửi đề xuất đổi giờ. Vui lòng thử lại.');
     } finally {
       setRescheduleLoading(false);
     }
@@ -254,6 +255,7 @@ export default function InvitationsScreen() {
     updateEndTime(startT, tc.toString());
 
     setAptFormat((item.format?.toUpperCase() === 'OFFLINE' ? 'OFFLINE' : 'ONLINE') as any);
+    setAptLocation('');
     setAptModalVisible(true);
   };
 
@@ -267,6 +269,17 @@ export default function InvitationsScreen() {
     const timeRegex = /^\d{2}:\d{2}$/;
     if (!timeRegex.test(aptStart.trim()) || !timeRegex.test(aptEnd.trim())) {
       Alert.alert('Lỗi định dạng', 'Vui lòng nhập giờ theo định dạng HH:MM (ví dụ: 09:00, 14:30)');
+      return;
+    }
+    const location = aptLocation.trim();
+    if (!location) {
+      Alert.alert('Thiếu thông tin', aptFormat === 'ONLINE'
+        ? 'Vui lòng nhập link Google Meet, Zoom hoặc phòng họp trực tuyến.'
+        : 'Vui lòng nhập địa điểm gặp mặt.');
+      return;
+    }
+    if (aptFormat === 'ONLINE' && !/^https?:\/\//i.test(location)) {
+      Alert.alert('Link chưa hợp lệ', 'Link họp phải bắt đầu bằng http:// hoặc https://');
       return;
     }
 
@@ -283,7 +296,7 @@ export default function InvitationsScreen() {
         startTime: `${aptStart.trim()}:00`,
         endTime: `${aptEnd.trim()}:00`,
         meetingType: aptFormat,
-        locationOrLink: aptFormat === 'OFFLINE' ? 'Gặp mặt trực tiếp' : 'Online Video Call',
+        locationOrLink: location,
         timeCreditAmount: parseFloat(aptCredit) || 1,
       };
       await AppointmentApi.create(payload);
@@ -623,6 +636,8 @@ export default function InvitationsScreen() {
               Chọn nhanh ngày giờ bên dưới để tạo lịch hẹn chính xác tuyệt đối.
             </Text>
 
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
+
             <Text style={styles.inputLabel}>Tiêu đề lịch hẹn *</Text>
             <TextInput
               style={[styles.rescheduleInput, { height: 42, minHeight: 42, marginBottom: 12 }]}
@@ -697,6 +712,20 @@ export default function InvitationsScreen() {
                 Khung giờ hỗ trợ: <Text style={{ fontWeight: 'bold', color: '#0D9488' }}>{aptStart} ➔ {aptEnd}</Text> ({aptCredit} Time Credit)
               </Text>
             </View>
+
+            <Text style={styles.inputLabel}>
+              {aptFormat === 'ONLINE' ? 'Link họp trực tuyến *' : 'Địa điểm gặp mặt *'}
+            </Text>
+            <TextInput
+              style={[styles.rescheduleInput, { height: 46, minHeight: 46, marginBottom: 12 }]}
+              placeholder={aptFormat === 'ONLINE' ? 'https://meet.google.com/...' : 'Nhập địa chỉ gặp mặt'}
+              placeholderTextColor="#94A3B8"
+              value={aptLocation}
+              onChangeText={setAptLocation}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            </ScrollView>
 
             <View style={styles.modalBtnRow}>
               <TouchableOpacity
