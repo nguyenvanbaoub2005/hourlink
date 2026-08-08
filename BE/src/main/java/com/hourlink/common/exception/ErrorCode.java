@@ -98,7 +98,8 @@ public enum ErrorCode {
     EVIDENCE_LIMIT_EXCEEDED(8012, "Chỉ được gửi tối đa 5 ảnh minh chứng",        HttpStatus.BAD_REQUEST),
     EVIDENCE_NOT_ALLOWED(8013,    "Không thể gửi minh chứng ở trạng thái hiện tại", HttpStatus.BAD_REQUEST),
     ACTIVITY_CANNOT_CANCEL(8014,  "Không thể hủy hoạt động ở trạng thái hiện tại", HttpStatus.BAD_REQUEST),
-    ACTUAL_HOURS_INVALID(8015,    "Số giờ xác nhận không hợp lệ",                 HttpStatus.BAD_REQUEST);
+    ACTUAL_HOURS_INVALID(8015,    "Số giờ xác nhận không hợp lệ",                 HttpStatus.BAD_REQUEST),
+    ORGANIZATION_NOT_FOLLOWABLE(8016, "Không thể theo dõi tổ chức này",           HttpStatus.BAD_REQUEST);
 
     // ─── Fields ──────────────────────────────────────────────────────
     private final int code;

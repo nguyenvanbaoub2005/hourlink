@@ -4,14 +4,17 @@ import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
 import com.hourlink.common.service.CloudinaryService;
 import com.hourlink.community.dto.request.ConfirmParticipantsRequest;
+import com.hourlink.community.dto.request.CreateActivityRequest;
 import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.entity.ActivityParticipant;
 import com.hourlink.community.entity.ActivityEvidence;
 import com.hourlink.community.entity.CommunityActivity;
+import com.hourlink.community.entity.OrganizationFollow;
 import com.hourlink.community.enums.ActivityParticipantStatus;
 import com.hourlink.community.enums.ActivityStatus;
 import com.hourlink.community.repository.ActivityParticipantRepository;
 import com.hourlink.community.repository.CommunityActivityRepository;
+import com.hourlink.community.repository.OrganizationFollowRepository;
 import com.hourlink.notification.service.NotificationService;
 import com.hourlink.notification.enums.NotificationType;
 import com.hourlink.user.entity.User;
@@ -44,6 +47,7 @@ class CommunityServiceTest {
 
     @Mock CommunityActivityRepository activityRepo;
     @Mock ActivityParticipantRepository participantRepo;
+    @Mock OrganizationFollowRepository followRepo;
     @Mock UserRepository userRepository;
     @Mock CloudinaryService cloudinaryService;
     CommunityService service;
@@ -56,7 +60,7 @@ class CommunityServiceTest {
     void authenticate() {
         walletService = new TestWalletService();
         notificationService = new TestNotificationService();
-        service = new CommunityService(activityRepo, participantRepo, userRepository,
+        service = new CommunityService(activityRepo, participantRepo, followRepo, userRepository,
                 walletService, notificationService, cloudinaryService);
         currentUser = user("user@hourlink.vn");
         SecurityContextHolder.getContext().setAuthentication(
@@ -93,6 +97,55 @@ class CommunityServiceTest {
         AppException error = assertThrows(AppException.class, () -> service.register(activity.getId()));
 
         assertEquals(ErrorCode.ORGANIZER_CANNOT_REGISTER, error.getErrorCode());
+    }
+
+    @Test
+    void followOrganization_isIdempotentAndReturnsOrganization() {
+        User organization = user("organization@hourlink.vn");
+        when(activityRepo.existsByOrganizerId(organization.getId())).thenReturn(true);
+        when(followRepo.findByFollowerIdAndOrganizationId(currentUser.getId(), organization.getId()))
+                .thenReturn(Optional.empty());
+        when(userRepository.findById(organization.getId())).thenReturn(Optional.of(organization));
+        when(followRepo.save(any())).thenAnswer(invocation -> {
+            OrganizationFollow follow = invocation.getArgument(0);
+            follow.setId(UUID.randomUUID());
+            follow.setCreatedAt(Instant.now());
+            return follow;
+        });
+
+        var response = service.followOrganization(organization.getId());
+
+        assertEquals(organization.getId(), response.getOrganizationId());
+        assertEquals(organization.getFullName(), response.getOrganizationName());
+        verify(followRepo).save(any(OrganizationFollow.class));
+    }
+
+    @Test
+    void createActivity_notifiesEveryFollower() {
+        currentUser.setVerified(true);
+        User follower = user("follower@hourlink.vn");
+        OrganizationFollow follow = OrganizationFollow.builder()
+                .follower(follower)
+                .organization(currentUser)
+                .build();
+        CreateActivityRequest request = new CreateActivityRequest();
+        request.setTitle("Dọn rác cuối tuần");
+        request.setDescription("Cùng làm sạch công viên");
+        request.setStartTime(Instant.now().plusSeconds(3600));
+        request.setEndTime(Instant.now().plusSeconds(7200));
+        request.setCreditReward(1.0);
+        when(activityRepo.save(any())).thenAnswer(invocation -> {
+            CommunityActivity activity = invocation.getArgument(0);
+            activity.setId(UUID.randomUUID());
+            activity.setCreatedAt(Instant.now());
+            return activity;
+        });
+        when(followRepo.findByOrganizationId(currentUser.getId())).thenReturn(List.of(follow));
+
+        service.createActivity(request);
+
+        assertEquals(1, notificationService.calls);
+        assertEquals(NotificationType.COMMUNITY_NEW_ACTIVITY, notificationService.lastType);
     }
 
     @Test
@@ -277,11 +330,19 @@ class CommunityServiceTest {
 
     private static class TestNotificationService extends NotificationService {
         int calls;
+        NotificationType lastType;
         TestNotificationService() { super(null); }
         @Override
         public void createNotification(User user, NotificationType type, String title,
                                        String body, UUID referenceId) {
             calls++;
+            lastType = type;
+        }
+        @Override
+        public void createNotification(User user, User actor, NotificationType type, String title,
+                                       String body, UUID referenceId) {
+            calls++;
+            lastType = type;
         }
     }
 }

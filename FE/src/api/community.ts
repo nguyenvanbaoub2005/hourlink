@@ -6,7 +6,8 @@ import type {
   ParticipantResponse,
   CreateActivityRequest,
   UpdateActivityRequest,
-  ConfirmParticipantsRequest
+  ConfirmParticipantsRequest,
+  FollowedOrganizationResponse
 } from '@types';
 
 const BASE_URL = '/community';
@@ -93,6 +94,26 @@ const CommunityApi = {
   cancelActivity: (id: string) => {
     return axiosInstance.patch<ApiResponse<ActivityResponse>>(
       `${BASE_URL}/activities/${id}/cancel`
+    );
+  },
+
+  // ─── Theo dõi tổ chức ──────────────────────────────────────
+
+  followOrganization: (organizationId: string) => {
+    return axiosInstance.post<ApiResponse<FollowedOrganizationResponse>>(
+      `${BASE_URL}/organizations/${organizationId}/follow`
+    );
+  },
+
+  unfollowOrganization: (organizationId: string) => {
+    return axiosInstance.delete<ApiResponse<void>>(
+      `${BASE_URL}/organizations/${organizationId}/follow`
+    );
+  },
+
+  getFollowedOrganizations: () => {
+    return axiosInstance.get<ApiResponse<FollowedOrganizationResponse[]>>(
+      `${BASE_URL}/organizations/following`
     );
   },
 

@@ -483,7 +483,15 @@ export interface ActivityResponse {
   status: ActivityStatus;
   registeredCount: number;
   registered: boolean;
+  organizerFollowed: boolean;
   createdAt: string;
+}
+
+export interface FollowedOrganizationResponse {
+  organizationId: string;
+  organizationName: string;
+  organizationAvatarUrl?: string;
+  followedAt: string;
 }
 
 export interface ParticipantResponse {

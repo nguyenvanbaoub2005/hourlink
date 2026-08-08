@@ -30,6 +30,8 @@ public interface CommunityActivityRepository extends JpaRepository<CommunityActi
     /** Lấy tất cả hoạt động của một tổ chức, mới nhất trước */
     Page<CommunityActivity> findByOrganizerIdOrderByCreatedAtDesc(UUID organizerId, Pageable pageable);
 
+    boolean existsByOrganizerId(UUID organizerId);
+
     /** Lấy tất cả hoạt động (bất kể trạng thái), phân trang */
     @Query("SELECT a FROM CommunityActivity a ORDER BY a.createdAt DESC")
     Page<CommunityActivity> findAllPaged(Pageable pageable);

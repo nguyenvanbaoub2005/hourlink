@@ -54,4 +54,7 @@ public enum NotificationType {
 
     /** Tổ chức hủy hoạt động cộng đồng */
     COMMUNITY_ACTIVITY_CANCELLED,
+
+    /** Tổ chức đang theo dõi tạo hoạt động cộng đồng mới */
+    COMMUNITY_NEW_ACTIVITY,
 }

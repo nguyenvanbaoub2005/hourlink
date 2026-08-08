@@ -6,6 +6,7 @@ import com.hourlink.community.dto.request.CreateActivityRequest;
 import com.hourlink.community.dto.request.UpdateActivityRequest;
 import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
+import com.hourlink.community.dto.response.FollowedOrganizationResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
 import com.hourlink.community.service.CommunityService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -121,6 +122,30 @@ public class CommunityController {
     @GetMapping("/activities/{id}")
     public ResponseEntity<ApiResponse<ActivityResponse>> getOne(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(communityService.getActivity(id)));
+    }
+
+    // ─── Theo dõi tổ chức ───────────────────────────────────────────────────
+
+    @Operation(summary = "Theo dõi tổ chức có hoạt động Community")
+    @PostMapping("/organizations/{organizationId}/follow")
+    public ResponseEntity<ApiResponse<FollowedOrganizationResponse>> followOrganization(
+            @PathVariable UUID organizationId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+                "Đã theo dõi tổ chức", communityService.followOrganization(organizationId)));
+    }
+
+    @Operation(summary = "Bỏ theo dõi tổ chức")
+    @DeleteMapping("/organizations/{organizationId}/follow")
+    public ResponseEntity<ApiResponse<Void>> unfollowOrganization(
+            @PathVariable UUID organizationId) {
+        communityService.unfollowOrganization(organizationId);
+        return ResponseEntity.ok(ApiResponse.noContent("Đã bỏ theo dõi tổ chức"));
+    }
+
+    @Operation(summary = "Danh sách tổ chức tôi đang theo dõi")
+    @GetMapping("/organizations/following")
+    public ResponseEntity<ApiResponse<List<FollowedOrganizationResponse>>> getFollowedOrganizations() {
+        return ResponseEntity.ok(ApiResponse.success(communityService.getFollowedOrganizations()));
     }
 
     // ─── US-36: Đăng ký / hủy đăng ký ───────────────────────────────────────

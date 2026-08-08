@@ -35,9 +35,13 @@ public class ActivityResponse {
     /** Người dùng hiện tại đã đăng ký chưa */
     private boolean registered;
 
+    /** Người dùng hiện tại có đang theo dõi tổ chức này không */
+    private boolean organizerFollowed;
+
     private Instant createdAt;
 
-    public static ActivityResponse fromEntity(CommunityActivity a, long registeredCount, boolean registered) {
+    public static ActivityResponse fromEntity(CommunityActivity a, long registeredCount,
+                                              boolean registered, boolean organizerFollowed) {
         return ActivityResponse.builder()
                 .id(a.getId())
                 .organizerId(a.getOrganizer().getId())
@@ -53,6 +57,7 @@ public class ActivityResponse {
                 .status(a.getStatus())
                 .registeredCount(registeredCount)
                 .registered(registered)
+                .organizerFollowed(organizerFollowed)
                 .createdAt(a.getCreatedAt())
                 .build();
     }

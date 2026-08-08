@@ -9,14 +9,17 @@ import com.hourlink.community.dto.request.CreateActivityRequest;
 import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.dto.request.UpdateActivityRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
+import com.hourlink.community.dto.response.FollowedOrganizationResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
 import com.hourlink.community.entity.ActivityParticipant;
 import com.hourlink.community.entity.ActivityEvidence;
 import com.hourlink.community.entity.CommunityActivity;
+import com.hourlink.community.entity.OrganizationFollow;
 import com.hourlink.community.enums.ActivityParticipantStatus;
 import com.hourlink.community.enums.ActivityStatus;
 import com.hourlink.community.repository.ActivityParticipantRepository;
 import com.hourlink.community.repository.CommunityActivityRepository;
+import com.hourlink.community.repository.OrganizationFollowRepository;
 import com.hourlink.user.entity.User;
 import com.hourlink.user.repository.UserRepository;
 import com.hourlink.wallet.service.WalletService;
@@ -55,6 +58,7 @@ public class CommunityService {
 
     private final CommunityActivityRepository activityRepo;
     private final ActivityParticipantRepository participantRepo;
+    private final OrganizationFollowRepository followRepo;
     private final UserRepository userRepository;
     private final WalletService walletService;
     private final NotificationService notificationService;
@@ -92,6 +96,7 @@ public class CommunityService {
                 .build();
 
         activity = activityRepo.save(activity);
+        notifyFollowersAboutNewActivity(activity);
         log.info("Activity created [{}] by organizer [{}]", activity.getId(), organizer.getId());
         return toResponse(activity, organizer);
     }
@@ -227,6 +232,46 @@ public class CommunityService {
         User currentUser = getCurrentUser();
         return activityRepo.findByOrganizerIdOrderByCreatedAtDesc(currentUser.getId(), PageRequest.of(page, size))
                 .map(a -> toResponse(a, currentUser));
+    }
+
+    // ─── Theo dõi tổ chức ──────────────────────────────────────────────────
+
+    /** Theo dõi một tài khoản đã từng tạo hoạt động Community; idempotent. */
+    @Transactional
+    public FollowedOrganizationResponse followOrganization(UUID organizationId) {
+        User follower = getCurrentUser();
+        if (follower.getId().equals(organizationId) ||
+                !activityRepo.existsByOrganizerId(organizationId)) {
+            throw new AppException(ErrorCode.ORGANIZATION_NOT_FOLLOWABLE);
+        }
+
+        OrganizationFollow follow = followRepo
+                .findByFollowerIdAndOrganizationId(follower.getId(), organizationId)
+                .orElseGet(() -> {
+                    User organization = userRepository.findById(organizationId)
+                            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+                    return followRepo.save(OrganizationFollow.builder()
+                            .follower(follower)
+                            .organization(organization)
+                            .build());
+                });
+        return FollowedOrganizationResponse.fromEntity(follow);
+    }
+
+    /** Bỏ theo dõi tổ chức; gọi lặp lại vẫn an toàn. */
+    @Transactional
+    public void unfollowOrganization(UUID organizationId) {
+        User follower = getCurrentUser();
+        followRepo.deleteByFollowerIdAndOrganizationId(follower.getId(), organizationId);
+    }
+
+    /** Danh sách tổ chức người dùng hiện tại đang theo dõi. */
+    public List<FollowedOrganizationResponse> getFollowedOrganizations() {
+        User follower = getCurrentUser();
+        return followRepo.findByFollowerIdOrderByCreatedAtDesc(follower.getId())
+                .stream()
+                .map(FollowedOrganizationResponse::fromEntity)
+                .toList();
     }
 
     // ─── US-36: Đăng ký / hủy đăng ký ───────────────────────────────────────
@@ -563,6 +608,20 @@ public class CommunityService {
         }
     }
 
+    private void notifyFollowersAboutNewActivity(CommunityActivity activity) {
+        List<OrganizationFollow> followers = followRepo.findByOrganizationId(
+                activity.getOrganizer().getId());
+        for (OrganizationFollow follow : followers) {
+            notificationService.createNotification(
+                    follow.getFollower(), activity.getOrganizer(),
+                    NotificationType.COMMUNITY_NEW_ACTIVITY,
+                    "Tổ chức bạn theo dõi có hoạt động mới",
+                    String.format("%s vừa đăng hoạt động: %s",
+                            activity.getOrganizer().getFullName(), activity.getTitle()),
+                    activity.getId());
+        }
+    }
+
     private List<ConfirmationTarget> resolveConfirmations(UUID activityId, ConfirmParticipantsRequest req) {
         List<ConfirmationTarget> result = new ArrayList<>();
         if (req.getConfirmations() != null && !req.getConfirmations().isEmpty()) {
@@ -620,13 +679,17 @@ public class CommunityService {
     private ActivityResponse toResponse(CommunityActivity activity, User currentUser) {
         long count = participantRepo.countByActivityIdAndStatus(activity.getId(), ActivityParticipantStatus.REGISTERED);
         boolean registered = false;
+        boolean organizerFollowed = false;
         if (currentUser != null) {
             registered = participantRepo.findByActivityIdAndUserId(activity.getId(), currentUser.getId())
                     .map(p -> p.getStatus() == ActivityParticipantStatus.REGISTERED ||
                             p.getStatus() == ActivityParticipantStatus.CONFIRMED)
                     .orElse(false);
+            organizerFollowed = !currentUser.getId().equals(activity.getOrganizer().getId()) &&
+                    followRepo.existsByFollowerIdAndOrganizationId(
+                            currentUser.getId(), activity.getOrganizer().getId());
         }
-        return ActivityResponse.fromEntity(activity, count, registered);
+        return ActivityResponse.fromEntity(activity, count, registered, organizerFollowed);
     }
 
     private User getCurrentUser() {

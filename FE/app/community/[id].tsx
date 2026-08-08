@@ -16,6 +16,7 @@ export default function ActivityDetailScreen() {
   const [activity, setActivity] = useState<ActivityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   const fetchDetail = async () => {
     try {
@@ -64,6 +65,25 @@ export default function ActivityDetailScreen() {
     ]);
   };
 
+  const handleToggleFollow = async () => {
+    if (!activity || followLoading) return;
+    try {
+      setFollowLoading(true);
+      if (activity.organizerFollowed) {
+        await CommunityApi.unfollowOrganization(activity.organizerId);
+      } else {
+        await CommunityApi.followOrganization(activity.organizerId);
+      }
+      setActivity(current => current
+        ? { ...current, organizerFollowed: !current.organizerFollowed }
+        : current);
+    } catch (error: any) {
+      Alert.alert('Lỗi', error?.response?.data?.message || 'Không thể cập nhật theo dõi.');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const isOrganizer = user?.id === activity?.organizerId;
 
   if (loading || !activity) {
@@ -87,22 +107,44 @@ export default function ActivityDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>{activity.title}</Text>
         
-        <TouchableOpacity
-          style={styles.orgRow}
-          onPress={() => openChatWithUser(router, activity.organizerId, activity.organizerName)}
-          disabled={isOrganizer}
-          accessibilityRole="button"
-          accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
-        >
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLetter}>{activity.organizerName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={styles.orgText}>
-            <Text style={styles.orgName}>{activity.organizerName}</Text>
-            {!isOrganizer && <Text style={styles.chatLabel}>Nhấn để nhắn tin với người tổ chức</Text>}
-          </View>
-          {!isOrganizer && <Ionicons name="chatbubble-ellipses-outline" size={22} color={Colors.primary} />}
-        </TouchableOpacity>
+        <View style={styles.orgRow}>
+          <TouchableOpacity
+            style={styles.orgChat}
+            onPress={() => openChatWithUser(router, activity.organizerId, activity.organizerName)}
+            disabled={isOrganizer}
+            accessibilityRole="button"
+            accessibilityLabel={`Nhắn tin với ${activity.organizerName}`}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarLetter}>{activity.organizerName.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.orgText}>
+              <Text style={styles.orgName}>{activity.organizerName}</Text>
+              {!isOrganizer && <Text style={styles.chatLabel}>Nhấn để nhắn tin</Text>}
+            </View>
+            {!isOrganizer && <Ionicons name="chatbubble-ellipses-outline" size={21} color={Colors.primary} />}
+          </TouchableOpacity>
+          {!isOrganizer && (
+            <TouchableOpacity
+              style={[styles.followButton, activity.organizerFollowed && styles.followButtonActive]}
+              onPress={handleToggleFollow}
+              disabled={followLoading}
+              accessibilityRole="button"
+              accessibilityLabel={activity.organizerFollowed ? 'Bỏ theo dõi tổ chức' : 'Theo dõi tổ chức'}
+            >
+              {followLoading
+                ? <ActivityIndicator size="small" color={Colors.primary} />
+                : <>
+                    <Ionicons
+                      name={activity.organizerFollowed ? 'checkmark' : 'person-add-outline'}
+                      size={17}
+                      color={Colors.primary}
+                    />
+                    <Text style={styles.followText}>{activity.organizerFollowed ? 'Đang theo dõi' : 'Theo dõi'}</Text>
+                  </>}
+            </TouchableOpacity>
+          )}
+        </View>
 
         <View style={styles.infoBox}>
           <View style={styles.infoRow}>
@@ -210,12 +252,16 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.md },
   title: { fontSize: 22, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 16 },
   
-  orgRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  orgRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 20 },
+  orgChat: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   avatarLetter: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   orgText: { flex: 1 },
   orgName: { fontSize: 16, fontWeight: '500', color: Colors.textPrimary },
   chatLabel: { color: Colors.primary, fontSize: 12, marginTop: 3 },
+  followButton: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, backgroundColor: '#FFFFFF' },
+  followButtonActive: { borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' },
+  followText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
   
   infoBox: { backgroundColor: '#fff', borderRadius: Radius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginBottom: 24 },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
