@@ -9,6 +9,7 @@ import com.hourlink.chat.repository.ChatMessageRepository;
 import com.hourlink.chat.repository.ChatReportRepository;
 import com.hourlink.chat.repository.ConversationRepository;
 import com.hourlink.chat.repository.UserBlockRepository;
+import com.hourlink.common.exception.AppException;
 import com.hourlink.common.service.CloudinaryService;
 import com.hourlink.common.service.FirebaseService;
 import com.hourlink.community.repository.ActivityParticipantRepository;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -170,6 +173,33 @@ class ChatServicePersonalConversationTest {
         UUID resolved = service.findConversationIdByInvitation(invitation.getId());
 
         assertEquals(canonical.getId(), resolved);
+    }
+
+    @Test
+    void attachmentValidationAcceptsIosHeicImage() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "IMG_1001.HEIC", "image/heic", new byte[]{1});
+
+        assertTrue(service.validateFile(file));
+    }
+
+    @Test
+    void attachmentValidationInfersSupportedTypesFromGenericPickerMime() {
+        MockMultipartFile image = new MockMultipartFile(
+                "file", "photo.webp", "application/octet-stream", new byte[]{1});
+        MockMultipartFile document = new MockMultipartFile(
+                "file", "lesson.docx", "application/octet-stream", new byte[]{1});
+
+        assertTrue(service.validateFile(image));
+        assertFalse(service.validateFile(document));
+    }
+
+    @Test
+    void attachmentValidationStillRejectsUnsupportedGenericFile() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "malware.exe", "application/octet-stream", new byte[]{1});
+
+        assertThrows(AppException.class, () -> service.validateFile(file));
     }
 
     private Conversation conversation(User userOne, User userTwo, Invitation invitation,

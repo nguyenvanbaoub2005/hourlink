@@ -48,8 +48,11 @@ const ChatApi = {
 
   /** Gửi hình ảnh hoặc tài liệu (multipart) */
   sendAttachment: (convId: string, formData: FormData) =>
+    // Không tự đặt Content-Type: Axios/React Native phải tự thêm multipart
+    // boundary. Nếu chỉ đặt "multipart/form-data", request có thể hỏng trước
+    // khi tới backend.
     api.post(`/chat/conversations/${convId}/messages/attachment`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
     }),
 
   /** Đề xuất đổi lịch ngay trong cuộc trò chuyện */

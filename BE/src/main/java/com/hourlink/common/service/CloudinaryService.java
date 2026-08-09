@@ -31,7 +31,16 @@ public class CloudinaryService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> uploadFile(MultipartFile file, String folder) throws IOException {
         String contentType = file.getContentType() != null ? file.getContentType() : "";
-        boolean isImage = contentType.startsWith("image/");
+        return uploadFile(file, folder, contentType.startsWith("image/"));
+    }
+
+    /**
+     * Upload với loại tài nguyên đã được tầng nghiệp vụ xác thực. Cách này xử
+     * lý đúng file ảnh mà thiết bị gửi lên dưới MIME application/octet-stream.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> uploadFile(MultipartFile file, String folder,
+                                          boolean isImage) throws IOException {
 
         Map<String, Object> options = ObjectUtils.asMap(
                 "folder", folder,

@@ -10,9 +10,6 @@ export const REFRESH_KEY = 'hourlink_refresh_token';
 const api: AxiosInstance = axios.create({
   baseURL: Config.API_URL,
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // ─── Request interceptor: gắn Bearer token ───────────────────

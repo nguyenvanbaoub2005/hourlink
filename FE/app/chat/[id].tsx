@@ -57,6 +57,39 @@ const REPORT_REASONS: { value: ChatReportReason; label: string; icon: string }[]
 
 /** Khoảng thời gian poll khi Firebase chưa cấu hình (chế độ dự phòng) */
 const POLL_INTERVAL_MS = 4000;
+const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024;
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};
+
+const fileNameFromUri = (uri: string) => {
+  const rawName = uri.split('/').pop()?.split('?')[0];
+  if (!rawName) return undefined;
+  try {
+    return decodeURIComponent(rawName);
+  } catch {
+    return rawName;
+  }
+};
+
+const resolveMimeType = (fileName: string, declaredType?: string | null, fallback = 'application/octet-stream') => {
+  const normalized = declaredType?.split(';')[0].trim().toLowerCase();
+  if (normalized && normalized !== 'application/octet-stream') return normalized;
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  return (extension && MIME_BY_EXTENSION[extension]) || fallback;
+};
 
 // Helper tạo danh sách 14 ngày tới
 const getNextDays = (count = 14) => {
@@ -337,6 +370,7 @@ export default function ChatRoomScreen() {
 
   const handleError = (e: any, fallback: string) => {
     const msg = e?.response?.data?.message ?? fallback;
+    console.error('Chat request failed:', e?.response?.status ?? e?.message ?? e);
     Alert.alert('Lỗi', msg);
   };
 
@@ -356,55 +390,73 @@ export default function ChatRoomScreen() {
   };
 
   const sendImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Cần quyền truy cập', 'Vui lòng cho phép HourLink truy cập thư viện ảnh.');
-      return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần quyền truy cập', 'Vui lòng cho phép HourLink truy cập thư viện ảnh.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const pickedName = asset.fileName ?? fileNameFromUri(asset.uri) ?? `image_${Date.now()}.jpg`;
+      await uploadFile(
+        asset.uri,
+        pickedName,
+        resolveMimeType(pickedName, asset.mimeType, 'image/jpeg'),
+        asset.fileSize
+      );
+    } catch (e: any) {
+      handleError(e, 'Không thể chọn ảnh. Vui lòng thử lại.');
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    const asset = result.assets[0];
-    await uploadFile(
-      asset.uri,
-      asset.fileName ?? `image_${Date.now()}.jpg`,
-      asset.mimeType ?? 'image/jpeg'
-    );
   };
 
   const sendDocument = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      ],
-      copyToCacheDirectory: true,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
 
-    const asset = result.assets[0];
-    await uploadFile(
-      asset.uri,
-      asset.name ?? `file_${Date.now()}`,
-      asset.mimeType ?? 'application/octet-stream'
-    );
+      const asset = result.assets[0];
+      const pickedName = asset.name ?? fileNameFromUri(asset.uri) ?? `file_${Date.now()}`;
+      await uploadFile(
+        asset.uri,
+        pickedName,
+        resolveMimeType(pickedName, asset.mimeType),
+        asset.size
+      );
+    } catch (e: any) {
+      handleError(e, 'Không thể chọn tài liệu. Vui lòng thử lại.');
+    }
   };
 
-  const uploadFile = async (uri: string, name: string, type: string) => {
+  const uploadFile = async (uri: string, name: string, type: string, size?: number) => {
     if (!id) return;
+    if (size && size > MAX_ATTACHMENT_SIZE) {
+      Alert.alert('Tệp quá lớn', 'Ảnh hoặc tài liệu phải có dung lượng tối đa 20 MB.');
+      return;
+    }
     setSending(true);
     try {
       const formData = new FormData();
       formData.append('file', {
-        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
+        // Giữ nguyên file:// trên iOS và content:// trên Android; React Native
+        // cần URI gốc để đọc dữ liệu file khi dựng multipart body.
+        uri,
         name,
         type,
       } as any);

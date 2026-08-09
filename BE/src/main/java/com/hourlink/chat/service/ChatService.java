@@ -57,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -92,7 +93,8 @@ public class ChatService {
     );
 
     private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
-            "image/jpeg", "image/png", "image/gif", "image/webp");
+            "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+            "image/heic", "image/heif");
 
     private static final List<String> ALLOWED_DOC_TYPES = List.of(
             "application/pdf",
@@ -533,7 +535,8 @@ public class ChatService {
         boolean isImage = validateFile(file);
 
         try {
-            Map<String, Object> uploadResult = cloudinaryService.uploadFile(file, CLOUDINARY_FOLDER);
+            Map<String, Object> uploadResult = cloudinaryService.uploadFile(
+                    file, CLOUDINARY_FOLDER, isImage);
 
             ChatMessage saved = chatMessageRepository.save(ChatMessage.builder()
                     .conversation(conv)
@@ -987,17 +990,40 @@ public class ChatService {
     }
 
     /** @return true nếu là ảnh, false nếu là tài liệu */
-    private boolean validateFile(MultipartFile file) {
+    boolean validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
-        String contentType = file.getContentType() != null ? file.getContentType() : "";
+        String contentType = file.getContentType() != null
+                ? file.getContentType().split(";", 2)[0].trim().toLowerCase(Locale.ROOT)
+                : "";
         if (ALLOWED_IMAGE_TYPES.contains(contentType)) return true;
         if (ALLOWED_DOC_TYPES.contains(contentType)) return false;
+
+        // Một số picker trên Android/iOS chỉ trả application/octet-stream.
+        // Khi đó suy luận theo đuôi file, nhưng vẫn chỉ nhận đúng danh sách đã
+        // cho phép để không mở rộng kiểu upload ngoài ý muốn.
+        if (contentType.isBlank() || "application/octet-stream".equals(contentType)) {
+            String fileName = file.getOriginalFilename() != null
+                    ? file.getOriginalFilename().toLowerCase(Locale.ROOT) : "";
+            if (hasExtension(fileName, ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif")) {
+                return true;
+            }
+            if (hasExtension(fileName, ".pdf", ".doc", ".docx", ".ppt", ".pptx")) {
+                return false;
+            }
+        }
         throw new AppException(ErrorCode.INVALID_REQUEST);
+    }
+
+    private boolean hasExtension(String fileName, String... extensions) {
+        for (String extension : extensions) {
+            if (fileName.endsWith(extension)) return true;
+        }
+        return false;
     }
 
     private String snapshotOf(ChatMessage m) {
