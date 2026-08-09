@@ -433,6 +433,8 @@ class AppointmentServiceTest {
         assertEquals(AppointmentStatus.COMPLETED, response.getStatus());
         assertEquals(1, provider.getCompletedSessions());
         assertEquals(1, receiver.getCompletedSessions());
+        verify(ratingService).checkAndAwardBadges(provider);
+        verify(ratingService).checkAndAwardBadges(receiver);
         verify(walletService).transferCredit(appointment);
         verify(chatService).updateAppointmentCardData(any(), any());
     }

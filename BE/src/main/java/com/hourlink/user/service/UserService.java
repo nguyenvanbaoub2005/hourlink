@@ -30,6 +30,7 @@ public class UserService {
     private final com.hourlink.user.repository.UserRepository userRepository;
     private final Cloudinary cloudinary;
     private final com.hourlink.skill.service.SkillService skillService;
+    private final com.hourlink.rating.service.RatingService ratingService;
 
     /**
      * Hồ sơ công khai của một người dùng khác — dùng khi xem thông tin người
@@ -58,6 +59,7 @@ public class UserService {
                 .cancelRate(user.getCancelRate())
                 .joinedAt(user.getCreatedAt())
                 .skills(skillService.getVisibleSkillsOfUser(userId))
+                .badges(ratingService.getUserBadges(userId))
                 .build();
     }
 

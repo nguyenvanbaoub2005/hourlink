@@ -32,7 +32,7 @@ public class UserController {
     UserService userService;
 
     @Operation(summary = "Xem hồ sơ công khai của một người dùng",
-            description = "Không trả về email / số điện thoại / ngày sinh. Kèm danh sách kỹ năng đang hiển thị.")
+            description = "Không trả về email / số điện thoại / ngày sinh. Kèm kỹ năng đang hiển thị và huy hiệu đã đạt.")
     @GetMapping("/{id}")
     public ApiResponse<com.hourlink.user.dto.PublicProfileResponse> getPublicProfile(
             @PathVariable java.util.UUID id) {

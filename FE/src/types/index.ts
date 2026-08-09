@@ -106,6 +106,31 @@ export interface UserResponse {
   createdAt: string;
 }
 
+export interface PublicUserProfileResponse {
+  id: string;
+  fullName: string;
+  avatarUrl?: string;
+  bio?: string;
+  region?: string;
+  occupation?: string;
+  languages?: string;
+  userType?: UserType;
+  isVerified?: boolean;
+  reputationScore?: number;
+  completedSessions?: number;
+  cancelRate?: number;
+  joinedAt?: string;
+  skills?: Array<{
+    id: string;
+    name: string;
+    categoryName?: string;
+    level?: string;
+    format?: string;
+    duration?: number;
+  }>;
+  badges?: BadgeResponse[];
+}
+
 export interface ProfileUpdateRequest {
   fullName: string;
   bio?: string;

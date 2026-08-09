@@ -16,6 +16,7 @@ import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import { useWalletStore } from '@store/walletStore';
 import type { UserResponse, BadgeResponse } from '@types';
+import { getBadgeVisual } from '@utils/badgeVisual';
 
 type SkillItem = { id: string; name: string; status: string };
 type RequestItem = { id: string; title: string; categoryName?: string; status: string };
@@ -60,6 +61,10 @@ export default function ProfileScreen() {
     }
     if (label === 'Đánh giá & Uy tín') {
       router.push('/profile/reputation' as any);
+      return;
+    }
+    if (label === 'Huy hiệu của tôi') {
+      router.push({ pathname: '/profile/reputation', params: { tab: 'BADGES' } } as any);
       return;
     }
     if (label === 'Báo cáo của tôi') {
@@ -264,18 +269,27 @@ export default function ProfileScreen() {
           {/* Huy hiệu */}
           <View style={[styles.sectionHeaderRow, { marginTop: Spacing.lg }]}>
             <Text style={styles.sectionTitle}>Huy hiệu</Text>
-            <TouchableOpacity onPress={() => router.push('/profile/reputation' as any)}>
-              <Text style={styles.actionLink}>Chi tiết</Text>
+            <TouchableOpacity
+              style={styles.badgeActionButton}
+              onPress={() => router.push({ pathname: '/profile/reputation', params: { tab: 'BADGES' } } as any)}
+            >
+              <Ionicons name="ribbon-outline" size={15} color={Colors.secondary} />
+              <Text style={styles.actionLink}>Xem tất cả</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.badgeRow}>
             {badges.length > 0 ? (
-              badges.slice(0, 3).map(b => (
-                <View key={b.id} style={styles.badgeCard}>
-                  <Ionicons name="ribbon-outline" size={28} color="#D97706" />
-                  <Text style={styles.badgeLabel} numberOfLines={2}>{b.name}</Text>
-                </View>
-              ))
+              badges.slice(0, 3).map(b => {
+                const visual = getBadgeVisual(b.code);
+                return (
+                  <View key={b.id} style={styles.badgeCard}>
+                    <View style={[styles.badgeIcon, { backgroundColor: visual.background }]}>
+                      <Ionicons name={visual.icon} size={24} color={visual.color} />
+                    </View>
+                    <Text style={styles.badgeLabel} numberOfLines={2}>{b.name}</Text>
+                  </View>
+                );
+              })
             ) : (
               <Text style={styles.emptyHint}>Chưa có huy hiệu nào</Text>
             )}
@@ -317,6 +331,7 @@ export default function ProfileScreen() {
             { icon: 'wallet-outline', color: '#059669', bg: '#D1FAE5', label: 'Ví Time Credit' },
             { icon: 'book-outline', color: '#0284C7', bg: '#E0F2FE', label: 'Yêu cầu của tôi' },
             { icon: 'star-outline', color: '#D97706', bg: '#FFEDD5', label: 'Đánh giá & Uy tín' },
+            { icon: 'ribbon-outline', color: '#7C3AED', bg: '#EDE9FE', label: 'Huy hiệu của tôi' },
             { icon: 'people-outline', color: '#9333EA', bg: '#F3E8FF', label: 'Lời mời' },
           ].map(item => (
             <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
@@ -434,7 +449,9 @@ const styles = StyleSheet.create({
   // Badges
   badgeRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   badgeCard:    { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: Radius.lg, padding: Spacing.md, width: 100, borderWidth: 1, borderColor: Colors.border },
+  badgeIcon:    { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 7 },
   badgeLabel:   { fontSize: 12, color: Colors.textMuted, textAlign: 'center', lineHeight: 16 },
+  badgeActionButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingLeft: 8 },
 
   // Menu
   menuSection:  { paddingHorizontal: Spacing.md, marginBottom: Spacing.xl, marginTop: Spacing.md },
