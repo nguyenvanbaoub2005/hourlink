@@ -21,13 +21,13 @@ import { Colors } from '@constants/Colors';
 import { formatConversationTime } from '@utils/chatFormat';
 import type { Conversation, MessageType } from '@types';
 
-/** Icon đứng trước preview theo loại tin nhắn cuối */
-const PREVIEW_ICON: Partial<Record<MessageType, string>> = {
-  IMAGE: '🖼️',
-  DOCUMENT: '📄',
-  LOCATION: '📍',
-  MEETING_LINK: '🔗',
-  RESCHEDULE_PROPOSAL: '📅',
+/** Nhãn ngắn cho loại tin nhắn cuối. */
+const PREVIEW_LABEL: Partial<Record<MessageType, string>> = {
+  IMAGE: 'Ảnh',
+  DOCUMENT: 'Tài liệu',
+  LOCATION: 'Vị trí',
+  MEETING_LINK: 'Link họp',
+  RESCHEDULE_PROPOSAL: 'Đề xuất đổi lịch',
 };
 
 export default function ConversationListScreen() {
@@ -70,6 +70,7 @@ export default function ConversationListScreen() {
       (c) =>
         c.otherUserName?.toLowerCase().includes(keyword) ||
         c.skillName?.toLowerCase().includes(keyword) ||
+        c.communityActivityTitle?.toLowerCase().includes(keyword) ||
         c.lastMessagePreview?.toLowerCase().includes(keyword)
     );
   }, [conversations, search]);
@@ -82,14 +83,15 @@ export default function ConversationListScreen() {
         otherName: item.otherUserName,
         otherUserId: item.otherUserId,
         otherAvatarUrl: item.otherUserAvatarUrl ?? '',
-        skillName: item.skillName ?? '',
+        skillName: item.communityActivityTitle ?? item.skillName ?? '',
+        sourceType: item.sourceType,
       },
     });
   };
 
   const renderItem = ({ item }: { item: Conversation }) => {
     const unread = item.unreadCount > 0;
-    const icon = item.lastMessageType ? PREVIEW_ICON[item.lastMessageType] : undefined;
+    const previewLabel = item.lastMessageType ? PREVIEW_LABEL[item.lastMessageType] : undefined;
 
     return (
       <TouchableOpacity
@@ -131,16 +133,17 @@ export default function ConversationListScreen() {
           <Text style={styles.name} numberOfLines={1}>
             {item.otherUserName}
           </Text>
-          {!!item.skillName && (
+          {!!(item.communityActivityTitle ?? item.skillName) && (
             <Text style={styles.skill} numberOfLines={1}>
-              {item.skillName}
+              {item.sourceType === 'COMMUNITY_ACTIVITY' ? 'Hoạt động: ' : ''}
+              {item.communityActivityTitle ?? item.skillName}
             </Text>
           )}
           <Text
             style={[styles.preview, unread && styles.previewUnread]}
             numberOfLines={1}
           >
-            {icon ? `${icon} ` : ''}
+            {previewLabel ? `[${previewLabel}] ` : ''}
             {item.lastMessagePreview ?? 'Bắt đầu cuộc trò chuyện'}
           </Text>
         </View>

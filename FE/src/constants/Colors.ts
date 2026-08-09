@@ -16,6 +16,7 @@ export const Colors = {
   bgInput:    '#FFFFFF',  // White inputs
   bgScreen:   '#F8FAFC',  // Very light screen bg
   bgDark:     '#F8FAFC',  // Alias for old screens to avoid errors
+  surface:    '#FFFFFF',  // Alias for legacy card/input screens
 
   // Text
   text:          '#1E293B',  // Alias for old screens

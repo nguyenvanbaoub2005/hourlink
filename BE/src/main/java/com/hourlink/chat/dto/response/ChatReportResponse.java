@@ -23,6 +23,7 @@ public class ChatReportResponse {
 
     ChatReportReason reason;
     String description;
+    String evidence;
     ChatReportStatus status;
 
     Instant createdAt;

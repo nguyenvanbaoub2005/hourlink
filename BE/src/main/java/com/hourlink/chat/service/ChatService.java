@@ -1,5 +1,8 @@
 package com.hourlink.chat.service;
 
+import com.hourlink.appointment.entity.Appointment;
+import com.hourlink.appointment.enums.AppointmentStatus;
+import com.hourlink.appointment.repository.AppointmentRepository;
 import com.hourlink.chat.dto.request.BlockUserRequest;
 import com.hourlink.chat.dto.request.ProposeRescheduleRequest;
 import com.hourlink.chat.dto.request.ReportMessageRequest;
@@ -14,6 +17,7 @@ import com.hourlink.chat.entity.ChatReport;
 import com.hourlink.chat.entity.Conversation;
 import com.hourlink.chat.entity.UserBlock;
 import com.hourlink.chat.enums.ChatReportStatus;
+import com.hourlink.chat.enums.ConversationSourceType;
 import com.hourlink.chat.enums.MessageType;
 import com.hourlink.chat.repository.ChatMessageRepository;
 import com.hourlink.chat.repository.ChatReportRepository;
@@ -26,6 +30,11 @@ import com.hourlink.common.response.PagedResponse;
 import com.hourlink.common.service.CloudinaryService;
 import com.hourlink.common.service.FirebaseService;
 import com.hourlink.common.util.SecurityUtil;
+import com.hourlink.community.entity.ActivityParticipant;
+import com.hourlink.community.entity.CommunityActivity;
+import com.hourlink.community.enums.ActivityParticipantStatus;
+import com.hourlink.community.repository.ActivityParticipantRepository;
+import com.hourlink.community.repository.CommunityActivityRepository;
 import com.hourlink.invitation.entity.Invitation;
 import com.hourlink.invitation.enums.InvitationStatus;
 import com.hourlink.invitation.repository.InvitationRepository;
@@ -38,6 +47,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -69,6 +79,15 @@ public class ChatService {
     private static final String CLOUDINARY_FOLDER = "chat_attachments";
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20MB
 
+    private static final List<AppointmentStatus> ACTIVE_APPOINTMENT_STATUSES = List.of(
+            AppointmentStatus.PENDING,
+            AppointmentStatus.CONFIRMED,
+            AppointmentStatus.UPCOMING,
+            AppointmentStatus.IN_PROGRESS,
+            AppointmentStatus.RESCHEDULED,
+            AppointmentStatus.DISPUTED
+    );
+
     private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
             "image/jpeg", "image/png", "image/gif", "image/webp");
 
@@ -84,6 +103,9 @@ public class ChatService {
     private final UserBlockRepository userBlockRepository;
     private final ChatReportRepository chatReportRepository;
     private final InvitationRepository invitationRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final CommunityActivityRepository communityActivityRepository;
+    private final ActivityParticipantRepository activityParticipantRepository;
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
     private final FirebaseService firebaseService;
@@ -147,6 +169,7 @@ public class ChatService {
                 .orElseGet(() -> {
                     Conversation conv = conversationRepository.save(Conversation.builder()
                             .invitation(invitation)
+                            .sourceType(ConversationSourceType.SKILL_INVITATION)
                             .userOne(invitation.getSender())
                             .userTwo(invitation.getReceiver())
                             .isActive(true)
@@ -175,6 +198,64 @@ public class ChatService {
                     log.info("Conversation created for invitation {}", invitation.getId());
                     return conv;
                 });
+    }
+
+    /**
+     * Mở hội thoại giữa người đã đăng ký hoạt động và tổ chức (idempotent).
+     * userOne luôn là tổ chức, userTwo luôn là người tham gia để khóa duy nhất
+     * theo (activity, participant) ở cả ứng dụng lẫn cơ sở dữ liệu.
+     */
+    @Transactional
+    public ConversationResponse getOrCreateCommunityConversation(UUID activityId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        User participantUser = getUser(email);
+        CommunityActivity activity = communityActivityRepository.findByIdForUpdate(activityId)
+                .orElseThrow(() -> new AppException(ErrorCode.ACTIVITY_NOT_FOUND));
+
+        if (activity.getOrganizer().getId().equals(participantUser.getId())) {
+            throw new AppException(ErrorCode.COMMUNITY_CHAT_NOT_ALLOWED);
+        }
+
+        ActivityParticipant participant = activityParticipantRepository
+                .findByActivityIdAndUserId(activityId, participantUser.getId())
+                .filter(p -> p.getStatus() != ActivityParticipantStatus.CANCELLED)
+                .orElseThrow(() -> new AppException(ErrorCode.COMMUNITY_CHAT_NOT_ALLOWED));
+
+        Conversation conversation = conversationRepository
+                .findByCommunityActivity_IdAndUserTwo_Id(activityId, participantUser.getId())
+                .orElseGet(() -> createCommunityConversation(activity, participant));
+        return mapToConversationResponse(conversation, email);
+    }
+
+    private Conversation createCommunityConversation(CommunityActivity activity,
+                                                       ActivityParticipant participant) {
+        Conversation conv = conversationRepository.save(Conversation.builder()
+                .communityActivity(activity)
+                .sourceType(ConversationSourceType.COMMUNITY_ACTIVITY)
+                .userOne(activity.getOrganizer())
+                .userTwo(participant.getUser())
+                .isActive(true)
+                .build());
+
+        ChatMessage systemMsg = chatMessageRepository.save(ChatMessage.builder()
+                .conversation(conv)
+                .sender(null)
+                .type(MessageType.SYSTEM)
+                .content("Bạn đã đăng ký hoạt động \"" + activity.getTitle()
+                        + "\". Bạn có thể trao đổi trực tiếp với tổ chức tại đây.")
+                .isRead(false)
+                .build());
+
+        conv.setLastMessagePreview(truncate(systemMsg.getContent()));
+        conv.setLastMessageType(MessageType.SYSTEM);
+        conv.setLastMessageAt(Instant.now());
+        conversationRepository.save(conv);
+
+        mirrorConversation(conv);
+        mirrorMessage(conv, systemMsg);
+        log.info("Community conversation created for activity {} and participant {}",
+                activity.getId(), participant.getUser().getId());
+        return conv;
     }
 
     // ─── Đọc danh sách / chi tiết ───────────────────────────────────────────
@@ -337,8 +418,8 @@ public class ChatService {
 
     /**
      * Đề xuất đổi lịch ngay trong cuộc trò chuyện.
-     * Cập nhật luôn Invitation gắn với hội thoại (module Appointment 9.11 chưa
-     * triển khai nên thời gian đề xuất được giữ ở Invitation.rescheduleTime).
+     * Đây là tin nhắn thương lượng. Trạng thái Invitation/Appointment chỉ được
+     * thay đổi qua workflow tương ứng để không làm một lời mời ACCEPTED bị kẹt.
      */
     @Transactional
     public ChatMessageResponse proposeReschedule(UUID conversationId, ProposeRescheduleRequest request) {
@@ -349,10 +430,9 @@ public class ChatService {
 
         requireNotBlocked(sender, receiver);
 
-        Invitation invitation = conv.getInvitation();
-        invitation.setStatus(InvitationStatus.RESCHEDULED);
-        invitation.setRescheduleTime(request.getProposedTime());
-        invitationRepository.save(invitation);
+        if (conv.getInvitation() == null) {
+            throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
+        }
 
         ChatMessage saved = chatMessageRepository.save(ChatMessage.builder()
                 .conversation(conv)
@@ -392,6 +472,7 @@ public class ChatService {
         Conversation conv = conversationRepository.findById(conversationId)
                 .orElse(null);
         if (conv == null) return;
+        if (conv.getInvitation() == null) return;
 
         User receiver = otherUserOf(conv, sender.getEmail());
 
@@ -423,12 +504,12 @@ public class ChatService {
      */
     @Transactional
     public void updateAppointmentCardData(UUID appointmentId, String newAptData) {
-        int updated = chatMessageRepository.updateAppointmentData(appointmentId, newAptData);
-        if (updated > 0 && firebaseService.isEnabled()) {
-            // Push 1 sự kiện giả để trigger realtime message refetch trên client
-            // Cách đơn giản nhất là đẩy vào 1 node update_trigger nào đó, 
-            // hoặc vì client tự động getMessages nếu mở chat nên chỉ cần DB update là đủ.
-            log.info("Updated appointment card data for appointment {} ({} messages)", appointmentId, updated);
+        List<ChatMessage> cards = chatMessageRepository.findAllByAppointmentId(appointmentId);
+        cards.forEach(card -> card.setAppointmentData(newAptData));
+        chatMessageRepository.saveAll(cards);
+        cards.forEach(card -> mirrorMessage(card.getConversation(), card));
+        if (!cards.isEmpty()) {
+            log.info("Updated appointment card data for appointment {} ({} messages)", appointmentId, cards.size());
         }
     }
 
@@ -439,10 +520,18 @@ public class ChatService {
         return conversationRepository.findAllByParticipantEmail(
                 userRepository.findById(userId1).map(User::getEmail).orElse("")
         ).stream()
+                .filter(c -> c.getInvitation() != null)
                 .filter(c -> (c.getUserOne().getId().equals(userId1) && c.getUserTwo().getId().equals(userId2))
                         || (c.getUserOne().getId().equals(userId2) && c.getUserTwo().getId().equals(userId1)))
                 .map(c -> c.getId())
                 .findFirst()
+                .orElse(null);
+    }
+
+    /** Tìm đúng cuộc trò chuyện gắn với lời mời, tránh nhầm khi hai người có nhiều lời mời. */
+    public UUID findConversationIdByInvitation(UUID invitationId) {
+        return conversationRepository.findByInvitation_Id(invitationId)
+                .map(Conversation::getId)
                 .orElse(null);
     }
 
@@ -496,13 +585,47 @@ public class ChatService {
 
         log.info("Message {} reported by {} — reason {}", messageId, email, request.getReason());
 
+        return toChatReportResponse(report);
+    }
+
+    public List<ChatReportResponse> getMyMessageReports() {
+        String email = SecurityUtil.getCurrentUserEmail();
+        return chatReportRepository.findAllByReporter_EmailOrderByCreatedAtDesc(email)
+                .stream().map(this::toChatReportResponse).toList();
+    }
+
+    public ChatReportResponse getMyMessageReport(UUID reportId) {
+        String email = SecurityUtil.getCurrentUserEmail();
+        ChatReport report = chatReportRepository.findByIdAndReporter_Email(reportId, email)
+                .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+        return toChatReportResponse(report);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public List<ChatReportResponse> getAllMessageReports() {
+        return chatReportRepository.findAllByOrderByCreatedAtDesc()
+                .stream().map(this::toChatReportResponse).toList();
+    }
+
+    @Transactional
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ChatReportResponse updateMessageReportStatus(UUID reportId, ChatReportStatus status) {
+        ChatReport report = chatReportRepository.findById(reportId)
+                .orElseThrow(() -> new AppException(ErrorCode.REPORT_NOT_FOUND));
+        report.setStatus(status);
+        return toChatReportResponse(chatReportRepository.save(report));
+    }
+
+    private ChatReportResponse toChatReportResponse(ChatReport report) {
+        ChatMessage message = report.getMessage();
         return ChatReportResponse.builder()
                 .id(report.getId())
                 .messageId(message.getId())
-                .reportedUserId(message.getSender().getId())
-                .reportedUserName(message.getSender().getFullName())
+                .reportedUserId(report.getReportedUser().getId())
+                .reportedUserName(report.getReportedUser().getFullName())
                 .reason(report.getReason())
                 .description(report.getDescription())
+                .evidence(report.getMessageSnapshot())
                 .status(report.getStatus())
                 .createdAt(report.getCreatedAt())
                 .build();
@@ -720,9 +843,15 @@ public class ChatService {
         data.put("participantInfo", Map.of(
                 conv.getUserOne().getId().toString(), participantInfo(conv.getUserOne()),
                 conv.getUserTwo().getId().toString(), participantInfo(conv.getUserTwo())));
-        data.put("invitationId", conv.getInvitation().getId().toString());
-        data.put("skillName", conv.getInvitation().getSkill() != null
+        data.put("sourceType", sourceTypeOf(conv).name());
+        data.put("invitationId", conv.getInvitation() != null
+                ? conv.getInvitation().getId().toString() : null);
+        data.put("skillName", conv.getInvitation() != null && conv.getInvitation().getSkill() != null
                 ? conv.getInvitation().getSkill().getName() : null);
+        data.put("communityActivityId", conv.getCommunityActivity() != null
+                ? conv.getCommunityActivity().getId().toString() : null);
+        data.put("communityActivityTitle", conv.getCommunityActivity() != null
+                ? conv.getCommunityActivity().getTitle() : null);
         data.put("lastMessage", conv.getLastMessagePreview());
         data.put("lastMessageType", conv.getLastMessageType() != null
                 ? conv.getLastMessageType().name() : null);
@@ -799,12 +928,29 @@ public class ChatService {
         var lastType = lastVisible.map(ChatMessage::getType).orElse(conv.getLastMessageType());
         var lastAt = lastVisible.map(ChatMessage::getCreatedAt).orElse(conv.getLastMessageAt());
 
+        Invitation invitation = conv.getInvitation();
+        CommunityActivity activity = conv.getCommunityActivity();
+        Appointment activeAppointment = invitation == null ? null : appointmentRepository
+                .findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+                        invitation.getId(), ACTIVE_APPOINTMENT_STATUSES)
+                .orElse(null);
+
         return ConversationResponse.builder()
                 .id(conv.getId())
-                .invitationId(conv.getInvitation().getId())
-                .invitationStatus(conv.getInvitation().getStatus())
-                .skillName(conv.getInvitation().getSkill() != null
-                        ? conv.getInvitation().getSkill().getName() : null)
+                .sourceType(sourceTypeOf(conv))
+                .invitationId(invitation != null ? invitation.getId() : null)
+                .invitationStatus(invitation != null ? invitation.getStatus() : null)
+                .invitationSenderId(invitation != null ? invitation.getSender().getId() : null)
+                .invitationReceiverId(invitation != null ? invitation.getReceiver().getId() : null)
+                .activeAppointmentId(activeAppointment != null ? activeAppointment.getId() : null)
+                .activeAppointmentStatus(activeAppointment != null ? activeAppointment.getStatus() : null)
+                .canCreateAppointment(invitation != null
+                        && invitation.getStatus() == InvitationStatus.ACCEPTED
+                        && activeAppointment == null)
+                .skillName(invitation != null && invitation.getSkill() != null
+                        ? invitation.getSkill().getName() : null)
+                .communityActivityId(activity != null ? activity.getId() : null)
+                .communityActivityTitle(activity != null ? activity.getTitle() : null)
                 .otherUserId(other.getId())
                 .otherUserName(other.getFullName())
                 .otherUserAvatarUrl(other.getAvatarUrl())
@@ -818,6 +964,13 @@ public class ChatService {
                 .isActive(conv.getIsActive())
                 .createdAt(conv.getCreatedAt())
                 .build();
+    }
+
+    private ConversationSourceType sourceTypeOf(Conversation conv) {
+        if (conv.getSourceType() != null) return conv.getSourceType();
+        return conv.getCommunityActivity() != null
+                ? ConversationSourceType.COMMUNITY_ACTIVITY
+                : ConversationSourceType.SKILL_INVITATION;
     }
 
     private ChatMessageResponse mapToMessageResponse(ChatMessage m) {

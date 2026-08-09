@@ -18,6 +18,7 @@ export type MessageType =
   | 'LOCATION'
   | 'MEETING_LINK'
   | 'RESCHEDULE_PROPOSAL'
+  | 'APPOINTMENT_CARD'
   | 'SYSTEM';
 
 /** Khớp com.hourlink.chat.enums.ChatReportReason */
@@ -34,10 +35,11 @@ export type VerificationMethod = 'QR' | 'OTP' | 'qr' | 'otp';
 export type ExtraCreditStatus = 'NONE' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'none' | 'pending' | 'accepted' | 'rejected';
 export type WalletTxType =
   | 'EARN' | 'SPEND' | 'HOLD' | 'RELEASE' | 'REFUND' | 'BONUS' | 'ADJUSTMENT';
-export type ReportReason = 'no_show' | 'offensive_behavior' | 'harassment' | 'credit_fraud' | 'wrong_guidance' | 'outside_payment_request' | 'password_otp_request' | 'fake_account' | 'other';
-export type ReportStatus = 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+export type ReportReason = 'SPAM' | 'HARASSMENT' | 'MISINFORMATION' | 'ILLEGAL_CONTENT' | 'FRAUD' | 'OTHER';
+export type ReportStatus = 'PENDING' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED';
+export type ReportTargetType = 'USER' | 'MESSAGE' | 'CONTENT';
 export type DisputeStatus = 'open' | 'reviewing' | 'resolved';
-export type ActivityParticipantStatus = 'registered' | 'confirmed' | 'completed' | 'cancelled';
+export type ActivityParticipantStatus = 'REGISTERED' | 'CONFIRMED' | 'CANCELLED' | 'ABSENT';
 export type NotificationType = 'invitation' | 'appointment' | 'wallet' | 'rating' | 'report' | 'community_activity' | 'system';
 
 // ─── API Response wrapper (mirrors ApiResponse<T> từ BE) ────
@@ -102,6 +104,31 @@ export interface UserResponse {
   completedSessions: number;
   cancelRate: number;
   createdAt: string;
+}
+
+export interface PublicUserProfileResponse {
+  id: string;
+  fullName: string;
+  avatarUrl?: string;
+  bio?: string;
+  region?: string;
+  occupation?: string;
+  languages?: string;
+  userType?: UserType;
+  isVerified?: boolean;
+  reputationScore?: number;
+  completedSessions?: number;
+  cancelRate?: number;
+  joinedAt?: string;
+  skills?: Array<{
+    id: string;
+    name: string;
+    categoryName?: string;
+    level?: string;
+    format?: string;
+    duration?: number;
+  }>;
+  badges?: BadgeResponse[];
 }
 
 export interface ProfileUpdateRequest {
@@ -219,9 +246,17 @@ export interface Invitation {
 /** Mirror com.hourlink.chat.dto.response.ConversationResponse */
 export interface Conversation {
   id: string;
-  invitationId: string;
-  invitationStatus: string;
+  sourceType: 'SKILL_INVITATION' | 'COMMUNITY_ACTIVITY';
+  invitationId?: string;
+  invitationStatus?: string;
+  invitationSenderId?: string;
+  invitationReceiverId?: string;
+  activeAppointmentId?: string;
+  activeAppointmentStatus?: string;
+  canCreateAppointment?: boolean;
   skillName?: string;
+  communityActivityId?: string;
+  communityActivityTitle?: string;
 
   otherUserId: string;
   otherUserName: string;
@@ -268,6 +303,10 @@ export interface ChatMessage {
   /** RESCHEDULE_PROPOSAL */
   proposedTime?: string;
 
+  /** APPOINTMENT_CARD */
+  appointmentId?: string;
+  appointmentData?: string;
+
   isRead: boolean;
   isRecalled?: boolean;
   recalled?: boolean;
@@ -294,6 +333,8 @@ export interface Appointment {
   receiverId?: string;
   receiverName?: string;
   receiverAvatarUrl?: string;
+  proposedById?: string;
+  proposedByName?: string;
   invitationId?: string;
   skillId?: string;
   skillName?: string;
@@ -330,6 +371,7 @@ export interface AppointmentVerification {
   method: VerificationMethod;
   code: string;
   expiresAt?: string;
+  generatedById?: string;
   verifiedAt?: string;
   verifiedById?: string;
   createdAt?: string;
@@ -369,6 +411,8 @@ export interface WalletTransaction {
   relatedAppointmentId?: string;
   /** Tiêu đề lịch hẹn liên quan (nếu có) */
   relatedAppointmentTitle?: string;
+  referenceType?: string;
+  referenceId?: string;
   createdAt: string;
 }
 
@@ -412,12 +456,39 @@ export interface BadgeResponse {
 
 export interface Report {
   id: string;
-  reporter: UserResponse;
-  reported: UserResponse;
+  targetId: string;
+  targetType: ReportTargetType;
   reason: ReportReason;
   description?: string;
-  evidenceUrl?: string;
+  evidenceUrls?: string;
   status: ReportStatus;
+  adminNote?: string;
+  createdAt: string;
+}
+
+export interface MessageReport {
+  id: string;
+  messageId: string;
+  reportedUserId: string;
+  reportedUserName: string;
+  reason: ChatReportReason;
+  description?: string;
+  evidence?: string;
+  status: 'PENDING' | 'REVIEWED' | 'DISMISSED' | 'ACTIONED';
+  createdAt: string;
+}
+
+export interface TrackedReport {
+  id: string;
+  source: 'REPORT' | 'MESSAGE';
+  targetId: string;
+  targetType: ReportTargetType;
+  targetLabel?: string;
+  reason: string;
+  description?: string;
+  evidence?: string;
+  status: string;
+  adminNote?: string;
   createdAt: string;
 }
 
@@ -449,7 +520,15 @@ export interface ActivityResponse {
   status: ActivityStatus;
   registeredCount: number;
   registered: boolean;
+  organizerFollowed: boolean;
   createdAt: string;
+}
+
+export interface FollowedOrganizationResponse {
+  organizationId: string;
+  organizationName: string;
+  organizationAvatarUrl?: string;
+  followedAt: string;
 }
 
 export interface ParticipantResponse {
@@ -461,6 +540,24 @@ export interface ParticipantResponse {
   actualHours?: number;
   confirmNote?: string;
   creditAwarded?: boolean;
+  confirmedAt?: string;
+  evidenceNote?: string;
+  evidenceSubmittedAt?: string;
+  evidence: ActivityEvidenceResponse[];
+  activityId: string;
+  activityTitle: string;
+  activityLocation?: string;
+  activityStartTime: string;
+  activityEndTime: string;
+  activityCreditReward: number;
+  createdAt: string;
+}
+
+export interface ActivityEvidenceResponse {
+  id: string;
+  fileUrl: string;
+  originalName?: string;
+  fileSize?: number;
   createdAt: string;
 }
 
@@ -478,8 +575,13 @@ export interface UpdateActivityRequest extends Partial<CreateActivityRequest> {}
 
 export interface ConfirmParticipantsRequest {
   participantIds?: string[];
-  actualHours: number;
+  actualHours?: number;
   confirmNote?: string;
+  confirmations?: Array<{
+    participantId: string;
+    actualHours: number;
+    confirmNote?: string;
+  }>;
 }
 
 // ─── Notification ────────────────────────────────────────────

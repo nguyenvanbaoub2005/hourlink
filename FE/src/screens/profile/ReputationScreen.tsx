@@ -5,26 +5,35 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import RatingApi from '@api/rating';
 import UserApi from '@api/user';
 import { useAuthStore } from '@store/authStore';
 import type { RatingResponse, BadgeResponse, UserResponse } from '@types';
 import Avatar from '@components/Avatar';
+import { getBadgeVisual } from '@utils/badgeVisual';
 
 export default function ReputationScreen() {
   const router = useRouter();
+  const { tab } = useLocalSearchParams<{ tab?: string | string[] }>();
+  const requestedTab = Array.isArray(tab) ? tab[0] : tab;
   const { user } = useAuthStore();
-  
+
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [ratings, setRatings] = useState<RatingResponse[]>([]);
   const [badges, setBadges] = useState<BadgeResponse[]>([]);
   const [systemBadges, setSystemBadges] = useState<BadgeResponse[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'RATINGS' | 'BADGES'>('RATINGS');
+  const [activeTab, setActiveTab] = useState<'RATINGS' | 'BADGES'>(
+    requestedTab === 'BADGES' ? 'BADGES' : 'RATINGS'
+  );
+
+  React.useEffect(() => {
+    setActiveTab(requestedTab === 'BADGES' ? 'BADGES' : 'RATINGS');
+  }, [requestedTab]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -38,7 +47,7 @@ export default function ReputationScreen() {
       setProfile(profRes.data?.data || null);
       setRatings(ratRes.data?.data?.content || []);
       setBadges(badgRes.data?.data || []);
-      
+
       const sortedSys = (sysBadgRes.data?.data || []).sort((a, b) => {
         if (a.category !== b.category) return (a.category || '').localeCompare(b.category || '');
         return (a.level || 0) - (b.level || 0);
@@ -70,7 +79,7 @@ export default function ReputationScreen() {
   }
 
   const renderRating = ({ item }: { item: RatingResponse }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.ratingCard}
       onPress={() => router.push(`/appointment/${item.appointmentId}` as any)}
       activeOpacity={0.7}
@@ -111,16 +120,16 @@ export default function ReputationScreen() {
       {(item.punctualityScore !== undefined || item.attitudeScore !== undefined || item.communicationScore !== undefined || item.qualityScore !== undefined) && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
           {item.punctualityScore !== undefined && item.punctualityScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{item.punctualityScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="time-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Đúng giờ: <Text style={{ fontWeight: '600' }}>{item.punctualityScore}</Text></Text></View>
           )}
           {item.attitudeScore !== undefined && item.attitudeScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{item.attitudeScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="happy-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Thái độ: <Text style={{ fontWeight: '600' }}>{item.attitudeScore}</Text></Text></View>
           )}
           {item.communicationScore !== undefined && item.communicationScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{item.communicationScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="chatbubbles-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Giao tiếp: <Text style={{ fontWeight: '600' }}>{item.communicationScore}</Text></Text></View>
           )}
           {item.qualityScore !== undefined && item.qualityScore !== null && (
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{item.qualityScore}</Text></Text>
+            <View style={styles.metricItem}><Ionicons name="school-outline" size={13} color={Colors.textSecondary} /><Text style={styles.metricText}>Chất lượng: <Text style={{ fontWeight: '600' }}>{item.qualityScore}</Text></Text></View>
           )}
         </View>
       )}
@@ -151,11 +160,12 @@ export default function ReputationScreen() {
     const opacity = status === 'LOCKED' ? 0.5 : 1;
     const bgColor = status === 'LOCKED' ? '#F1F5F9' : (status === 'PASSED' ? '#F8FAFC' : '#FEF3C7');
     const borderColor = status === 'LOCKED' ? 'transparent' : (status === 'PASSED' ? Colors.border : '#FCD34D');
+    const visual = getBadgeVisual(item.code);
 
     return (
       <View style={[styles.badgeCard, { opacity, borderColor, backgroundColor: status === 'EARNED' ? '#fff' : '#FAFAFA' }]}>
         <View style={[styles.badgeIconWrap, { backgroundColor: bgColor }]}>
-          <Text style={styles.badgeEmoji}>{item.iconUrl || '🏆'}</Text>
+          <Ionicons name={visual.icon} size={27} color={status === 'LOCKED' ? '#64748B' : visual.color} />
         </View>
         <View style={styles.badgeInfo}>
           <Text style={[styles.badgeName, status === 'LOCKED' && { color: Colors.textMuted }]}>
@@ -188,9 +198,11 @@ export default function ReputationScreen() {
       </View>
 
       <FlatList
-        data={activeTab === 'RATINGS' ? ratings : systemBadges}
+        data={(activeTab === 'RATINGS' ? ratings : systemBadges) as Array<RatingResponse | BadgeResponse>}
         keyExtractor={item => item.id}
-        renderItem={activeTab === 'RATINGS' ? (renderRating as any) : (renderBadge as any)}
+        renderItem={({ item }) => activeTab === 'RATINGS'
+          ? renderRating({ item: item as RatingResponse })
+          : renderBadge({ item: item as BadgeResponse })}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -327,6 +339,8 @@ const styles = StyleSheet.create({
   ratingDate: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   starsWrap: { flexDirection: 'row' },
   ratingComment: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  metricItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metricText: { fontSize: 12, color: Colors.textSecondary },
 
   // Badge item
   badgeCard: {
@@ -343,7 +357,6 @@ const styles = StyleSheet.create({
     width: 50, height: 50, borderRadius: 25, backgroundColor: '#FEF3C7',
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  badgeEmoji: { fontSize: 24 },
   badgeInfo: { flex: 1 },
   badgeName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 2 },
   badgeDesc: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },

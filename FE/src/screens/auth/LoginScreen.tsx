@@ -78,7 +78,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Chào mừng trở lại 👋</Text>
+            <Text style={styles.title}>Chào mừng trở lại</Text>
             <Text style={styles.subtitle}>Đăng nhập để tiếp tục kết nối cộng đồng</Text>
           </View>
 

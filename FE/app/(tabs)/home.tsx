@@ -12,17 +12,19 @@ import CommunityHomeScreen from '../../src/screens/home/CommunityHomeScreen';
 export default function HomeScreen() {
   const { role, user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'individual' | 'community'>('individual');
+  const isOrganization = role?.includes('ROLE_ORGANIZATION') || user?.userType === 'organization';
 
   const renderHomeContent = () => {
+    if (isOrganization) {
+      return <OrganizationHomeScreen />;
+    }
+
     if (activeTab === 'community') {
       return <CommunityHomeScreen />;
     }
 
     if (role?.includes('ROLE_ADMIN') || user?.userType === 'admin') {
       return <AdminHomeScreen />;
-    }
-    if (role?.includes('ROLE_ORGANIZATION') || user?.userType === 'organization') {
-      return <OrganizationHomeScreen />;
     }
     return <IndividualHomeScreen />;
   };
@@ -34,14 +36,14 @@ export default function HomeScreen() {
           style={[styles.tabBtn, activeTab === 'individual' && styles.tabBtnActive]}
           onPress={() => setActiveTab('individual')}
         >
-          <Text style={[styles.tabText, activeTab === 'individual' && styles.tabTextActive]}>Cá nhân</Text>
+          <Text style={[styles.tabText, activeTab === 'individual' && styles.tabTextActive]}>{isOrganization ? 'Cộng đồng' : 'Cá nhân'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        {!isOrganization && <TouchableOpacity
           style={[styles.tabBtn, activeTab === 'community' && styles.tabBtnActive]}
           onPress={() => setActiveTab('community')}
         >
           <Text style={[styles.tabText, activeTab === 'community' && styles.tabTextActive]}>Cộng đồng</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </View>
       {renderHomeContent()}
     </SafeAreaView>

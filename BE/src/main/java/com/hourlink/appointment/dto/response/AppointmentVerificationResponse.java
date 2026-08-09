@@ -17,6 +17,7 @@ public class AppointmentVerificationResponse {
     VerificationMethod method;
     String code;
     LocalDateTime expiresAt;
+    UUID generatedById;
     LocalDateTime verifiedAt;
     UUID verifiedById;
     Instant createdAt;
@@ -28,6 +29,7 @@ public class AppointmentVerificationResponse {
                 .method(v.getMethod())
                 .code(v.getCode())
                 .expiresAt(v.getExpiresAt())
+                .generatedById(v.getGeneratedBy() != null ? v.getGeneratedBy().getId() : null)
                 .verifiedAt(v.getVerifiedAt())
                 .verifiedById(v.getVerifiedBy() != null ? v.getVerifiedBy().getId() : null)
                 .createdAt(v.getCreatedAt())

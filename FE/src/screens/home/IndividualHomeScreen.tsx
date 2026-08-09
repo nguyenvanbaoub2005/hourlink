@@ -14,6 +14,9 @@ import HelpRequestApi from '@api/helprequest';
 import UserApi from '@api/user';
 import AppointmentApi from '@api/appointment';
 import Logo from '@components/Logo';
+import InvitationApi, { type InvitationResponse } from '@api/invitation';
+import Avatar from '@components/Avatar';
+import { formatDateTimeVi } from '@utils/dateTime';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 type HelpRequestItem = {
@@ -31,9 +34,9 @@ type HelpRequestItem = {
 // ─── Time greeting ─────────────────────────────────────────────────────────
 function getGreeting(): string {
   const h = new Date().getHours();
-  if (h >= 5 && h < 12)  return 'Chào buổi sáng ☀️';
-  if (h >= 12 && h < 18) return 'Chào buổi chiều 🌤';
-  return 'Chào buổi tối 🌙';
+  if (h >= 5 && h < 12) return 'Chào buổi sáng';
+  if (h >= 12 && h < 18) return 'Chào buổi chiều';
+  return 'Chào buổi tối';
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────
@@ -44,29 +47,41 @@ export default function IndividualHomeScreen() {
   const { totalUnread: chatUnread, setTotalUnread: setChatUnread } = useChatStore();
   const [myRequests, setMyRequests] = useState<HelpRequestItem[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<InvitationResponse[]>([]);
   const [firstName, setFirstName] = useState<string>('Bạn');
   const [refreshing, setRefreshing] = useState(false);
   const { wallet, fetchWallet } = useWalletStore();
 
   const fetchData = async () => {
-    try {
-      const [reqRes, profileRes, aptRes] = await Promise.all([
+    const [homeResult, invitationResult] = await Promise.allSettled([
+      Promise.all([
         HelpRequestApi.getMyRequests(),
         UserApi.getMyProfile(),
         AppointmentApi.getMyAppointments('UPCOMING', 0, 1),
-        fetchWallet()
-      ]);
+        fetchWallet(),
+      ]),
+      InvitationApi.getReceived(),
+    ]);
+
+    if (homeResult.status === 'fulfilled') {
+      const [reqRes, profileRes, aptRes] = homeResult.value;
       setMyRequests(reqRes.data.data ?? []);
       setUpcomingAppointments(aptRes.data.data?.content ?? []);
-      
+
       if (profileRes.data.data?.fullName) {
         setFirstName(profileRes.data.data.fullName.split(' ').pop() ?? 'Bạn');
       } else if (user?.fullName) {
         setFirstName(user.fullName.split(' ').pop() ?? 'Bạn');
       }
-    } catch {
+    } else {
       setMyRequests([]);
       setUpcomingAppointments([]);
+    }
+
+    if (invitationResult.status === 'fulfilled') {
+      setPendingInvitations((invitationResult.value.data.data ?? []).filter(item => item.status === 'PENDING'));
+    } else {
+      setPendingInvitations([]);
     }
 
     // Badge tin nhắn chưa đọc — tách riêng để lỗi chat không làm hỏng màn hình
@@ -91,6 +106,10 @@ export default function IndividualHomeScreen() {
   };
 
   const activeRequests = myRequests.filter(r => r.status === 'SEARCHING' || r.status === 'ASSIGNED');
+  const openReceivedInvitations = () => router.push({
+    pathname: '/profile/invitations',
+    params: { tab: 'RECEIVED' },
+  });
 
   return (
     <ScrollView
@@ -114,6 +133,24 @@ export default function IndividualHomeScreen() {
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>
                   {chatUnread > 9 ? '9+' : String(chatUnread)}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, { position: 'relative' }]}
+            onPress={openReceivedInvitations}
+            accessibilityLabel="Lời mời hỗ trợ"
+          >
+            <Ionicons
+              name={pendingInvitations.length > 0 ? 'mail-unread-outline' : 'mail-outline'}
+              size={24}
+              color={Colors.textPrimary}
+            />
+            {pendingInvitations.length > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>
+                  {pendingInvitations.length > 9 ? '9+' : String(pendingInvitations.length)}
                 </Text>
               </View>
             )}
@@ -183,7 +220,7 @@ export default function IndividualHomeScreen() {
           onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'shareSkill' } } as any)}
         >
           <View style={[styles.actionIcon, { backgroundColor: '#CCFBF1' }]}>
-            <Text style={{ fontSize: 26 }}>🤝</Text>
+            <Ionicons name="school-outline" size={26} color="#0F766E" />
           </View>
           <Text style={styles.actionTitle}>Đăng kỹ năng</Text>
           <Text style={styles.actionSub}>Chia sẻ với cộng đồng</Text>
@@ -194,12 +231,67 @@ export default function IndividualHomeScreen() {
           onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'needHelp' } } as any)}
         >
           <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
-            <Text style={{ fontSize: 26 }}>🙋</Text>
+            <Ionicons name="help-buoy-outline" size={26} color="#B45309" />
           </View>
           <Text style={styles.actionTitle}>Cần hỗ trợ</Text>
           <Text style={styles.actionSub}>Đặt yêu cầu giúp đỡ</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── Lời mời mới ────────────────────────────────────────────────── */}
+      {pendingInvitations.length > 0 && (
+        <View style={styles.invitationPanel}>
+          <View style={styles.invitationHeader}>
+            <View style={styles.invitationTitleRow}>
+              <View style={styles.invitationIcon}>
+                <Ionicons name="mail-unread-outline" size={19} color="#047857" />
+              </View>
+              <View>
+                <Text style={styles.invitationTitle}>Lời mời mới</Text>
+                <Text style={styles.invitationSubtitle}>Đang chờ bạn phản hồi</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.invitationCountButton}
+              onPress={openReceivedInvitations}
+            >
+              <Text style={styles.invitationCountText}>{pendingInvitations.length}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#047857" />
+            </TouchableOpacity>
+          </View>
+
+          {pendingInvitations.slice(0, 3).map((invitation, index) => (
+            <TouchableOpacity
+              key={invitation.id}
+              style={[styles.invitationItem, index > 0 && styles.invitationItemBorder]}
+              activeOpacity={0.7}
+              onPress={openReceivedInvitations}
+            >
+              <Avatar uri={invitation.senderAvatarUrl} name={invitation.senderName} size={42} />
+              <View style={styles.invitationContent}>
+                <Text style={styles.invitationSender} numberOfLines={1}>{invitation.senderName}</Text>
+                <Text style={styles.invitationSkill} numberOfLines={1}>
+                  {invitation.skillName ? `Muốn bạn hỗ trợ · ${invitation.skillName}` : invitation.content}
+                </Text>
+                <View style={styles.invitationTimeRow}>
+                  <Ionicons name="time-outline" size={12} color="#64748B" />
+                  <Text style={styles.invitationTime}>Nhận lúc {formatDateTimeVi(invitation.createdAt)}</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={19} color="#94A3B8" />
+            </TouchableOpacity>
+          ))}
+
+          {pendingInvitations.length > 3 && (
+            <TouchableOpacity
+              style={styles.invitationMoreButton}
+              onPress={openReceivedInvitations}
+            >
+              <Text style={styles.invitationMoreText}>Xem thêm {pendingInvitations.length - 3} lời mời</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* ── Lịch hẹn ─────────────────────────────────────────────────────── */}
       <View style={styles.sectionRow}>
@@ -219,7 +311,10 @@ export default function IndividualHomeScreen() {
           <TouchableOpacity 
             key={apt.id} 
             style={styles.requestCard}
-            onPress={() => router.push(`/(tabs)/appointments/${apt.id}` as any)}
+            onPress={() => router.push({
+              pathname: '/appointment/[id]',
+              params: { id: apt.id },
+            })}
           >
             <View style={styles.requestTopRow}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -285,8 +380,9 @@ export default function IndividualHomeScreen() {
                   </Text>
                 </View>
                 {req.duration ? (
-                  <View style={[styles.badge, { backgroundColor: '#FFEDD5' }]}>
-                    <Text style={[styles.badgeText, { color: '#C2410C' }]}>⏱ {Number((req.duration / 60).toFixed(1))} TC</Text>
+                  <View style={[styles.badge, styles.iconBadge, { backgroundColor: '#FFEDD5' }]}>
+                    <Ionicons name="time-outline" size={13} color="#C2410C" />
+                    <Text style={[styles.badgeText, { color: '#C2410C' }]}>{Number((req.duration / 60).toFixed(1))} TC</Text>
                   </View>
                 ) : null}
               </View>
@@ -299,13 +395,24 @@ export default function IndividualHomeScreen() {
             <View style={styles.cardDivider} />
             
             <View style={styles.requestBottomRow}>
-              <Text style={styles.requestBottomText}>
-                🕒 {req.duration || 60} phút · {
-                  req.format === 'OFFLINE' ? 'Trực tiếp' : 
-                  req.format === 'BOTH' ? 'Cả hai' : 'Online'
-                } 📈 {req.responseCount ?? 0} phản hồi
-              </Text>
-              <Text style={styles.aiSuggestText}>⚡ AI gợi ý</Text>
+              <View style={styles.requestMetaGroup}>
+                <View style={styles.requestMetaItem}>
+                  <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
+                  <Text style={styles.requestBottomText}>{req.duration || 60} phút</Text>
+                </View>
+                <Text style={styles.requestBottomText}>·</Text>
+                <Text style={styles.requestBottomText}>
+                  {req.format === 'OFFLINE' ? 'Trực tiếp' : req.format === 'BOTH' ? 'Cả hai' : 'Online'}
+                </Text>
+                <View style={styles.requestMetaItem}>
+                  <Ionicons name="chatbubble-outline" size={14} color={Colors.textMuted} />
+                  <Text style={styles.requestBottomText}>{req.responseCount ?? 0} phản hồi</Text>
+                </View>
+              </View>
+              <View style={styles.aiSuggestBadge}>
+                <Ionicons name="sparkles-outline" size={14} color="#059669" />
+                <Text style={styles.aiSuggestText}>AI gợi ý</Text>
+              </View>
             </View>
           </View>
         ))
@@ -359,6 +466,40 @@ const styles = StyleSheet.create({
   actionTitle:  { fontSize: 15, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 2 },
   actionSub:    { fontSize: 12, color: Colors.textMuted },
 
+  invitationPanel: {
+    backgroundColor: '#FFFFFF', borderRadius: Radius.lg, borderWidth: 1,
+    borderColor: '#A7F3D0', marginBottom: Spacing.lg, overflow: 'hidden',
+  },
+  invitationHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#ECFDF5', paddingHorizontal: 14, paddingVertical: 12,
+  },
+  invitationTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  invitationIcon: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#D1FAE5',
+    alignItems: 'center', justifyContent: 'center', marginRight: 10,
+  },
+  invitationTitle: { fontSize: 16, fontWeight: 'bold', color: '#065F46' },
+  invitationSubtitle: { fontSize: 12, color: '#047857', marginTop: 1 },
+  invitationCountButton: {
+    minWidth: 42, height: 32, paddingHorizontal: 9, borderRadius: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#D1FAE5',
+  },
+  invitationCountText: { fontSize: 14, fontWeight: 'bold', color: '#047857' },
+  invitationItem: { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  invitationItemBorder: { borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  invitationContent: { flex: 1, marginHorizontal: 11 },
+  invitationSender: { fontSize: 14, fontWeight: 'bold', color: Colors.textPrimary },
+  invitationSkill: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  invitationTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  invitationTime: { fontSize: 11, color: '#64748B' },
+  invitationMoreButton: {
+    alignItems: 'center', paddingVertical: 11, borderTopWidth: 1,
+    borderTopColor: '#D1FAE5', backgroundColor: '#F0FDFA',
+  },
+  invitationMoreText: { fontSize: 13, fontWeight: '600', color: '#047857' },
+
   sectionRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
   sectionTitle: { fontSize: 17, fontWeight: 'bold', color: Colors.textPrimary },
   seeAll:       { color: Colors.secondary, fontWeight: '500', fontSize: 14 },
@@ -371,6 +512,7 @@ const styles = StyleSheet.create({
   requestCard:  { backgroundColor: '#fff', borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.sm },
   requestTopRow:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   badge:        { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  iconBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeText:    { fontSize: 12, fontWeight: '600' },
   creditText:   { fontSize: 13, color: Colors.accent, fontWeight: 'bold' },
   requestTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary, marginBottom: 4 },
@@ -379,5 +521,8 @@ const styles = StyleSheet.create({
   cardDivider: { height: 1, backgroundColor: Colors.border, marginVertical: 12 },
   requestBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   requestBottomText: { fontSize: 13, color: Colors.textMuted },
+  requestMetaGroup: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5 },
+  requestMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  aiSuggestBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 },
   aiSuggestText: { fontSize: 13, fontWeight: 'bold', color: '#059669' },
 });

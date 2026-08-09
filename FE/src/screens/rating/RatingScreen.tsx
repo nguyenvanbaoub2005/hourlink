@@ -240,14 +240,14 @@ export default function RatingScreen() {
             {overallStars === 0
               ? 'Chưa chấm điểm'
               : overallStars === 1
-              ? '⭐ Rất tệ'
+              ? 'Rất tệ'
               : overallStars === 2
-              ? '⭐⭐ Tệ'
+              ? 'Tệ'
               : overallStars === 3
-              ? '⭐⭐⭐ Bình thường'
+              ? 'Bình thường'
               : overallStars === 4
-              ? '⭐⭐⭐⭐ Tốt'
-              : '⭐⭐⭐⭐⭐ Xuất sắc!'}
+              ? 'Tốt'
+              : 'Xuất sắc!'}
           </Text>
         </View>
 

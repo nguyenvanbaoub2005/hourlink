@@ -6,7 +6,8 @@ import type {
   ParticipantResponse,
   CreateActivityRequest,
   UpdateActivityRequest,
-  ConfirmParticipantsRequest
+  ConfirmParticipantsRequest,
+  FollowedOrganizationResponse
 } from '@types';
 
 const BASE_URL = '/community';
@@ -17,6 +18,14 @@ const CommunityApi = {
   getOpenActivities: (page = 0, size = 10) => {
     return axiosInstance.get<ApiResponse<PagedResponse<ActivityResponse>>>(
       `${BASE_URL}/activities`,
+      { params: { page, size } }
+    );
+  },
+
+  /** Hoạt động đang mở + hoạt động người dùng đã đăng ký để truy cập minh chứng */
+  getCommunityFeed: (page = 0, size = 10) => {
+    return axiosInstance.get<ApiResponse<PagedResponse<ActivityResponse>>>(
+      `${BASE_URL}/activities/feed`,
       { params: { page, size } }
     );
   },
@@ -48,6 +57,20 @@ const CommunityApi = {
     );
   },
 
+  getMyParticipation: (id: string) => {
+    return axiosInstance.get<ApiResponse<ParticipantResponse>>(
+      `${BASE_URL}/activities/${id}/my-participation`
+    );
+  },
+
+  submitEvidence: (id: string, formData: FormData) => {
+    return axiosInstance.post<ApiResponse<ParticipantResponse>>(
+      `${BASE_URL}/activities/${id}/evidence`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  },
+
   // ─── Tổ chức (CRUD) ─────────────────────────────────────────
 
   createActivity: (data: CreateActivityRequest) => {
@@ -76,6 +99,32 @@ const CommunityApi = {
     );
   },
 
+  cancelActivity: (id: string) => {
+    return axiosInstance.patch<ApiResponse<ActivityResponse>>(
+      `${BASE_URL}/activities/${id}/cancel`
+    );
+  },
+
+  // ─── Theo dõi tổ chức ──────────────────────────────────────
+
+  followOrganization: (organizationId: string) => {
+    return axiosInstance.post<ApiResponse<FollowedOrganizationResponse>>(
+      `${BASE_URL}/organizations/${organizationId}/follow`
+    );
+  },
+
+  unfollowOrganization: (organizationId: string) => {
+    return axiosInstance.delete<ApiResponse<void>>(
+      `${BASE_URL}/organizations/${organizationId}/follow`
+    );
+  },
+
+  getFollowedOrganizations: () => {
+    return axiosInstance.get<ApiResponse<FollowedOrganizationResponse[]>>(
+      `${BASE_URL}/organizations/following`
+    );
+  },
+
   // ─── Đăng ký / Xác nhận (US-36, 37, 38) ──────────────────────
 
   register: (id: string) => {
@@ -101,6 +150,13 @@ const CommunityApi = {
     return axiosInstance.post<ApiResponse<ParticipantResponse[]>>(
       `${BASE_URL}/activities/${id}/participants/confirm`,
       data
+    );
+  },
+
+  markParticipantsAbsent: (id: string, participantIds: string[], reason?: string) => {
+    return axiosInstance.post<ApiResponse<ParticipantResponse[]>>(
+      `${BASE_URL}/activities/${id}/participants/absent`,
+      { participantIds, reason }
     );
   }
 };

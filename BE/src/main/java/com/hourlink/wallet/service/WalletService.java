@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.UUID;
 
 /**
  * WalletService — Business logic cho module Wallet (chức năng 9.16 & 9.17).
@@ -94,7 +95,7 @@ public class WalletService {
      */
     @Transactional
     public void holdCredit(User receiver, Double amount, Appointment appointment) {
-        Wallet wallet = getWalletByUser(receiver);
+        Wallet wallet = getLockedWalletByUser(receiver);
 
         if (wallet.getBalance() < amount) {
             throw new AppException(ErrorCode.INSUFFICIENT_CREDIT);
@@ -112,7 +113,7 @@ public class WalletService {
     }
 
     /**
-     * HOOK: Appointment → COMPLETED (cả 2 bên đã xác nhận).
+     * HOOK: Appointment → COMPLETED (một trong hai người tham gia đã xác nhận).
      * Trừ Time Credit của Receiver (SPEND) và cộng cho Provider (EARN).
      */
     @Transactional
@@ -122,7 +123,7 @@ public class WalletService {
         Double amount  = appointment.getTimeCreditAmount();
 
         // --- Receiver: release hold → SPEND ---
-        Wallet receiverWallet = getWalletByUser(receiver);
+        Wallet receiverWallet = getLockedWalletByUser(receiver);
         if (receiverWallet.getHeldAmount() < amount) {
             // Fallback: trừ thẳng balance nếu chưa hold (trường hợp bất thường)
             log.warn("transferCredit: held_amount < amount for receiver [{}]. Deducting from balance.", receiver.getId());
@@ -141,7 +142,7 @@ public class WalletService {
                 "Thanh toán cho lịch hẹn: " + appointment.getTitle());
 
         // --- Provider: EARN ---
-        Wallet providerWallet = getWalletByUser(provider);
+        Wallet providerWallet = getLockedWalletByUser(provider);
         providerWallet.setBalance(providerWallet.getBalance() + amount);
         providerWallet.setTotalEarned(providerWallet.getTotalEarned() + amount);
         walletRepository.save(providerWallet);
@@ -163,7 +164,7 @@ public class WalletService {
         User receiver = appointment.getReceiver();
         Double amount  = appointment.getTimeCreditAmount();
 
-        Wallet wallet = getWalletByUser(receiver);
+        Wallet wallet = getLockedWalletByUser(receiver);
 
         // Chỉ release nếu thực sự đang hold
         if (wallet.getHeldAmount() <= 0) {
@@ -190,6 +191,11 @@ public class WalletService {
     /** Tìm ví theo user; tự động tạo nếu chưa có (dành cho acc cũ). */
     public Wallet getWalletByUser(User user) {
         return walletRepository.findByUserId(user.getId())
+                .orElseGet(() -> initWallet(user));
+    }
+
+    private Wallet getLockedWalletByUser(User user) {
+        return walletRepository.findByUserIdForUpdate(user.getId())
                 .orElseGet(() -> initWallet(user));
     }
 
@@ -231,6 +237,39 @@ public class WalletService {
         recordTransaction(wallet, null, WalletTxType.BONUS, amount, wallet.getBalance(), description);
 
         log.info("COMMUNITY BONUS: +{} TC → user [{}] | reason: {}", amount, user.getId(), description);
+    }
+
+    /**
+     * Cộng thưởng hoạt động cộng đồng đúng một lần cho mỗi participant.
+     * Khóa ví và dùng idempotency key ở DB để chống hai request xác nhận đồng thời.
+     *
+     * @return true nếu giao dịch mới được tạo, false nếu đã thưởng trước đó
+     */
+    @Transactional
+    public boolean addCommunityCredit(User user, Double amount, String description,
+                                      UUID activityId, UUID participantId) {
+        String idempotencyKey = "COMMUNITY_PARTICIPANT:" + participantId;
+        Wallet wallet = walletRepository.findByUserIdForUpdate(user.getId())
+                .orElseGet(() -> initWallet(user));
+
+        if (txRepository.existsByIdempotencyKey(idempotencyKey)) return false;
+
+        wallet.setBalance(wallet.getBalance() + amount);
+        wallet.setTotalEarned(wallet.getTotalEarned() + amount);
+        walletRepository.save(wallet);
+
+        WalletTransaction transaction = WalletTransaction.builder()
+                .wallet(wallet)
+                .type(WalletTxType.BONUS)
+                .amount(amount)
+                .balanceAfter(wallet.getBalance())
+                .description(description)
+                .referenceType("COMMUNITY_ACTIVITY")
+                .referenceId(activityId)
+                .idempotencyKey(idempotencyKey)
+                .build();
+        txRepository.save(transaction);
+        return true;
     }
 
     private User getCurrentUser() {

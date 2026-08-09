@@ -4,7 +4,9 @@ import com.hourlink.common.response.ApiResponse;
 import com.hourlink.community.dto.request.ConfirmParticipantsRequest;
 import com.hourlink.community.dto.request.CreateActivityRequest;
 import com.hourlink.community.dto.request.UpdateActivityRequest;
+import com.hourlink.community.dto.request.MarkParticipantsAbsentRequest;
 import com.hourlink.community.dto.response.ActivityResponse;
+import com.hourlink.community.dto.response.FollowedOrganizationResponse;
 import com.hourlink.community.dto.response.ParticipantResponse;
 import com.hourlink.community.service.CommunityService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,8 +17,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -81,6 +85,13 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success("Đã đóng đăng ký", communityService.closeRegistration(id)));
     }
 
+    @Operation(summary = "Hủy hoạt động và thông báo người tham gia")
+    @PatchMapping("/activities/{id}/cancel")
+    public ResponseEntity<ApiResponse<ActivityResponse>> cancelActivity(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã hủy hoạt động", communityService.cancelActivity(id)));
+    }
+
     // ─── Read ─────────────────────────────────────────────────────────────────
 
     @Operation(summary = "Danh sách hoạt động đang mở (US-36)")
@@ -89,6 +100,14 @@ public class CommunityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(ApiResponse.success(communityService.getOpenActivities(page, size)));
+    }
+
+    @Operation(summary = "Feed Community gồm hoạt động đang mở và hoạt động tôi đã đăng ký")
+    @GetMapping("/activities/feed")
+    public ResponseEntity<ApiResponse<Page<ActivityResponse>>> getCommunityFeed(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.success(communityService.getCommunityFeed(page, size)));
     }
 
     @Operation(summary = "Toàn bộ hoạt động (admin / organizer)")
@@ -111,6 +130,30 @@ public class CommunityController {
     @GetMapping("/activities/{id}")
     public ResponseEntity<ApiResponse<ActivityResponse>> getOne(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(communityService.getActivity(id)));
+    }
+
+    // ─── Theo dõi tổ chức ───────────────────────────────────────────────────
+
+    @Operation(summary = "Theo dõi tổ chức có hoạt động Community")
+    @PostMapping("/organizations/{organizationId}/follow")
+    public ResponseEntity<ApiResponse<FollowedOrganizationResponse>> followOrganization(
+            @PathVariable UUID organizationId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+                "Đã theo dõi tổ chức", communityService.followOrganization(organizationId)));
+    }
+
+    @Operation(summary = "Bỏ theo dõi tổ chức")
+    @DeleteMapping("/organizations/{organizationId}/follow")
+    public ResponseEntity<ApiResponse<Void>> unfollowOrganization(
+            @PathVariable UUID organizationId) {
+        communityService.unfollowOrganization(organizationId);
+        return ResponseEntity.ok(ApiResponse.noContent("Đã bỏ theo dõi tổ chức"));
+    }
+
+    @Operation(summary = "Danh sách tổ chức tôi đang theo dõi")
+    @GetMapping("/organizations/following")
+    public ResponseEntity<ApiResponse<List<FollowedOrganizationResponse>>> getFollowedOrganizations() {
+        return ResponseEntity.ok(ApiResponse.success(communityService.getFollowedOrganizations()));
     }
 
     // ─── US-36: Đăng ký / hủy đăng ký ───────────────────────────────────────
@@ -137,6 +180,22 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success(communityService.getMyRegistrations(page, size)));
     }
 
+    @Operation(summary = "Xem đăng ký của tôi trong một hoạt động")
+    @GetMapping("/activities/{id}/my-participation")
+    public ResponseEntity<ApiResponse<ParticipantResponse>> getMyParticipation(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(communityService.getMyParticipation(id)));
+    }
+
+    @Operation(summary = "Gửi hoặc cập nhật ảnh minh chứng tham gia hoạt động")
+    @PostMapping(value = "/activities/{id}/evidence", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ParticipantResponse>> submitEvidence(
+            @PathVariable UUID id,
+            @RequestPart(name = "files", required = false) List<MultipartFile> files,
+            @RequestParam(name = "note", required = false) String note) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã gửi minh chứng tham gia", communityService.submitEvidence(id, files, note)));
+    }
+
     // ─── US-37 + US-38: Xác nhận người tham gia ──────────────────────────────
 
     @Operation(summary = "Lấy danh sách người tham gia hoạt động (US-37)")
@@ -157,5 +216,15 @@ public class CommunityController {
         return ResponseEntity.ok(ApiResponse.success(
                 String.format("Đã xác nhận %d người tham gia và cộng Time Credit thành công", confirmed.size()),
                 confirmed));
+    }
+
+    @Operation(summary = "Đánh dấu người đăng ký vắng mặt")
+    @PostMapping("/activities/{id}/participants/absent")
+    public ResponseEntity<ApiResponse<List<ParticipantResponse>>> markParticipantsAbsent(
+            @PathVariable UUID id,
+            @Valid @RequestBody MarkParticipantsAbsentRequest request) {
+        List<ParticipantResponse> absent = communityService.markParticipantsAbsent(id, request);
+        return ResponseEntity.ok(ApiResponse.success(
+                String.format("Đã đánh dấu %d người vắng mặt", absent.size()), absent));
     }
 }

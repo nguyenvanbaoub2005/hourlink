@@ -10,4 +10,7 @@ public class VerifyCodeRequest {
 
     @NotBlank(message = "Mã xác nhận không được để trống")
     String code;
+
+    /** Người dùng đã xác nhận cảnh báo khi muốn bắt đầu trước giờ hẹn. */
+    Boolean allowEarlyStart;
 }

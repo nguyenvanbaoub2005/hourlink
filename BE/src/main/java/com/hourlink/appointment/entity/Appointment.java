@@ -10,6 +10,7 @@ import com.hourlink.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -36,6 +37,11 @@ public class Appointment extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receiver_id", nullable = false)
     User receiver;
+
+    /** Người đưa ra lịch/khung giờ hiện tại; bên còn lại mới được chấp nhận. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_by")
+    User proposedBy;
 
     /** Lời mời gốc tạo nên lịch hẹn này (nullable nếu tạo trực tiếp) */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -98,6 +104,10 @@ public class Appointment extends BaseEntity {
     /** Thời gian đề xuất mới khi RESCHEDULED (ví dụ "2026-07-30 19:00-20:00") */
     @Column(name = "reschedule_proposed_time", length = 200)
     String rescheduleProposedTime;
+
+    /** Đánh dấu đã gửi nhắc lịch để scheduler không gửi lặp. */
+    @Column(name = "reminder_sent_at")
+    Instant reminderSentAt;
 
     /** Trạng thái xin thêm tín dụng giờ phát sinh */
     @Enumerated(EnumType.STRING)

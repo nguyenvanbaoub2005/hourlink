@@ -1,8 +1,9 @@
 package com.hourlink.community.dto.request;
 
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -22,11 +23,27 @@ public class ConfirmParticipantsRequest {
     private List<UUID> participantIds;
 
     /** Số giờ đóng góp thực tế */
-    @NotNull(message = "Số giờ đóng góp không được để trống")
     @DecimalMin(value = "0.5", message = "Tối thiểu 0.5 giờ")
     private Double actualHours;
 
     /** Ghi chú của tổ chức */
     @Size(max = 500)
     private String confirmNote;
+
+    /** Xác nhận chi tiết theo từng người; nếu có thì ưu tiên hơn các field tương thích cũ phía trên. */
+    @Valid
+    private List<ParticipantConfirmation> confirmations;
+
+    @Data
+    public static class ParticipantConfirmation {
+        @NotNull(message = "Participant ID không được để trống")
+        private UUID participantId;
+
+        @NotNull(message = "Số giờ đóng góp không được để trống")
+        @DecimalMin(value = "0.5", message = "Tối thiểu 0.5 giờ")
+        private Double actualHours;
+
+        @Size(max = 500)
+        private String confirmNote;
+    }
 }

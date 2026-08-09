@@ -18,6 +18,10 @@ const ChatApi = {
   openFromInvitation: (invitationId: string) =>
     api.post(`/chat/conversations/from-invitation/${invitationId}`),
 
+  /** Mở chat giữa người đã đăng ký hoạt động cộng đồng và tổ chức */
+  openFromCommunity: (activityId: string) =>
+    api.post(`/chat/conversations/from-community/${activityId}`),
+
   /** Danh sách cuộc trò chuyện của tôi */
   getConversations: () => api.get('/chat/conversations'),
 
@@ -73,6 +77,10 @@ const ChatApi = {
     messageId: string,
     data: { reason: string; description?: string }
   ) => api.post(`/chat/messages/${messageId}/report`, data),
+
+  /** Danh sách/chi tiết báo cáo tin nhắn tôi đã gửi */
+  getMyMessageReports: () => api.get('/chat/reports/my'),
+  getMyMessageReport: (reportId: string) => api.get(`/chat/reports/my/${reportId}`),
 
   /** Chặn một người dùng */
   blockUser: (data: { userId: string; reason?: string }) =>

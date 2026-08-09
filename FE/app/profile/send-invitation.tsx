@@ -10,10 +10,10 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import InvitationApi from '@api/invitation';
 
 const FORMAT_OPTIONS = [
-  { label: 'Trực tuyến 💻', value: 'ONLINE' },
-  { label: 'Trực tiếp 🤝', value: 'OFFLINE' },
-  { label: 'Cả hai 🌐',    value: 'BOTH'    },
-];
+  { label: 'Trực tuyến', value: 'ONLINE', icon: 'videocam-outline' },
+  { label: 'Trực tiếp', value: 'OFFLINE', icon: 'people-outline' },
+  { label: 'Cả hai', value: 'BOTH', icon: 'git-compare-outline' },
+] as const;
 
 const DURATION_OPTIONS = [
   { label: '30 phút', value: 30 },
@@ -74,14 +74,16 @@ export default function SendInvitationScreen() {
       });
 
       Alert.alert(
-        '🎉 Gửi thành công!',
+        'Gửi thành công',
         `Lời mời đã được gửi đến ${params.receiverName}. Bạn sẽ nhận được thông báo khi họ phản hồi.`,
         [
           {
             text: 'Xem lời mời đã gửi',
             onPress: () => {
-              router.back();
-              router.push('/profile/invitations' as any);
+              router.replace({
+                pathname: '/profile/invitations',
+                params: { tab: 'SENT' },
+              });
             }
           },
           { text: 'OK', onPress: () => router.back() },
@@ -126,7 +128,10 @@ export default function SendInvitationScreen() {
               <Text style={styles.receiverLabel}>Gửi lời mời đến</Text>
               <Text style={styles.receiverName}>{params.receiverName ?? '—'}</Text>
               {params.skillName ? (
-                <Text style={styles.receiverSkill}>📚 Kỹ năng: {params.skillName}</Text>
+                <View style={styles.receiverSkillRow}>
+                  <Ionicons name="book-outline" size={13} color={Colors.textMuted} />
+                  <Text style={styles.receiverSkill}>Kỹ năng: {params.skillName}</Text>
+                </View>
               ) : null}
             </View>
             <Ionicons name="send" size={22} color={Colors.primary} />
@@ -144,6 +149,7 @@ export default function SendInvitationScreen() {
               multiline
               value={content}
               onChangeText={setContent}
+              maxLength={500}
               textAlignVertical="top"
             />
             <Text style={styles.charCount}>{content.length} / 500</Text>
@@ -161,6 +167,11 @@ export default function SendInvitationScreen() {
                   style={[styles.optionBtn, format === opt.value && styles.optionBtnActive]}
                   onPress={() => setFormat(opt.value)}
                 >
+                  <Ionicons
+                    name={opt.icon}
+                    size={15}
+                    color={format === opt.value ? Colors.primary : '#475569'}
+                  />
                   <Text style={[styles.optionText, format === opt.value && styles.optionTextActive]}>
                     {opt.label}
                   </Text>
@@ -196,6 +207,7 @@ export default function SendInvitationScreen() {
               placeholderTextColor={Colors.textMuted}
               value={proposedTime}
               onChangeText={setProposedTime}
+              maxLength={200}
             />
             {/* Gợi ý nhanh */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
@@ -225,6 +237,7 @@ export default function SendInvitationScreen() {
               multiline
               value={message}
               onChangeText={setMessage}
+              maxLength={500}
               textAlignVertical="top"
             />
           </View>
@@ -290,7 +303,8 @@ const styles = StyleSheet.create({
   receiverLetter: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
   receiverLabel: { fontSize: 12, color: Colors.textMuted },
   receiverName: { fontSize: 16, fontWeight: 'bold', color: '#0F172A', marginTop: 2 },
-  receiverSkill: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  receiverSkillRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  receiverSkill: { fontSize: 12, color: Colors.textMuted },
 
   fieldGroup: { marginBottom: 18 },
   fieldLabel: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
@@ -312,6 +326,7 @@ const styles = StyleSheet.create({
 
   optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 14, paddingVertical: 10, borderRadius: Radius.lg,
     backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#E2E8F0',
   },

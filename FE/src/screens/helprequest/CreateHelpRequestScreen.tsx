@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import AiMatchingApi from '@api/aimatching';
 
 export default function CreateHelpRequestScreen() {
@@ -25,7 +26,7 @@ export default function CreateHelpRequestScreen() {
       const res = await AiMatchingApi.predictCategory({ description });
       const data = res.data.data;
       if (data) {
-        setCategoryId(data.category_id);
+        setCategoryId(String(data.category_id));
         setCategoryName(data.category_name);
         Alert.alert('AI Phân loại', `Đã tự động chọn danh mục: ${data.category_name} (Độ tin cậy: ${(data.confidence * 100).toFixed(1)}%)`);
       }
@@ -77,7 +78,10 @@ export default function CreateHelpRequestScreen() {
             {isAiLoading ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.aiButtonText}>✨ AI Tự động Phân loại Danh mục</Text>
+              <View style={styles.aiButtonContent}>
+                <Ionicons name="sparkles-outline" size={17} color="#fff" />
+                <Text style={styles.aiButtonText}>AI tự động phân loại danh mục</Text>
+              </View>
             )}
           </TouchableOpacity>
         </View>
@@ -130,6 +134,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
+  aiButtonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   categoryBox: {
     backgroundColor: Colors.surface,
     padding: 12,

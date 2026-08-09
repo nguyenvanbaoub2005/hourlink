@@ -9,6 +9,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
+import CancelAppointmentModal from '@components/CancelAppointmentModal';
+import { useAuthStore } from '@store/authStore';
 import type { AppointmentItem } from '@types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -22,8 +24,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   RESCHEDULED: { label: 'Đề xuất đổi lịch', color: '#F97316', bg: '#FFEDD5', icon: 'repeat-outline' },
 };
 
-const TABS = [
-  { id: 'ALL', label: 'Tất cả' },
+type AppointmentTab = 'UPCOMING' | 'IN_PROGRESS' | 'HISTORY';
+
+const TABS: { id: AppointmentTab; label: string }[] = [
   { id: 'UPCOMING', label: 'Sắp tới' },
   { id: 'IN_PROGRESS', label: 'Đang diễn ra' },
   { id: 'HISTORY', label: 'Lịch sử' },
@@ -31,17 +34,49 @@ const TABS = [
 
 export default function AppointmentsScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<string>('UPCOMING');
+  const currentUser = useAuthStore((state) => state.user);
+  const [activeTab, setActiveTab] = useState<AppointmentTab>('UPCOMING');
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [tabCounts, setTabCounts] = useState<Record<AppointmentTab, number>>({
+    UPCOMING: 0,
+    IN_PROGRESS: 0,
+    HISTORY: 0,
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; title: string } | null>(null);
+
+  const fetchTabCounts = useCallback(async () => {
+    const countEntries = await Promise.all(TABS.map(async ({ id: tabId }) => {
+      try {
+        const response = await AppointmentApi.getMyAppointments(tabId, 0, 1);
+        const pageData = response.data?.data;
+        const count = Array.isArray(pageData)
+          ? pageData.length
+          : pageData?.totalElements ?? pageData?.content?.length ?? 0;
+        return [tabId, count] as const;
+      } catch (error) {
+        console.error(`Failed to fetch ${tabId} appointment count:`, error);
+        return null;
+      }
+    }));
+
+    setTabCounts((current) => {
+      const next = { ...current };
+      countEntries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+      return next;
+    });
+  }, []);
 
   const fetchAppointments = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
 
     try {
+      const countsPromise = fetchTabCounts();
       const res = await AppointmentApi.getMyAppointments(activeTab, 0, 50);
       if (res.data?.data?.content) {
         setAppointments(res.data.data.content);
@@ -50,6 +85,7 @@ export default function AppointmentsScreen() {
       } else {
         setAppointments([]);
       }
+      await countsPromise;
     } catch (error: any) {
       console.error('Failed to fetch appointments:', error);
       Alert.alert('Lỗi', 'Không thể tải danh sách lịch hẹn. Vui lòng thử lại.');
@@ -57,7 +93,7 @@ export default function AppointmentsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab]);
+  }, [activeTab, fetchTabCounts]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,23 +102,25 @@ export default function AppointmentsScreen() {
   );
 
   const handleRespond = async (id: string, action: 'CONFIRM' | 'CANCEL', title: string) => {
-    const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
+    if (action === 'CANCEL') {
+      setCancelTarget({ id, title });
+      return;
+    }
     Alert.alert(
-      `${action === 'CONFIRM' ? 'Xác nhận' : 'Hủy'} lịch hẹn`,
-      `Bạn có chắc chắn muốn ${actionText} buổi hẹn "${title}" không?`,
+      'Xác nhận lịch hẹn',
+      `Bạn có chắc chắn muốn xác nhận buổi hẹn "${title}" không?`,
       [
         { text: 'Bỏ qua', style: 'cancel' },
         {
-          text: action === 'CONFIRM' ? 'Đồng ý' : 'Hủy lịch',
-          style: action === 'CANCEL' ? 'destructive' : 'default',
+          text: 'Đồng ý',
           onPress: async () => {
             try {
               setActionLoading(id);
-              await AppointmentApi.respond(id, { action, reason: action === 'CANCEL' ? 'Người dùng hủy lịch' : undefined });
-              Alert.alert('Thành công', `Đã ${actionText} lịch hẹn.`);
+              await AppointmentApi.respond(id, { action });
+              Alert.alert('Thành công', 'Đã xác nhận lịch hẹn.');
               fetchAppointments();
             } catch (err: any) {
-              Alert.alert('Lỗi', err?.response?.data?.message || `Không thể ${actionText} lịch hẹn.`);
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
             } finally {
               setActionLoading(null);
             }
@@ -92,13 +130,47 @@ export default function AppointmentsScreen() {
     );
   };
 
+  const submitCancellation = async (reason: string) => {
+    if (!cancelTarget) return;
+    try {
+      setActionLoading(cancelTarget.id);
+      await AppointmentApi.respond(cancelTarget.id, { action: 'CANCEL', reason });
+      setCancelTarget(null);
+      Alert.alert('Đã hủy lịch hẹn', 'Lý do hủy đã được gửi cho người còn lại.');
+      await fetchAppointments();
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lịch hẹn.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleVerify = (item: AppointmentItem) => {
     const isOffline = item.meetingType?.toUpperCase() === 'OFFLINE' || (item as any).format === 'offline';
-    if (isOffline) {
-      router.push(`/appointment/qr?id=${item.id}` as any);
-    } else {
-      router.push(`/appointment/otp?id=${item.id}` as any);
+    const openVerification = (allowEarlyStart: boolean) => router.push({
+      pathname: isOffline ? '/appointment/qr' : '/appointment/otp',
+      params: {
+        id: item.id,
+        allowEarlyStart: allowEarlyStart ? 'true' : 'false',
+      },
+    } as any);
+    const startAt = Date.parse(
+      `${item.appointmentDate}T${item.startTime?.slice(0, 8) || '00:00:00'}`,
+    );
+
+    if (Number.isFinite(startAt) && Date.now() < startAt) {
+      Alert.alert(
+        'Chưa tới giờ hẹn',
+        `Lịch bắt đầu lúc ${item.startTime?.slice(0, 5)} ngày ${item.appointmentDate}. Bạn vẫn muốn bắt đầu sớm?`,
+        [
+          { text: 'Chưa bắt đầu', style: 'cancel' },
+          { text: 'Vẫn bắt đầu', onPress: () => openVerification(true) },
+        ],
+      );
+      return;
     }
+
+    openVerification(false);
   };
 
   const renderCard = ({ item }: { item: AppointmentItem }) => {
@@ -108,6 +180,10 @@ export default function AppointmentsScreen() {
     const titleStr = item.title || (item as any).content || 'Buổi hỗ trợ kỹ năng';
     const tcAmount = item.timeCreditAmount || (item as any).timeCredit || 1;
     const isOffline = item.meetingType?.toUpperCase() === 'OFFLINE' || (item as any).format === 'offline';
+    const canRespond = !item.proposedById || item.proposedById !== currentUser?.id;
+    const endAt = Date.parse(`${item.appointmentDate}T${item.endTime?.slice(0, 8) || '00:00:00'}`);
+    const isExpired = Number.isFinite(endAt) && endAt < Date.now();
+    const canAccept = canRespond && !isExpired;
 
     return (
       <TouchableOpacity
@@ -182,11 +258,26 @@ export default function AppointmentsScreen() {
 
         {/* Actions Row */}
         <View style={styles.actionsContainer}>
-          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && (
+          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && canAccept && (
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.btn, styles.btnConfirm]}
-                onPress={() => handleRespond(item.id, 'CONFIRM', titleStr)}
+                onPress={() => {
+                  const location = item.locationOrLink?.trim() || '';
+                  const validLocation = isOffline ? location.length > 0 : /^https?:\/\//i.test(location);
+                  if (!validLocation) {
+                    Alert.alert(
+                      isOffline ? 'Thiếu địa điểm' : 'Thiếu link họp',
+                      `Mở chi tiết lịch hẹn để bổ sung ${isOffline ? 'địa điểm' : 'link họp'} trước khi chấp nhận.`,
+                      [
+                        { text: 'Để sau', style: 'cancel' },
+                        { text: 'Mở chi tiết', onPress: () => router.push(`/appointment/${item.id}` as any) },
+                      ]
+                    );
+                    return;
+                  }
+                  handleRespond(item.id, 'CONFIRM', titleStr);
+                }}
                 disabled={isLoading}
               >
                 {isLoading ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.btnTextWhite}>Chấp nhận</Text>}
@@ -198,6 +289,15 @@ export default function AppointmentsScreen() {
               >
                 <Text style={styles.btnTextCancel}>Từ chối</Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && !canAccept && (
+            <View style={styles.waitingBox}>
+              <Ionicons name={isExpired ? 'alert-circle-outline' : 'hourglass-outline'} size={15} color="#B45309" />
+              <Text style={styles.waitingText}>
+                {isExpired ? 'Đã quá giờ · mở chi tiết để đổi lịch' : 'Đang chờ người còn lại phản hồi'}
+              </Text>
             </View>
           )}
 
@@ -244,30 +344,28 @@ export default function AppointmentsScreen() {
 
       {/* Filter Tabs */}
       <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'UPCOMING' && styles.tabItemActive]}
-          onPress={() => setActiveTab('UPCOMING')}
-        >
-          <Text style={[styles.tabText, activeTab === 'UPCOMING' && styles.tabTextActive]}>
-            Sắp tới
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'IN_PROGRESS' && styles.tabItemActive]}
-          onPress={() => setActiveTab('IN_PROGRESS')}
-        >
-          <Text style={[styles.tabText, activeTab === 'IN_PROGRESS' && styles.tabTextActive]}>
-            Đang diễn ra
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'HISTORY' && styles.tabItemActive]}
-          onPress={() => setActiveTab('HISTORY')}
-        >
-          <Text style={[styles.tabText, activeTab === 'HISTORY' && styles.tabTextActive]}>
-            Lịch sử
-          </Text>
-        </TouchableOpacity>
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const count = tabCounts[tab.id];
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tabItem, isActive && styles.tabItemActive]}
+              onPress={() => setActiveTab(tab.id)}
+            >
+              <View style={styles.tabLabelRow}>
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
+                {count > 0 && (
+                  <View style={[styles.tabCountBadge, isActive && styles.tabCountBadgeActive]}>
+                    <Text style={[styles.tabCountText, isActive && styles.tabCountTextActive]}>
+                      {count > 99 ? '99+' : count}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Content */}
@@ -292,6 +390,13 @@ export default function AppointmentsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      <CancelAppointmentModal
+        visible={cancelTarget !== null}
+        appointmentTitle={cancelTarget?.title}
+        loading={cancelTarget !== null && actionLoading === cancelTarget.id}
+        onClose={() => setCancelTarget(null)}
+        onSubmit={submitCancellation}
+      />
     </SafeAreaView>
   );
 }
@@ -324,8 +429,16 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabItemActive: { borderBottomColor: Colors.primary },
+  tabLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   tabText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
   tabTextActive: { color: Colors.primary },
+  tabCountBadge: {
+    minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0',
+  },
+  tabCountBadgeActive: { backgroundColor: Colors.primary },
+  tabCountText: { fontSize: 10, lineHeight: 12, fontWeight: '700', color: Colors.textSecondary },
+  tabCountTextActive: { color: '#FFF' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: Colors.textSecondary, fontSize: 14 },
@@ -438,6 +551,12 @@ const styles = StyleSheet.create({
   btnVerify: { backgroundColor: '#0D9488' },
   btnComplete: { backgroundColor: '#9333EA' },
   btnDetail: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: Colors.border },
+  waitingBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+    paddingVertical: 10, borderRadius: Radius.md,
+  },
+  waitingText: { color: '#B45309', fontSize: 13, fontWeight: '600' },
 
   btnTextWhite: { color: '#FFF', fontWeight: '600', fontSize: 13 },
   btnTextCancel: { color: '#DC2626', fontWeight: '600', fontSize: 13 },

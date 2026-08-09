@@ -12,31 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import UserApi from '@api/user';
 import Avatar from '@components/Avatar';
 import { Colors, Radius } from '@constants/Colors';
-
-/** Mirror com.hourlink.user.dto.PublicProfileResponse */
-type PublicProfile = {
-  id: string;
-  fullName: string;
-  avatarUrl?: string;
-  bio?: string;
-  region?: string;
-  occupation?: string;
-  languages?: string;
-  userType?: string;
-  isVerified?: boolean;
-  reputationScore?: number;
-  completedSessions?: number;
-  cancelRate?: number;
-  joinedAt?: string;
-  skills?: {
-    id: string;
-    name: string;
-    categoryName?: string;
-    level?: string;
-    format?: string;
-    duration?: number;
-  }[];
-};
+import type { PublicUserProfileResponse } from '@types';
+import { getBadgeVisual } from '@utils/badgeVisual';
 
 const LEVEL_LABEL: Record<string, string> = {
   BEGINNER: 'Cơ bản',
@@ -64,7 +41,7 @@ interface Props {
  * thông tin backend cho phép công khai (không có email / số điện thoại).
  */
 export default function UserProfileSheet({ visible, userId, onClose }: Props) {
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [profile, setProfile] = useState<PublicUserProfileResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,7 +54,7 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
 
     UserApi.getUserById(userId)
       .then((res) => {
-        if (!cancelled) setProfile((res.data as any)?.data ?? null);
+        if (!cancelled) setProfile(res.data?.data ?? null);
       })
       .catch((e: any) => {
         if (!cancelled) {
@@ -177,6 +154,34 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
                 </View>
               )}
 
+              {/* ── Huy hiệu đã đạt ───────────────────────────── */}
+              <View style={styles.section}>
+                <View style={styles.badgeSectionTitleRow}>
+                  <Text style={[styles.sectionTitle, styles.badgeSectionTitle]}>Huy hiệu đã đạt</Text>
+                  <Text style={styles.badgeCount}>{profile.badges?.length ?? 0}</Text>
+                </View>
+                {profile.badges && profile.badges.length > 0 ? (
+                  <View style={styles.badgeGrid}>
+                    {profile.badges.map((badge) => {
+                      const visual = getBadgeVisual(badge.code);
+                      return (
+                        <View key={badge.id} style={styles.publicBadgeCard}>
+                          <View style={[styles.publicBadgeIcon, { backgroundColor: visual.background }]}>
+                            <Ionicons name={visual.icon} size={22} color={visual.color} />
+                          </View>
+                          <View style={styles.publicBadgeInfo}>
+                            <Text style={styles.publicBadgeName} numberOfLines={1}>{badge.name}</Text>
+                            <Text style={styles.publicBadgeDescription} numberOfLines={2}>{badge.description}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={styles.emptyText}>Người này chưa đạt huy hiệu nào.</Text>
+                )}
+              </View>
+
               {/* ── Kỹ năng đang chia sẻ ──────────────────────── */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>
@@ -271,6 +276,23 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
   bodyText: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
   emptyText: { fontSize: 13, color: Colors.textMuted, fontStyle: 'italic' },
+  badgeSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  badgeSectionTitle: { marginBottom: 0 },
+  badgeCount: {
+    minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6,
+    textAlign: 'center', textAlignVertical: 'center',
+    backgroundColor: '#EDE9FE', color: '#7C3AED', fontSize: 11, fontWeight: '700',
+  },
+  badgeGrid: { gap: 8 },
+  publicBadgeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 11, borderRadius: Radius.lg, borderWidth: 1, borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  publicBadgeIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  publicBadgeInfo: { flex: 1 },
+  publicBadgeName: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
+  publicBadgeDescription: { fontSize: 11, color: Colors.textMuted, lineHeight: 16, marginTop: 2 },
 
   skillCard: {
     flexDirection: 'row',

@@ -70,7 +70,7 @@ public class AppointmentController {
         return ApiResponse.success("Xác thực mã thành công", appointmentService.verifyCode(id, request));
     }
 
-    @Operation(summary = "Xác nhận hoàn thành buổi hỗ trợ", description = "Ghi nhận hoàn thành và thời lượng thực tế từ người dùng")
+    @Operation(summary = "Xác nhận hoàn thành buổi hỗ trợ", description = "Một trong hai người tham gia xác nhận để hoàn thành buổi hỗ trợ và quyết toán Time Credit")
     @PostMapping({"/{id}/confirm-completion", "/{id}/confirm-complete"})
     public ApiResponse<AppointmentResponse> confirmCompletion(
             @PathVariable UUID id,

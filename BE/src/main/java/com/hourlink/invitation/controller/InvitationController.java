@@ -61,7 +61,8 @@ public class InvitationController {
 
     @Operation(
             summary = "Phản hồi lời mời",
-            description = "Helper chấp nhận (ACCEPT), từ chối (REJECT) hoặc đề xuất thời gian khác (RESCHEDULE)"
+            description = "Người nhận dùng ACCEPT/REJECT/RESCHEDULE; người gửi dùng "
+                    + "ACCEPT_RESCHEDULE/REJECT_RESCHEDULE để quyết định thời gian mới"
     )
     @PutMapping("/{id}/respond")
     public ApiResponse<InvitationResponse> respondToInvitation(

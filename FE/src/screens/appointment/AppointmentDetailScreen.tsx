@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, Linking, Modal, TextInput, Switch
+  ActivityIndicator, Alert, Linking, Modal, TextInput, Switch,
+  Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +11,8 @@ import { Colors, Radius, Spacing } from '@constants/Colors';
 import AppointmentApi from '@api/appointment';
 import RatingApi from '@api/rating';
 import Avatar from '@components/Avatar';
+import CancelAppointmentModal from '@components/CancelAppointmentModal';
+import DateTimePickerModal from '@components/DateTimePickerModal';
 import { useAuthStore } from '@store/authStore';
 import type { AppointmentItem, RatingResponse } from '@types';
 
@@ -51,7 +54,7 @@ export default function AppointmentDetailScreen() {
       if (res.data?.data) {
         const appt = res.data.data;
         setAppointment(appt);
-        
+
         // Nếu đã hoàn thành, thử tải danh sách đánh giá
         if (appt.status === 'COMPLETED') {
           try {
@@ -81,41 +84,49 @@ export default function AppointmentDetailScreen() {
 
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [meetingLink, setMeetingLink] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleStart, setRescheduleStart] = useState('');
+  const [rescheduleEnd, setRescheduleEnd] = useState('');
+  const [reschedulePicker, setReschedulePicker] = useState<'date' | 'start' | 'end' | null>(null);
 
   const handleRespond = async (action: 'CONFIRM' | 'CANCEL', link?: string) => {
     if (!id || !appointment) return;
-    const actionText = action === 'CONFIRM' ? 'xác nhận' : 'hủy';
-    
+
+    if (action === 'CANCEL') {
+      setShowCancelModal(true);
+      return;
+    }
+
     // Nếu là xác nhận và là Online, kiểm tra link
     if (action === 'CONFIRM' && (appointment.meetingType?.toUpperCase() === 'ONLINE' || (appointment as any).format === 'online')) {
       const existingLink = appointment.locationOrLink || (appointment as any).meetingLink;
-      if (!existingLink && !link) {
+      if ((!existingLink || !/^https?:\/\//i.test(existingLink)) && (!link || !/^https?:\/\//i.test(link))) {
         setShowLinkModal(true);
         return;
       }
     }
 
     Alert.alert(
-      `${action === 'CONFIRM' ? 'Xác nhận' : 'Hủy'} lịch hẹn`,
-      `Bạn có chắc chắn muốn ${actionText} lịch hẹn này?`,
+      'Xác nhận lịch hẹn',
+      'Bạn có chắc chắn muốn xác nhận lịch hẹn này?',
       [
         { text: 'Bỏ qua', style: 'cancel' },
         {
-          text: action === 'CONFIRM' ? 'Đồng ý' : 'Hủy lịch',
-          style: action === 'CANCEL' ? 'destructive' : 'default',
+          text: 'Đồng ý',
           onPress: async () => {
             try {
               setActionLoading(true);
-              await AppointmentApi.respond(id, { 
-                action, 
-                reason: action === 'CANCEL' ? 'Người dùng hủy từ màn chi tiết' : undefined,
+              await AppointmentApi.respond(id, {
+                action,
                 locationOrLink: link
               });
-              Alert.alert('Thành công', `Đã ${actionText} lịch hẹn.`);
+              Alert.alert('Thành công', 'Đã xác nhận lịch hẹn.');
               setShowLinkModal(false);
               fetchDetail();
             } catch (err: any) {
-              Alert.alert('Lỗi', err?.response?.data?.message || `Không thể ${actionText} lịch hẹn.`);
+              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
             } finally {
               setActionLoading(false);
             }
@@ -125,14 +136,87 @@ export default function AppointmentDetailScreen() {
     );
   };
 
+  const submitCancellation = async (reason: string) => {
+    if (!id) return;
+    try {
+      setActionLoading(true);
+      await AppointmentApi.respond(id, { action: 'CANCEL', reason });
+      setShowCancelModal(false);
+      Alert.alert('Đã hủy lịch hẹn', 'Lý do hủy đã được gửi cho người còn lại.');
+      await fetchDetail();
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lịch hẹn.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openRescheduleModal = () => {
+    if (!appointment) return;
+    setRescheduleDate(appointment.appointmentDate || '');
+    setRescheduleStart(appointment.startTime?.slice(0, 5) || '09:00');
+    setRescheduleEnd(appointment.endTime?.slice(0, 5) || '10:00');
+    setShowRescheduleModal(true);
+  };
+
+  const submitReschedule = async () => {
+    if (!id) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rescheduleDate)
+        || !/^\d{2}:\d{2}$/.test(rescheduleStart)
+        || !/^\d{2}:\d{2}$/.test(rescheduleEnd)) {
+      Alert.alert('Thông tin chưa hợp lệ', 'Vui lòng chọn đầy đủ ngày, giờ bắt đầu và giờ kết thúc.');
+      return;
+    }
+    if (rescheduleEnd <= rescheduleStart) {
+      Alert.alert('Giờ chưa hợp lệ', 'Giờ kết thúc phải sau giờ bắt đầu.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await AppointmentApi.respond(id, {
+        action: 'RESCHEDULE',
+        newAppointmentDate: rescheduleDate,
+        newStartTime: `${rescheduleStart}:00`,
+        newEndTime: `${rescheduleEnd}:00`,
+      });
+      setShowRescheduleModal(false);
+      Alert.alert('Thành công', 'Đã gửi đề xuất đổi lịch cho người còn lại.');
+      fetchDetail();
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể đề xuất đổi lịch.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleVerify = () => {
     if (!appointment) return;
     const isOffline = appointment.meetingType?.toUpperCase() === 'OFFLINE' || (appointment as any).format === 'offline';
-    if (isOffline) {
-      router.push(`/appointment/qr?id=${appointment.id}` as any);
-    } else {
-      router.push(`/appointment/otp?id=${appointment.id}` as any);
+    const openVerification = (allowEarlyStart: boolean) => router.push({
+      pathname: isOffline ? '/appointment/qr' : '/appointment/otp',
+      params: {
+        id: appointment.id,
+        allowEarlyStart: allowEarlyStart ? 'true' : 'false',
+      },
+    } as any);
+    const startAt = Date.parse(
+      `${appointment.appointmentDate}T${appointment.startTime?.slice(0, 8) || '00:00:00'}`,
+    );
+
+    if (Number.isFinite(startAt) && Date.now() < startAt) {
+      Alert.alert(
+        'Chưa tới giờ hẹn',
+        `Lịch bắt đầu lúc ${appointment.startTime?.slice(0, 5)} ngày ${appointment.appointmentDate}. Bạn vẫn muốn bắt đầu sớm?`,
+        [
+          { text: 'Chưa bắt đầu', style: 'cancel' },
+          { text: 'Vẫn bắt đầu', onPress: () => openVerification(true) },
+        ],
+      );
+      return;
     }
+
+    openVerification(false);
   };
 
   const submitCompletion = async () => {
@@ -155,7 +239,12 @@ export default function AppointmentDetailScreen() {
         hasIssue,
         issueDescription: hasIssue ? issueDescription.trim() : undefined,
       });
-      Alert.alert('Thành công', 'Đã gửi xác nhận hoàn thành buổi hỗ trợ.');
+      Alert.alert(
+        hasIssue ? 'Đã gửi báo cáo' : 'Hoàn thành',
+        hasIssue
+          ? 'Lịch hẹn đã chuyển sang tranh chấp và Time Credit chưa được chuyển.'
+          : 'Buổi hỗ trợ đã hoàn thành và Time Credit đã được chuyển.',
+      );
       setShowModal(false);
       fetchDetail();
     } catch (err: any) {
@@ -191,6 +280,12 @@ export default function AppointmentDetailScreen() {
   const isOffline = appointment.meetingType?.toUpperCase() === 'OFFLINE' || (appointment as any).format === 'offline';
   const titleStr = appointment.title || (appointment as any).content || 'Buổi hỗ trợ kỹ năng';
   const tcAmount = appointment.timeCreditAmount || (appointment as any).timeCredit || 1;
+  const canRespond = !appointment.proposedById || appointment.proposedById !== currentUser?.id;
+  const isAwaitingResponse = statusStr === 'PENDING' || statusStr === 'RESCHEDULED';
+  const canManageConfirmed = statusStr === 'CONFIRMED' || statusStr === 'UPCOMING';
+  const endAt = Date.parse(`${appointment.appointmentDate}T${appointment.endTime?.slice(0, 8) || '00:00:00'}`);
+  const isExpired = Number.isFinite(endAt) && endAt < Date.now();
+  const canAccept = canRespond && !isExpired;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -200,9 +295,20 @@ export default function AppointmentDetailScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi Tiết Lịch Hẹn</Text>
-        <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
-          <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.headerBack}
+          onPress={() => {
+            const isProvider = currentUser?.id === appointment?.providerId;
+            const peerId = isProvider ? appointment?.receiverId : appointment?.providerId;
+            router.push({ pathname: '/report/create', params: { targetId: peerId || appointment?.id, targetType: 'USER' } } as any);
+          }}
+        >
+          <Ionicons name="alert-circle-outline" size={24} color={Colors.danger} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg, alignSelf: 'center', marginBottom: Spacing.md }]}>
+        <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -233,7 +339,7 @@ export default function AppointmentDetailScreen() {
         {/* Schedule & Location */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>Thời Gian & Địa Điểm</Text>
-          
+
           <View style={styles.infoRow}>
             <View style={styles.iconBox}>
               <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
@@ -350,16 +456,16 @@ export default function AppointmentDetailScreen() {
                 </View>
                 <View style={{ flexDirection: 'row' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star} 
-                      name={partnerRating.overallStars >= star ? 'star' : 'star-outline'} 
-                      size={16} 
-                      color={partnerRating.overallStars >= star ? Colors.warning : Colors.border} 
+                    <Ionicons
+                      key={star}
+                      name={partnerRating.overallStars >= star ? 'star' : 'star-outline'}
+                      size={16}
+                      color={partnerRating.overallStars >= star ? Colors.warning : Colors.border}
                     />
                   ))}
                 </View>
               </View>
-              
+
               {partnerRating.comment ? (
                 <Text style={{ fontSize: 14, color: '#166534', fontStyle: 'italic', marginBottom: 12 }}>
                   "{partnerRating.comment}"
@@ -372,16 +478,16 @@ export default function AppointmentDetailScreen() {
 
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 {partnerRating.punctualityScore !== undefined && partnerRating.punctualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{partnerRating.punctualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="time-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Đúng giờ: <Text style={{ fontWeight: '600' }}>{partnerRating.punctualityScore}</Text></Text></View>
                 )}
                 {partnerRating.attitudeScore !== undefined && partnerRating.attitudeScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{partnerRating.attitudeScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="happy-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Thái độ: <Text style={{ fontWeight: '600' }}>{partnerRating.attitudeScore}</Text></Text></View>
                 )}
                 {partnerRating.communicationScore !== undefined && partnerRating.communicationScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{partnerRating.communicationScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="chatbubbles-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Giao tiếp: <Text style={{ fontWeight: '600' }}>{partnerRating.communicationScore}</Text></Text></View>
                 )}
                 {partnerRating.qualityScore !== undefined && partnerRating.qualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: '#15803D' }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{partnerRating.qualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="school-outline" size={13} color="#15803D" /><Text style={{ fontSize: 12, color: '#15803D' }}>Chất lượng: <Text style={{ fontWeight: '600' }}>{partnerRating.qualityScore}</Text></Text></View>
                 )}
               </View>
             </View>
@@ -403,16 +509,16 @@ export default function AppointmentDetailScreen() {
                 </View>
                 <View style={{ flexDirection: 'row' }}>
                   {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star} 
-                      name={myRating.overallStars >= star ? 'star' : 'star-outline'} 
-                      size={16} 
-                      color={myRating.overallStars >= star ? Colors.warning : Colors.border} 
+                    <Ionicons
+                      key={star}
+                      name={myRating.overallStars >= star ? 'star' : 'star-outline'}
+                      size={16}
+                      color={myRating.overallStars >= star ? Colors.warning : Colors.border}
                     />
                   ))}
                 </View>
               </View>
-              
+
               {myRating.comment ? (
                 <Text style={{ fontSize: 14, color: Colors.textSecondary, fontStyle: 'italic', marginBottom: 12 }}>
                   "{myRating.comment}"
@@ -422,19 +528,19 @@ export default function AppointmentDetailScreen() {
                   Không có nhận xét.
                 </Text>
               )}
-              
+
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
                 {myRating.punctualityScore !== undefined && myRating.punctualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>⏱ Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="time-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Đúng giờ: <Text style={{ fontWeight: '600' }}>{myRating.punctualityScore}</Text></Text></View>
                 )}
                 {myRating.attitudeScore !== undefined && myRating.attitudeScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>😊 Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="happy-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Thái độ: <Text style={{ fontWeight: '600' }}>{myRating.attitudeScore}</Text></Text></View>
                 )}
                 {myRating.communicationScore !== undefined && myRating.communicationScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>💬 Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="chatbubbles-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Giao tiếp: <Text style={{ fontWeight: '600' }}>{myRating.communicationScore}</Text></Text></View>
                 )}
                 {myRating.qualityScore !== undefined && myRating.qualityScore !== null && (
-                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>🎓 Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text>
+                  <View style={styles.ratingMetric}><Ionicons name="school-outline" size={13} color={Colors.textSecondary} /><Text style={{ fontSize: 12, color: Colors.textSecondary }}>Chất lượng: <Text style={{ fontWeight: '600' }}>{myRating.qualityScore}</Text></Text></View>
                 )}
               </View>
             </View>
@@ -443,9 +549,9 @@ export default function AppointmentDetailScreen() {
       </ScrollView>
 
       {/* Footer Actions */}
-      {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED' || statusStr === 'UPCOMING' || statusStr === 'IN_PROGRESS' || statusStr === 'COMPLETED') && (
+      {(isAwaitingResponse || canManageConfirmed || statusStr === 'IN_PROGRESS' || statusStr === 'COMPLETED') && (
         <View style={styles.footer}>
-          {(statusStr === 'PENDING' || statusStr === 'RESCHEDULED') && (
+          {isAwaitingResponse && canAccept && (
             <View style={styles.footerRow}>
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: Colors.success }]}
@@ -464,13 +570,50 @@ export default function AppointmentDetailScreen() {
             </View>
           )}
 
-          {(statusStr === 'UPCOMING') && (
-            <View style={styles.footerRow}>
-              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#0D9488' }]} onPress={handleVerify}>
+          {isAwaitingResponse && !canAccept && (
+            <View style={styles.waitingBox}>
+              <Ionicons name={isExpired ? 'alert-circle-outline' : 'hourglass-outline'} size={16} color="#B45309" />
+              <Text style={styles.waitingText}>
+                {isExpired ? 'Lịch đã quá giờ. Hãy đề xuất thời gian mới.' : 'Đang chờ người còn lại phản hồi đề xuất này'}
+              </Text>
+            </View>
+          )}
+
+          {isAwaitingResponse && (
+            <View style={[styles.footerRow, { marginTop: 10 }]}>
+              <TouchableOpacity style={[styles.actionBtn, styles.secondaryBtn]} onPress={openRescheduleModal} disabled={actionLoading}>
+                <Ionicons name="calendar-outline" size={17} color="#2563EB" style={{ marginRight: 6 }} />
+                <Text style={styles.secondaryBtnText}>Đổi lịch</Text>
+              </TouchableOpacity>
+              {!canAccept && (
+                <TouchableOpacity style={[styles.actionBtn, styles.dangerBtn]} onPress={() => handleRespond('CANCEL')} disabled={actionLoading}>
+                  <Text style={styles.dangerBtnText}>Hủy đề xuất</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {canManageConfirmed && (
+            <>
+              <View style={styles.footerRow}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: '#0D9488' }]}
+                  onPress={handleVerify}
+                >
                 <Ionicons name={isOffline ? 'qr-code' : 'keypad'} size={18} color="#FFF" style={{ marginRight: 8 }} />
                 <Text style={styles.btnTextWhite}>Bắt Đầu / Xác Thực {isOffline ? 'QR Code' : 'OTP'}</Text>
-              </TouchableOpacity>
-            </View>
+                </TouchableOpacity>
+              </View>
+              <View style={[styles.footerRow, { marginTop: 10 }]}>
+                <TouchableOpacity style={[styles.actionBtn, styles.secondaryBtn]} onPress={openRescheduleModal} disabled={actionLoading}>
+                  <Ionicons name="calendar-outline" size={17} color="#2563EB" style={{ marginRight: 6 }} />
+                  <Text style={styles.secondaryBtnText}>Đổi lịch</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, styles.dangerBtn]} onPress={() => handleRespond('CANCEL')} disabled={actionLoading}>
+                  <Text style={styles.dangerBtnText}>Hủy lịch</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
 
           {statusStr === 'IN_PROGRESS' && (
@@ -515,65 +658,143 @@ export default function AppointmentDetailScreen() {
       )}
 
       {/* Completion Modal */}
+      <CancelAppointmentModal
+        visible={showCancelModal}
+        appointmentTitle={appointment.title}
+        loading={actionLoading}
+        onClose={() => setShowCancelModal(false)}
+        onSubmit={submitCancellation}
+      />
+
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={() => setShowModal(false)}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Xác Nhận Hoàn Thành</Text>
+              <Text style={styles.modalSub}>
+                {hasIssue
+                  ? 'Lịch hẹn sẽ chuyển sang tranh chấp và Time Credit chưa được chuyển.'
+                  : 'Chỉ cần một người xác nhận. Lịch hẹn sẽ hoàn thành và Time Credit được chuyển ngay.'}
+              </Text>
+
+              <Text style={styles.inputLabel}>Thời lượng thực tế (phút):</Text>
+              <TextInput
+                style={styles.input}
+                value={actualDuration}
+                onChangeText={setActualDuration}
+                keyboardType="numeric"
+                placeholder="Ví dụ: 60"
+              />
+
+              <Text style={styles.inputLabel}>Nội dung đã hoàn thành / trao đổi:</Text>
+              <TextInput
+                style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
+                value={contentCompleted}
+                onChangeText={setContentCompleted}
+                multiline
+                placeholder="Mô tả tóm tắt những gì hai bên đã trao đổi..."
+              />
+
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Có tranh chấp / vấn đề phát sinh?</Text>
+                  <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Bật nếu buổi hỗ trợ không đạt chất lượng hoặc vi phạm</Text>
+                </View>
+                <Switch value={hasIssue} onValueChange={setHasIssue} trackColor={{ false: '#CBD5E1', true: '#FECACA' }} thumbColor={hasIssue ? '#DC2626' : '#F8FAFC'} />
+              </View>
+
+              {hasIssue && (
+                <>
+                  <Text style={[styles.inputLabel, { color: '#DC2626' }]}>Mô tả chi tiết vấn đề:</Text>
+                  <TextInput
+                    style={[styles.input, { height: 70, textAlignVertical: 'top', borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
+                    value={issueDescription}
+                    onChangeText={setIssueDescription}
+                    multiline
+                    placeholder="Vui lòng ghi rõ lý do để admin hỗ trợ giải quyết tranh chấp..."
+                  />
+                </>
+              )}
+
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.bgCard }]} onPress={() => setShowModal(false)}>
+                  <Text style={{ color: Colors.textPrimary, fontWeight: '600' }}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: hasIssue ? '#DC2626' : Colors.primary }]}
+                  onPress={submitCompletion}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.btnTextWhite}>{hasIssue ? 'Gửi Báo Cáo' : 'Hoàn Tất'}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Reschedule Modal */}
+      <Modal visible={showRescheduleModal} transparent animationType="slide" onRequestClose={() => setShowRescheduleModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Xác Nhận Hoàn Thành</Text>
-            <Text style={styles.modalSub}>Vui lòng xác nhận thời lượng và kết quả buổi trao đổi kỹ năng.</Text>
+            <Text style={styles.modalTitle}>Đề Xuất Đổi Lịch</Text>
+            <Text style={styles.modalSub}>Chọn thời gian mới. Người còn lại cần chấp nhận trước khi lịch được xác nhận lại.</Text>
 
-            <Text style={styles.inputLabel}>Thời lượng thực tế (phút):</Text>
-            <TextInput
-              style={styles.input}
-              value={actualDuration}
-              onChangeText={setActualDuration}
-              keyboardType="numeric"
-              placeholder="Ví dụ: 60"
-            />
+            <Text style={styles.inputLabel}>Ngày hẹn mới *</Text>
+            <TouchableOpacity style={styles.pickerField} onPress={() => setReschedulePicker('date')}>
+              <Ionicons name="calendar-outline" size={19} color="#2563EB" />
+              <Text style={styles.pickerFieldText}>{rescheduleDate || 'Chọn ngày'}</Text>
+              <Ionicons name="chevron-down" size={18} color={Colors.textMuted} />
+            </TouchableOpacity>
 
-            <Text style={styles.inputLabel}>Nội dung đã hoàn thành / trao đổi:</Text>
-            <TextInput
-              style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
-              value={contentCompleted}
-              onChangeText={setContentCompleted}
-              multiline
-              placeholder="Mô tả tóm tắt những gì hai bên đã trao đổi..."
-            />
-
-            <View style={styles.switchRow}>
+            <View style={styles.footerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.textPrimary }}>Có tranh chấp / vấn đề phát sinh?</Text>
-                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>Bật nếu buổi hỗ trợ không đạt chất lượng hoặc vi phạm</Text>
+                <Text style={styles.inputLabel}>Bắt đầu *</Text>
+                <TouchableOpacity style={styles.pickerField} onPress={() => setReschedulePicker('start')}>
+                  <Ionicons name="time-outline" size={18} color="#2563EB" />
+                  <Text style={styles.pickerFieldText}>{rescheduleStart || 'Chọn giờ'}</Text>
+                </TouchableOpacity>
               </View>
-              <Switch value={hasIssue} onValueChange={setHasIssue} trackColor={{ false: '#CBD5E1', true: '#FECACA' }} thumbColor={hasIssue ? '#DC2626' : '#F8FAFC'} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inputLabel}>Kết thúc *</Text>
+                <TouchableOpacity style={styles.pickerField} onPress={() => setReschedulePicker('end')}>
+                  <Ionicons name="time-outline" size={18} color="#2563EB" />
+                  <Text style={styles.pickerFieldText}>{rescheduleEnd || 'Chọn giờ'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {hasIssue && (
-              <>
-                <Text style={[styles.inputLabel, { color: '#DC2626' }]}>Mô tả chi tiết vấn đề:</Text>
-                <TextInput
-                  style={[styles.input, { height: 70, textAlignVertical: 'top', borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
-                  value={issueDescription}
-                  onChangeText={setIssueDescription}
-                  multiline
-                  placeholder="Vui lòng ghi rõ lý do để admin hỗ trợ giải quyết tranh chấp..."
-                />
-              </>
-            )}
-
             <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.bgCard }]} onPress={() => setShowModal(false)}>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: Colors.bgCard }]} onPress={() => setShowRescheduleModal(false)}>
                 <Text style={{ color: Colors.textPrimary, fontWeight: '600' }}>Hủy</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, { backgroundColor: hasIssue ? '#DC2626' : Colors.primary }]}
-                onPress={submitCompletion}
-                disabled={actionLoading}
-              >
-                {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnTextWhite}>Gửi Xác Nhận</Text>}
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#2563EB' }]} onPress={submitReschedule} disabled={actionLoading}>
+                {actionLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.btnTextWhite}>Gửi đề xuất</Text>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
+
+        <DateTimePickerModal
+          visible={reschedulePicker !== null}
+          mode={reschedulePicker === 'date' ? 'date' : 'time'}
+          initialValue={reschedulePicker === 'date'
+            ? rescheduleDate
+            : reschedulePicker === 'start' ? rescheduleStart : rescheduleEnd}
+          title={reschedulePicker === 'date'
+            ? 'Chọn ngày hẹn mới'
+            : reschedulePicker === 'start' ? 'Chọn giờ bắt đầu' : 'Chọn giờ kết thúc'}
+          onClose={() => setReschedulePicker(null)}
+          onSelect={(value) => {
+            if (reschedulePicker === 'date') setRescheduleDate(value);
+            else if (reschedulePicker === 'start') setRescheduleStart(value);
+            else setRescheduleEnd(value);
+          }}
+        />
       </Modal>
 
       {/* Provide Link Modal */}
@@ -582,7 +803,7 @@ export default function AppointmentDetailScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Cung Cấp Link Họp</Text>
             <Text style={styles.modalSub}>Vì đây là buổi hỗ trợ Online, bạn cần cung cấp link Google Meet, Zoom... để người nhận tham gia.</Text>
-            
+
             <Text style={styles.inputLabel}>Link họp / Phòng học *</Text>
             <TextInput
               style={styles.input}
@@ -600,8 +821,8 @@ export default function AppointmentDetailScreen() {
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: Colors.success }]}
                 onPress={() => {
-                  if (!meetingLink.trim()) {
-                    Alert.alert('Lỗi', 'Vui lòng nhập link họp hợp lệ!');
+                  if (!/^https?:\/\//i.test(meetingLink.trim())) {
+                    Alert.alert('Lỗi', 'Link họp phải bắt đầu bằng http:// hoặc https://');
                     return;
                   }
                   handleRespond('CONFIRM', meetingLink.trim());
@@ -683,6 +904,7 @@ const styles = StyleSheet.create({
   tcValue: { fontSize: 16, fontWeight: '700', color: '#B45309' },
 
   sectionHeader: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 14 },
+  ratingMetric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   iconBox: {
     width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.bgCard,
@@ -714,6 +936,16 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   btnTextWhite: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  waitingBox: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    paddingVertical: 12, borderRadius: Radius.md,
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+  },
+  waitingText: { color: '#B45309', fontSize: 13, fontWeight: '600' },
+  secondaryBtn: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
+  secondaryBtnText: { color: '#2563EB', fontWeight: '700', fontSize: 14 },
+  dangerBtn: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
+  dangerBtnText: { color: '#DC2626', fontWeight: '700', fontSize: 14 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: Spacing.lg },
   modalCard: { backgroundColor: '#FFF', borderRadius: Radius.xl, padding: Spacing.lg, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, elevation: 10 },
@@ -721,6 +953,12 @@ const styles = StyleSheet.create({
   modalSub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 16, lineHeight: 18 },
   inputLabel: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary, marginBottom: 6, marginTop: 10 },
   input: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: Colors.textPrimary },
+  pickerField: {
+    minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
+    paddingHorizontal: 12, paddingVertical: 10,
+  },
+  pickerFieldText: { flex: 1, color: Colors.textPrimary, fontSize: 14, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
   modalBtnRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
   modalBtn: { flex: 1, paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
