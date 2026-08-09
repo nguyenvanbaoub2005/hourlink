@@ -15,6 +15,7 @@ import type { RatingResponse } from '@types';
 import Avatar from '@components/Avatar';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Types
 type CategoryItem = { id: string; name: string; description?: string };
@@ -132,9 +133,9 @@ export default function ExploreScreen() {
 
   const formatLabel = (fmt: string) => {
     switch (fmt) {
-      case 'ONLINE': return 'Trực tuyến 💻';
-      case 'OFFLINE': return 'Trực tiếp 🤝';
-      case 'BOTH': return 'Cả hai 🌐';
+      case 'ONLINE': return 'Trực tuyến';
+      case 'OFFLINE': return 'Trực tiếp';
+      case 'BOTH': return 'Cả hai';
       default: return fmt;
     }
   };
@@ -149,16 +150,16 @@ export default function ExploreScreen() {
     }
   };
 
-  const getCategoryEmoji = (name: string) => {
+  const getCategoryVisual = (name: string): { icon: IoniconName; color: string; background: string } => {
     const lower = name.toLowerCase();
-    if (lower.includes('lập trình')) return '💻';
-    if (lower.includes('ngôn ngữ')) return '🌍';
-    if (lower.includes('thiết kế')) return '🎨';
-    if (lower.includes('kinh doanh')) return '📊';
-    if (lower.includes('giáo dục')) return '📚';
-    if (lower.includes('sức khỏe')) return '💪';
-    if (lower.includes('nghệ thuật')) return '🎵';
-    return '✨'; // Khác
+    if (lower.includes('lập trình')) return { icon: 'code-slash-outline', color: '#2563EB', background: '#DBEAFE' };
+    if (lower.includes('ngôn ngữ')) return { icon: 'language-outline', color: '#7C3AED', background: '#EDE9FE' };
+    if (lower.includes('thiết kế')) return { icon: 'color-palette-outline', color: '#DB2777', background: '#FCE7F3' };
+    if (lower.includes('kinh doanh')) return { icon: 'bar-chart-outline', color: '#D97706', background: '#FEF3C7' };
+    if (lower.includes('giáo dục')) return { icon: 'book-outline', color: '#059669', background: '#D1FAE5' };
+    if (lower.includes('sức khỏe')) return { icon: 'fitness-outline', color: '#DC2626', background: '#FEE2E2' };
+    if (lower.includes('nghệ thuật')) return { icon: 'musical-notes-outline', color: '#4F46E5', background: '#E0E7FF' };
+    return { icon: 'grid-outline', color: '#475569', background: '#F1F5F9' };
   };
 
   const renderAvatar = (item: SkillItem) => {
@@ -219,21 +220,31 @@ export default function ExploreScreen() {
           <View style={styles.categoryGrid}>
             {categories.map((cat) => {
               const active = selectedCategoryId === cat.id;
-              const emoji = getCategoryEmoji(cat.name);
+              const categoryVisual = getCategoryVisual(cat.name);
               const count = skills.filter(s => s.categoryId === cat.id || s.categoryName === cat.name).length;
               return (
                 <TouchableOpacity
                   key={cat.id}
-                  style={[styles.categoryCard, active && styles.categoryCardActive]}
+                  style={[
+                    styles.categoryCard,
+                    active && styles.categoryCardActive,
+                    active && { backgroundColor: categoryVisual.background, borderColor: categoryVisual.color },
+                  ]}
                   onPress={() => setSelectedCategoryId(active ? null : cat.id)}
                 >
-                  <View style={[styles.catIconCircle, active && styles.catIconCircleActive]}>
-                    <Text style={styles.catEmojiText}>{emoji}</Text>
+                  <View style={[
+                    styles.catIconCircle,
+                    { backgroundColor: active ? categoryVisual.color : categoryVisual.background },
+                  ]}>
+                    <Ionicons name={categoryVisual.icon} size={22} color={active ? '#FFFFFF' : categoryVisual.color} />
                   </View>
-                  <Text style={[styles.catCardName, active && styles.catCardNameActive]} numberOfLines={1}>
+                  <Text
+                    style={[styles.catCardName, active && styles.catCardNameActive, active && { color: categoryVisual.color }]}
+                    numberOfLines={1}
+                  >
                     {cat.name}
                   </Text>
-                  <Text style={[styles.catStatText, active && styles.catStatTextActive]}>
+                  <Text style={[styles.catStatText, active && styles.catStatTextActive, active && { color: categoryVisual.color }]}>
                     {count} kỹ năng
                   </Text>
                 </TouchableOpacity>
@@ -245,7 +256,10 @@ export default function ExploreScreen() {
         {/* ── Kỹ năng hot / nổi bật (Chỉ hiển thị khi có dữ liệu thật) ───── */}
         {trendingSkills.length > 0 && (
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Kỹ năng nổi bật 🔥</Text>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="trending-up-outline" size={18} color={Colors.textPrimary} />
+              <Text style={styles.sectionTitle}>Kỹ năng nổi bật</Text>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
               {trendingSkills.map((skName) => {
                 const active = keyword.toLowerCase() === skName.toLowerCase();
@@ -268,10 +282,10 @@ export default function ExploreScreen() {
           <Text style={styles.sectionTitle}>Hình thức hỗ trợ</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
             {[
-              { label: 'Tất cả', value: null },
-              { label: 'Trực tuyến 💻', value: 'ONLINE' },
-              { label: 'Trực tiếp 🤝', value: 'OFFLINE' },
-              { label: 'Cả hai 🌐', value: 'BOTH' },
+              { label: 'Tất cả', value: null, icon: 'apps-outline' as IoniconName },
+              { label: 'Trực tuyến', value: 'ONLINE', icon: 'videocam-outline' as IoniconName },
+              { label: 'Trực tiếp', value: 'OFFLINE', icon: 'people-outline' as IoniconName },
+              { label: 'Cả hai', value: 'BOTH', icon: 'git-compare-outline' as IoniconName },
             ].map((item) => {
               const active = selectedFormat === item.value;
               return (
@@ -280,6 +294,7 @@ export default function ExploreScreen() {
                   style={[styles.formatPill, active && styles.formatPillActive]}
                   onPress={() => setSelectedFormat(active ? null : item.value)}
                 >
+                  <Ionicons name={item.icon} size={14} color={active ? '#0284C7' : Colors.textSecondary} />
                   <Text style={[styles.formatPillText, active && styles.formatPillTextActive]}>{item.label}</Text>
                 </TouchableOpacity>
               );
@@ -363,9 +378,11 @@ export default function ExploreScreen() {
                     <Text style={styles.tutorName}>{item.userFullName || 'Thành viên HourLink'}</Text>
                     <Ionicons name="checkmark-circle" size={16} color={Colors.primary} style={{ marginLeft: 4 }} />
                   </View>
-                  <Text style={styles.tutorSub}>
-                    {item.userOccupation || 'Người hỗ trợ'} • 📍 {item.userRegion || item.region || 'Toàn quốc'}
-                  </Text>
+                  <Text style={styles.tutorSub}>{item.userOccupation || 'Người hỗ trợ'}</Text>
+                  <View style={styles.tutorLocationRow}>
+                    <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
+                    <Text style={styles.tutorLocationText}>{item.userRegion || item.region || 'Toàn quốc'}</Text>
+                  </View>
                 </View>
                 <View style={styles.badgeIndex}>
                   <Text style={styles.badgeIndexText}>#{index + 1}</Text>
@@ -524,7 +541,10 @@ export default function ExploreScreen() {
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryCol}>
-                      <Text style={styles.summaryVal}>{selectedSkill.userReputationScore ? `${selectedSkill.userReputationScore.toFixed(1)}/5 ⭐` : '—'}</Text>
+                      <View style={styles.summaryValueRow}>
+                        <Text style={styles.summaryVal}>{selectedSkill.userReputationScore ? `${selectedSkill.userReputationScore.toFixed(1)}/5` : '—'}</Text>
+                        {selectedSkill.userReputationScore ? <Ionicons name="star" size={14} color="#F59E0B" /> : null}
+                      </View>
                       <Text style={styles.summaryLbl}>Đánh giá</Text>
                     </View>
                     <View style={styles.summaryDivider} />
@@ -735,6 +755,7 @@ const styles = StyleSheet.create({
 
   sectionContainer: { marginTop: Spacing.md, paddingHorizontal: Spacing.md },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 8 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pillRow: { gap: 8, paddingBottom: 4 },
 
   // Category Grid (4 columns x 2 rows matching photo)
@@ -754,14 +775,12 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
-  categoryCardActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6', borderWidth: 1.5 },
+  categoryCardActive: { borderWidth: 1.5 },
   catIconCircle: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  catIconCircleActive: { backgroundColor: '#DBEAFE' },
-  catEmojiText: { fontSize: 22 },
   catCardName: { fontSize: 12, fontWeight: '600', color: '#334155', textAlign: 'center' },
-  catCardNameActive: { color: '#1D4ED8', fontWeight: '700' },
+  catCardNameActive: { fontWeight: '700' },
   catStatText: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
-  catStatTextActive: { color: '#3B82F6', fontWeight: '600' },
+  catStatTextActive: { fontWeight: '600' },
 
   // Trending pills
   trendingPill: { backgroundColor: '#FFF7ED', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: '#FFEDD5' },
@@ -769,7 +788,7 @@ const styles = StyleSheet.create({
   trendingPillText: { fontSize: 12, color: '#C2410C', fontWeight: '600' },
   trendingPillTextActive: { color: '#fff', fontWeight: '700' },
 
-  formatPill: { backgroundColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16 },
+  formatPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16 },
   formatPillActive: { backgroundColor: '#E0F2FE', borderWidth: 1, borderColor: '#0284C7' },
   formatPillText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
   formatPillTextActive: { color: '#0284C7', fontWeight: '700' },
@@ -801,6 +820,8 @@ const styles = StyleSheet.create({
   tutorNameRow: { flexDirection: 'row', alignItems: 'center' },
   tutorName: { fontSize: 16, fontWeight: 'bold', color: Colors.textPrimary },
   tutorSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  tutorLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  tutorLocationText: { fontSize: 12, color: Colors.textMuted },
   badgeIndex: { backgroundColor: '#FFF7ED', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#FFEDD5' },
   badgeIndexText: { fontSize: 12, fontWeight: 'bold', color: '#D97706' },
 
@@ -853,6 +874,7 @@ const styles = StyleSheet.create({
   summaryCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: Radius.lg, paddingVertical: 14, marginVertical: 14, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 3, elevation: 1 },
   summaryCol: { flex: 1, alignItems: 'center' },
   summaryVal: { fontSize: 15, fontWeight: 'bold', color: '#0F172A' },
+  summaryValueRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   summaryLbl: { fontSize: 12, color: '#64748B', marginTop: 2 },
   summaryDivider: { width: 1, backgroundColor: '#E2E8F0', height: '70%', alignSelf: 'center' },
 

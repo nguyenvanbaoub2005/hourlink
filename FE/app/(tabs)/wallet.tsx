@@ -18,11 +18,11 @@ const TX_CONFIG: Record<WalletTxType, {
   icon: any;
   color: string;
   bg: string;
-  sign: '+' | '-' | '⏸';
+  sign: '+' | '-' | '';
 }> = {
   EARN:       { label: 'Nhận được',      icon: 'arrow-down-circle',  color: '#10B981', bg: '#D1FAE5', sign: '+' },
   SPEND:      { label: 'Đã sử dụng',     icon: 'arrow-up-circle',    color: '#EF4444', bg: '#FEE2E2', sign: '-' },
-  HOLD:       { label: 'Tạm giữ',        icon: 'pause-circle',       color: '#F59E0B', bg: '#FEF3C7', sign: '⏸' },
+  HOLD:       { label: 'Tạm giữ',        icon: 'pause-circle',       color: '#F59E0B', bg: '#FEF3C7', sign: '' },
   RELEASE:    { label: 'Hoàn trả',       icon: 'refresh-circle',     color: '#6366F1', bg: '#EEF2FF', sign: '+' },
   REFUND:     { label: 'Hoàn tiền',      icon: 'return-up-back',     color: '#06B6D4', bg: '#CFFAFE', sign: '+' },
   BONUS:      { label: 'Thưởng',         icon: 'gift',               color: '#8B5CF6', bg: '#F3E8FF', sign: '+' },
@@ -37,7 +37,7 @@ const isPositive = (type: WalletTxType) =>
 function TransactionItem({ item }: { item: WalletTransaction }) {
   const cfg = TX_CONFIG[item.type] ?? TX_CONFIG.ADJUSTMENT;
   const positive = isPositive(item.type);
-  const amountText = `${positive ? '+' : item.type === 'HOLD' ? '⏸' : '-'}${item.amount.toFixed(1)} TC`;
+  const amountText = `${positive ? '+' : item.type === 'HOLD' ? '' : '-'}${item.amount.toFixed(1)} TC`;
   const date = new Date(item.createdAt).toLocaleDateString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });

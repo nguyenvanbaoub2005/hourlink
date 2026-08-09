@@ -50,7 +50,7 @@ export default function WalletDetailScreen() {
 
   const cfg = TX_CONFIG[tx.type] ?? TX_CONFIG.ADJUSTMENT;
   const positive = isPositive(tx.type);
-  const amountText = `${positive ? '+' : tx.type === 'HOLD' ? '⏸' : '-'}${tx.amount.toFixed(1)} TC`;
+  const amountText = `${positive ? '+' : tx.type === 'HOLD' ? '' : '-'}${tx.amount.toFixed(1)} TC`;
   const date = new Date(tx.createdAt).toLocaleDateString('vi-VN', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',

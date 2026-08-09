@@ -128,9 +128,13 @@ export default function HelpRequestsScreen() {
 
         {/* Info Row */}
         <View style={styles.infoRow}>
-          <Text style={styles.infoText}>🕒 {durMin} phút · {item.format === 'OFFLINE' ? 'Trực tiếp' : 'Online'}</Text>
-          <View style={styles.tcBadge}>
-            <Text style={styles.tcText}>⏱ {tcVal} TC</Text>
+          <View style={styles.infoItem}>
+            <Ionicons name="time-outline" size={15} color="#64748B" />
+            <Text style={styles.infoText}>{durMin} phút · {item.format === 'OFFLINE' ? 'Trực tiếp' : 'Online'}</Text>
+          </View>
+          <View style={[styles.tcBadge, styles.infoItem]}>
+            <Ionicons name="hourglass-outline" size={13} color="#EA580C" />
+            <Text style={styles.tcText}>{tcVal} TC</Text>
           </View>
           <Text style={styles.replyText}>{item.responseCount ?? 0} phản hồi</Text>
         </View>
@@ -143,7 +147,8 @@ export default function HelpRequestsScreen() {
             style={styles.aiButton}
             onPress={() => router.push({ pathname: '/profile/ai-suggest', params: { helpRequestId: item.id } })}
           >
-            <Text style={styles.aiButtonText}>⚡ Xem AI gợi ý</Text>
+            <Ionicons name="sparkles-outline" size={17} color="#059669" />
+            <Text style={styles.aiButtonText}>Xem AI gợi ý</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
             <Ionicons name="pencil-outline" size={18} color="#64748b" />
@@ -253,6 +258,7 @@ const styles = StyleSheet.create({
   description: { fontSize: 14, color: '#64748B', marginTop: 8, lineHeight: 20 },
 
   infoRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  infoItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   infoText: { fontSize: 13, color: '#64748B' },
   tcBadge: { backgroundColor: '#FFEDD5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
   tcText: { fontSize: 12, fontWeight: 'bold', color: '#EA580C' },
@@ -262,7 +268,7 @@ const styles = StyleSheet.create({
 
   actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   aiButton: {
-    flex: 1, backgroundColor: '#ECFDF5', paddingVertical: 10,
+    flex: 1, flexDirection: 'row', gap: 6, backgroundColor: '#ECFDF5', paddingVertical: 10,
     borderRadius: 10, alignItems: 'center', justifyContent: 'center'
   },
   aiButtonText: { fontSize: 14, fontWeight: 'bold', color: '#059669' },

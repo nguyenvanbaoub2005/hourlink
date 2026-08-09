@@ -83,7 +83,7 @@ export default function SkillAttachmentsScreen() {
       } as any);
 
       await SkillApi.uploadAttachment(skillId, formData);
-      Alert.alert('Thành công ✅', 'File đã được upload!');
+      Alert.alert('Thành công', 'File đã được upload!');
       await fetchAttachments();
     } catch (e: any) {
       const msg = e?.response?.data?.message ?? 'Không thể upload file. Vui lòng thử lại.';
@@ -135,11 +135,11 @@ export default function SkillAttachmentsScreen() {
 
   const showUploadOptions = () => {
     Alert.alert(
-      '📎 Thêm minh chứng',
+      'Thêm minh chứng',
       'Chọn loại file bạn muốn upload',
       [
-        { text: '🖼️ Tải ảnh lên', onPress: pickImage },
-        { text: '📄 Tải tệp lên', onPress: pickDocument },
+        { text: 'Tải ảnh lên', onPress: pickImage },
+        { text: 'Tải tệp lên', onPress: pickDocument },
         { text: 'Hủy', style: 'cancel' },
       ]
     );
@@ -195,8 +195,9 @@ export default function SkillAttachmentsScreen() {
           <Text style={styles.fileName} numberOfLines={1}>{item.originalName}</Text>
           <View style={styles.metaRow}>
             <View style={[styles.typeBadge, isImage ? styles.badgeImg : styles.badgeDoc]}>
+              <Ionicons name={isImage ? 'image-outline' : 'document-text-outline'} size={12} color={isImage ? '#3B82F6' : '#F97316'} />
               <Text style={[styles.typeText, isImage ? styles.typeTextImg : styles.typeTextDoc]}>
-                {isImage ? '🖼️ Ảnh' : '📄 Tài liệu'}
+                {isImage ? 'Ảnh' : 'Tài liệu'}
               </Text>
             </View>
             <Text style={styles.sizeText}>{formatBytes(item.fileSize)}</Text>
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1 },
   fileName: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  typeBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
   badgeImg: { backgroundColor: '#EFF6FF' },
   badgeDoc: { backgroundColor: '#FFF7ED' },
   typeText: { fontSize: 11, fontWeight: '600' },
