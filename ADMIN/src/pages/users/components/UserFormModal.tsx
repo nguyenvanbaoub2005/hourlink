@@ -69,10 +69,10 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
     try {
       if (mode === 'create') {
         await usersApi.createUser(formData);
-        toast.success('Tạo người dùng thành công!');
+        toast.success('Đã thêm người dùng mới thành công!');
       } else {
         await usersApi.updateUser(initialData.id, formData);
-        toast.success('Cập nhật thông tin thành công!');
+        toast.success('Đã cập nhật thông tin người dùng thành công!');
       }
       onSuccess();
       onClose();
@@ -101,7 +101,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
       setIsUploading(true);
       const url = await usersApi.uploadAvatar(file);
       setFormData(prev => ({ ...prev, avatarUrl: url }));
-      toast.success('Tải ảnh lên thành công');
+      toast.success('Đã tải ảnh đại diện lên thành công!');
     } catch (error: any) {
       toast.error('Lỗi tải ảnh: ' + (error.response?.data?.message || 'Có lỗi xảy ra'));
     } finally {

@@ -12,5 +12,7 @@ public interface SkillAttachmentRepository extends JpaRepository<SkillAttachment
 
     List<SkillAttachment> findAllBySkill_Id(UUID skillId);
 
+    List<SkillAttachment> findAllBySkill_IdAndIsDeletedFalse(UUID skillId);
+
     void deleteAllBySkill_Id(UUID skillId);
 }

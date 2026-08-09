@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, ShieldAlert, BadgeCheck, Shield, MapPin, Briefcase, 
+  ArrowLeft, ShieldAlert, BadgeCheck, MapPin, Briefcase, 
   Mail, Phone, AlertTriangle, Lock, Unlock, Save, Edit, X, KeyRound
 } from 'lucide-react';
 import { usersApi, type AdminUserDetailResponse } from '@/api/users';

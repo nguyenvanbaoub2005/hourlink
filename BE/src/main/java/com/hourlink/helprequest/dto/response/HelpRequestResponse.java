@@ -19,7 +19,7 @@ public class HelpRequestResponse {
     String desiredTime;
     Integer duration;
     String region;
-    Integer timeCreditAmount;
+    Double timeCreditAmount;
     RequestStatus status;
     UUID categoryId;
     String categoryName;

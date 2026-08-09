@@ -227,8 +227,8 @@ public class AdminUserService {
 
         user = userRepository.save(user);
 
-        Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Role USER not found"));
+        Role userRole = roleRepository.findByRoleCode("ROLE_USER")
+                .orElseThrow(() -> new RuntimeException("Role ROLE_USER not found"));
 
         UserRole mapping = UserRole.builder()
                 .user(user)

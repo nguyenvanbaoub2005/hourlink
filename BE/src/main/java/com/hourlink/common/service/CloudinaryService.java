@@ -33,11 +33,23 @@ public class CloudinaryService {
         String contentType = file.getContentType() != null ? file.getContentType() : "";
         boolean isImage = contentType.startsWith("image/");
 
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            originalFilename = "file";
+        }
+        
+        String baseName = org.springframework.util.StringUtils.stripFilenameExtension(originalFilename);
+        String extension = org.springframework.util.StringUtils.getFilenameExtension(originalFilename);
+        
+        String publicId = baseName + "_" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        if (!isImage && extension != null) {
+            publicId = publicId + "." + extension;
+        }
+
         Map<String, Object> options = ObjectUtils.asMap(
                 "folder", folder,
-                "resource_type", isImage ? "image" : "raw",
-                "use_filename", true,
-                "unique_filename", true,
+                "public_id", publicId,
+                "resource_type", "auto",
                 "overwrite", false
         );
 

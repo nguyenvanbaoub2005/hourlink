@@ -10,7 +10,6 @@ import com.hourlink.rating.dto.response.BadgeResponse;
 import com.hourlink.rating.dto.response.RatingResponse;
 import com.hourlink.rating.entity.Rating;
 import com.hourlink.rating.repository.RatingRepository;
-import com.hourlink.user.entity.Badge;
 import com.hourlink.user.entity.User;
 import com.hourlink.user.entity.UserBadge;
 import com.hourlink.user.repository.BadgeRepository;

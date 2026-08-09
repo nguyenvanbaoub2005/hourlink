@@ -51,4 +51,8 @@ public class SkillAttachment extends BaseEntity {
      */
     @Column(name = "file_size")
     Long fileSize;
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    boolean isDeleted = false;
 }

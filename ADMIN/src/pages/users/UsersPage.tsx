@@ -6,8 +6,10 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table';
-import { Search, Filter, ShieldAlert, BadgeCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Plus } from 'lucide-react';
+import { Search, Filter, ShieldAlert, BadgeCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Plus, Edit, Eye, KeyRound, Trash2 } from 'lucide-react';
 import UserFormModal from './components/UserFormModal';
+import Modal from '@/components/ui/Modal';
+import toast from 'react-hot-toast';
 import { usersApi, type AdminUserResponse } from '@/api/users';
 
 const columnHelper = createColumnHelper<AdminUserResponse>();
@@ -21,12 +23,17 @@ export default function UsersPage() {
   const [page, setPage] = useState(0);
   const [size] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
 
   const [filters, setFilters] = useState({
     name: '', email: '', phone: '', userType: '', locked: '' as boolean | '', verified: '' as boolean | ''
   });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userFormMode, setUserFormMode] = useState<'create' | 'edit'>('create');
+  const [editingUser, setEditingUser] = useState<AdminUserResponse | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<AdminUserResponse | null>(null);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<AdminUserResponse | null>(null);
 
   const handleFilterChange = (key: string, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -43,6 +50,7 @@ export default function UsersPage() {
       );
       setData(response.content);
       setTotalPages(response.totalPages);
+      setTotalElements(response.totalElements);
     } catch (error) {
       console.error("Failed to fetch users:", error);
     } finally {
@@ -135,15 +143,59 @@ export default function UsersPage() {
       }),
       columnHelper.display({
         id: 'actions',
-        header: '',
-        cell: (info) => (
-          <button 
-            onClick={() => navigate(`/users/${info.row.original.id}`)}
-            className="px-3 py-1.5 text-[13px] font-semibold text-primary rounded-md transition hover:bg-primary/10"
-          >
-            Chi tiết
-          </button>
-        )
+        header: 'Thao tác',
+        cell: (info) => {
+          const user = info.row.original;
+          return (
+            <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingUser(user);
+                  setUserFormMode('edit');
+                  setIsModalOpen(true);
+                }}
+                className="p-1.5 rounded-lg hover:bg-primary/10 text-text-muted hover:text-primary transition"
+                title={`Chỉnh sửa ${user.fullName}`}
+              >
+                <Edit size={15} />
+              </button>
+
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/users/${user.id}`);
+                }}
+                className="p-1.5 rounded-lg hover:bg-primary/10 text-text-muted hover:text-primary transition"
+                title={`Xem chi tiết ${user.fullName}`}
+              >
+                <Eye size={15} />
+              </button>
+
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setResetPasswordUser(user);
+                }}
+                className="p-1.5 rounded-lg hover:bg-amber-500/10 text-text-muted hover:text-amber-600 transition"
+                title={`Cấp lại mật khẩu cho ${user.fullName}`}
+              >
+                <KeyRound size={15} />
+              </button>
+
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteUserTarget(user);
+                }}
+                className="p-1.5 rounded-lg hover:bg-red-100 text-text-muted hover:text-danger transition"
+                title={`Xóa người dùng ${user.fullName}`}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          );
+        }
       })
     ],
     [navigate, page, size]
@@ -272,18 +324,23 @@ export default function UsersPage() {
                   <option value="false">Chưa xác thực</option>
                 </select>
               </div>
+              <button 
+                onClick={() => {
+                  setFilters({ name: '', email: '', phone: '', userType: '', locked: '', verified: '' });
+                  setPage(0);
+                }}
+                className="w-9 h-9 flex items-center justify-center text-text-muted bg-surface-2 border border-border rounded-lg hover:bg-surface-hover hover:text-text transition shrink-0"
+                title="Làm mới bộ lọc"
+              >
+                <RotateCcw size={16}/>
+              </button>
             </div>
             
-            <button 
-              onClick={() => {
-                setFilters({ name: '', email: '', phone: '', userType: '', locked: '', verified: '' });
-                setPage(0);
-              }}
-              className="w-9 h-9 flex items-center justify-center text-text-muted bg-surface-2 border border-border rounded-lg hover:bg-surface-hover hover:text-text transition shrink-0"
-              title="Làm mới bộ lọc"
-            >
-              <RotateCcw size={16}/>
-            </button>
+            <div className="flex justify-end">
+              <p className="text-sm text-text-muted">
+                {totalElements > 0 && <span>Tổng <strong className="text-text">{totalElements}</strong> người dùng</span>}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -371,9 +428,56 @@ export default function UsersPage() {
       
       <UserFormModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingUser(null);
+        }}
         onSuccess={fetchUsers}
-        mode="create"
+        mode={userFormMode}
+        initialData={editingUser}
+      />
+
+      <Modal
+        isOpen={resetPasswordUser !== null}
+        title="Xác nhận cấp lại mật khẩu"
+        message={`Hệ thống sẽ tạo mật khẩu ngẫu nhiên mới và gửi email tới "${resetPasswordUser?.email}". Bạn có chắc chắn không?`}
+        confirmText="Cấp lại mật khẩu"
+        cancelText="Hủy"
+        type="warning"
+        onCancel={() => setResetPasswordUser(null)}
+        onConfirm={async () => {
+          if (!resetPasswordUser) return;
+          const user = resetPasswordUser;
+          setResetPasswordUser(null);
+          try {
+            await usersApi.resetPassword(user.id);
+            toast.success(`Đã cấp lại mật khẩu cho ${user.fullName} và gửi email thành công!`);
+          } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Không thể cấp lại mật khẩu');
+          }
+        }}
+      />
+
+      <Modal
+        isOpen={deleteUserTarget !== null}
+        title="Xác nhận xóa người dùng"
+        message={`Bạn có chắc chắn muốn xóa tài khoản người dùng "${deleteUserTarget?.fullName}"?`}
+        confirmText="Xóa tài khoản"
+        cancelText="Hủy"
+        type="danger"
+        onCancel={() => setDeleteUserTarget(null)}
+        onConfirm={async () => {
+          if (!deleteUserTarget) return;
+          const user = deleteUserTarget;
+          setDeleteUserTarget(null);
+          try {
+            await usersApi.performAction(user.id, 'SOFT_DELETE');
+            toast.success(`Đã xóa người dùng ${user.fullName} thành công!`);
+            fetchUsers();
+          } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Không thể xóa người dùng');
+          }
+        }}
       />
     </div>
   );
