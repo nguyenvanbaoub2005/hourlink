@@ -268,19 +268,37 @@ export default function RegisterScreen() {
             {!!errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
 
             {/* Điều khoản */}
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => setAgreed(!agreed)}
-              activeOpacity={0.7}
-              disabled={loading}
-            >
-              <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-                {agreed && <Feather name="check" size={14} color="#FFF" />}
-              </View>
+            <View style={styles.checkboxContainer}>
+              <TouchableOpacity
+                onPress={() => setAgreed(!agreed)}
+                activeOpacity={0.7}
+                disabled={loading}
+                hitSlop={8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: agreed, disabled: loading }}
+                accessibilityLabel="Đồng ý với điều khoản và chính sách quyền riêng tư"
+              >
+                <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+                  {agreed && <Feather name="check" size={14} color="#FFF" />}
+                </View>
+              </TouchableOpacity>
               <Text style={styles.checkboxText}>
-                Tôi đồng ý với <Text style={styles.linkText}>Điều khoản dịch vụ</Text> và <Text style={styles.linkText}>Chính sách bảo mật</Text>
+                Tôi đồng ý với{' '}
+                <Text
+                  style={styles.linkText}
+                  onPress={() => !loading && router.push('/legal/terms' as any)}
+                >
+                  Điều khoản dịch vụ
+                </Text>
+                {' '}và{' '}
+                <Text
+                  style={styles.linkText}
+                  onPress={() => !loading && router.push('/legal/privacy' as any)}
+                >
+                  Chính sách quyền riêng tư
+                </Text>
               </Text>
-            </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={[styles.registerButton, isSubmitDimmed && styles.registerButtonDisabled]}

@@ -71,6 +71,26 @@ export default function ProfileScreen() {
       router.push('/report/my-reports' as any);
       return;
     }
+    if (label === 'Thông báo') {
+      router.push('/notifications' as any);
+      return;
+    }
+    if (label === 'Bảo mật') {
+      router.push('/profile/security' as any);
+      return;
+    }
+    if (label === 'Quyền riêng tư') {
+      router.push('/profile/privacy' as any);
+      return;
+    }
+    if (label === 'Trợ giúp & FAQ') {
+      router.push('/profile/help' as any);
+      return;
+    }
+    if (label === 'Điều khoản dịch vụ') {
+      router.push('/legal/terms' as any);
+      return;
+    }
     Alert.alert('Thông báo', `Tính năng "${label}" đang được phát triển.`);
   };
 
@@ -156,7 +176,12 @@ export default function ProfileScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push('/profile/settings' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Mở cài đặt"
+          >
             <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
