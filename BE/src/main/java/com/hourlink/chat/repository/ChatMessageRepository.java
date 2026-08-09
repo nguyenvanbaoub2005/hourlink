@@ -44,7 +44,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     long countTotalUnread(@Param("email") String email);
 
     /** Đánh dấu toàn bộ tin nhắn của người kia trong cuộc trò chuyện là đã đọc */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    // Không clear persistence context ở đây: bước hợp nhất còn cần các quan hệ
+    // lazy User/Invitation để cập nhật phòng chính và mirror Firebase.
+    @Modifying(flushAutomatically = true)
     @Query("""
             UPDATE ChatMessage m SET m.isRead = true
             WHERE m.conversation.id = :conversationId
@@ -68,9 +70,6 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     int moveToConversation(
             @Param("target") com.hourlink.chat.entity.Conversation target,
             @Param("sourceConversationIds") Collection<UUID> sourceConversationIds);
-
-    /** Toàn bộ lịch sử để đồng bộ lại Firebase sau khi hợp nhất phòng. */
-    List<ChatMessage> findAllByConversation_IdOrderByCreatedAtAsc(UUID conversationId);
 
     /**
      * Lấy tin nhắn mới nhất còn hiển thị với một user cụ thể trong hội thoại.

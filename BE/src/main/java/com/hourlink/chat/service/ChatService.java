@@ -285,7 +285,6 @@ public class ChatService {
                 if (!Objects.equals(canonical.getPersonalPairKey(), pairKey)) {
                     canonical.setPersonalPairKey(pairKey);
                     conversationRepository.save(canonical);
-                    mirrorConversation(canonical);
                 }
                 continue;
             }
@@ -332,12 +331,9 @@ public class ChatService {
             canonical.setLastMessageAt(newestSummary.getLastMessageAt());
             conversationRepository.save(canonical);
 
-            if (firebaseService.isEnabled()) {
-                chatMessageRepository.findAllByConversation_IdOrderByCreatedAtAsc(canonical.getId())
-                        .forEach(message -> mirrorMessage(canonical, message));
-                duplicates.forEach(this::mirrorConversation);
-            }
-            mirrorConversation(canonical);
+            // Không mirror các phòng cũ ngay trong transaction bảo trì. MySQL là
+            // nguồn sự thật; FE tải lịch sử qua REST và các tin mới vẫn được
+            // mirror realtime sau khi transaction này hoàn tất.
             archivedCount += duplicates.size();
             log.info("Merged {} duplicate personal conversations into {} for pair {}",
                     duplicates.size(), canonical.getId(), pairKey);
