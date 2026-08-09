@@ -31,6 +31,7 @@ public class UserService {
     private final Cloudinary cloudinary;
     private final com.hourlink.skill.service.SkillService skillService;
     private final com.hourlink.rating.service.RatingService ratingService;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     /**
      * Hồ sơ công khai của một người dùng khác — dùng khi xem thông tin người
@@ -112,6 +113,27 @@ public class UserService {
 
         user = userRepository.save(user);
         return mapToDto(user);
+    }
+
+    @Transactional
+    public void changePassword(com.hourlink.user.dto.ChangePasswordRequest request) {
+        String email = com.hourlink.common.util.SecurityUtil.getCurrentUserEmail();
+        com.hourlink.user.entity.User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new com.hourlink.common.exception.AppException(
+                        com.hourlink.common.exception.ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new com.hourlink.common.exception.AppException(
+                    com.hourlink.common.exception.ErrorCode.WRONG_PASSWORD);
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new com.hourlink.common.exception.AppException(
+                    com.hourlink.common.exception.ErrorCode.NEW_PASSWORD_SAME_AS_OLD);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 
     private com.hourlink.user.dto.UserDto mapToDto(com.hourlink.user.entity.User user) {

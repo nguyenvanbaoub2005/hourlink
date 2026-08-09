@@ -192,18 +192,18 @@ export default function EditProfileScreen() {
           />
         </View>
         
-        {/* Email is usually uneditable or requires a different process, but we allow it as per DTO for now */}
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>Email đăng nhập</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, styles.readOnlyInput]}
             value={profile.email}
-            onChangeText={(text) => setProfile({ ...profile, email: text })}
             placeholder="Địa chỉ email"
             placeholderTextColor={Colors.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={false}
           />
+          <Text style={styles.fieldHint}>Email không thể đổi trực tiếp để bảo vệ tài khoản.</Text>
         </View>
         
         <View style={{ height: Spacing.xl }} />
@@ -258,5 +258,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textPrimary
   },
+  readOnlyInput: { backgroundColor: '#F1F5F9', color: Colors.textSecondary },
+  fieldHint: { color: Colors.textMuted, fontSize: 12, marginTop: 6 },
   textArea: { minHeight: 100 }
 });
