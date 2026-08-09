@@ -49,6 +49,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -56,6 +58,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -82,6 +85,7 @@ public class ChatService {
 
     private static final String CLOUDINARY_FOLDER = "chat_attachments";
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20MB
+    private static final int MAX_ORIGINAL_FILENAME_LENGTH = 255;
 
     private static final List<AppointmentStatus> ACTIVE_APPOINTMENT_STATUSES = List.of(
             AppointmentStatus.PENDING,
@@ -406,8 +410,13 @@ public class ChatService {
     /** Danh sách cuộc trò chuyện của tôi, mới nhất trước */
     public List<ConversationResponse> getMyConversations() {
         String email = SecurityUtil.getCurrentUserEmail();
-        return conversationRepository.findAllByParticipantEmail(email)
-                .stream()
+        Map<UUID, Conversation> canonicalConversations = new LinkedHashMap<>();
+        conversationRepository.findAllByParticipantEmail(email).stream()
+                .map(this::resolveCanonicalConversation)
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+                .forEach(c -> canonicalConversations.putIfAbsent(c.getId(), c));
+
+        return canonicalConversations.values().stream()
                 .filter(c -> {
                     if (c.getUserOne().getEmail().equals(email)) return !c.isHiddenByUserOne();
                     return !c.isHiddenByUserTwo();
@@ -532,31 +541,48 @@ public class ChatService {
         User receiver = otherUserOf(conv, email);
 
         requireNotBlocked(sender, receiver);
-        boolean isImage = validateFile(file);
+        String originalName = normalizeOriginalFilename(file != null ? file.getOriginalFilename() : null);
+        boolean isImage = validateFile(file, originalName);
+
+        String uploadedPublicId = null;
+        boolean rollbackCleanupRegistered = false;
 
         try {
             Map<String, Object> uploadResult = cloudinaryService.uploadFile(
                     file, CLOUDINARY_FOLDER, isImage);
+            uploadedPublicId = requiredUploadField(uploadResult, "public_id");
+            rollbackCleanupRegistered = registerAttachmentRollbackCleanup(uploadedPublicId, isImage);
+            String secureUrl = requiredUploadField(uploadResult, "secure_url");
 
             ChatMessage saved = chatMessageRepository.save(ChatMessage.builder()
                     .conversation(conv)
                     .sender(sender)
                     .type(isImage ? MessageType.IMAGE : MessageType.DOCUMENT)
                     .content(caption)
-                    .attachmentUrl((String) uploadResult.get("secure_url"))
-                    .publicId((String) uploadResult.get("public_id"))
-                    .originalName(file.getOriginalFilename())
+                    .attachmentUrl(secureUrl)
+                    .publicId(uploadedPublicId)
+                    .originalName(originalName)
                     .fileSize(file.getSize())
                     .isRead(false)
                     .build());
 
-            String preview = isImage ? "🖼️ Hình ảnh" : "📄 " + file.getOriginalFilename();
+            String preview = isImage ? "🖼️ Hình ảnh" : "📄 " + originalName;
             afterMessageSent(conv, saved, sender, receiver, preview);
             return mapToMessageResponse(saved);
 
         } catch (IOException e) {
+            cleanupAttachmentImmediatelyIfNeeded(uploadedPublicId, isImage,
+                    rollbackCleanupRegistered);
             log.error("Upload đính kèm chat thất bại: {}", e.getMessage());
             throw new AppException(ErrorCode.UPLOAD_FAILED);
+        } catch (RuntimeException e) {
+            cleanupAttachmentImmediatelyIfNeeded(uploadedPublicId, isImage,
+                    rollbackCleanupRegistered);
+            if (uploadedPublicId == null && !(e instanceof AppException)) {
+                log.error("Cloudinary upload đính kèm chat thất bại: {}", e.getMessage());
+                throw new AppException(ErrorCode.UPLOAD_FAILED);
+            }
+            throw e;
         }
     }
 
@@ -613,9 +639,11 @@ public class ChatService {
     public void sendAppointmentCardInternal(UUID conversationId, UUID appointmentId, String appointmentData,
                                             User sender) {
         if (conversationId == null) return;
-        Conversation conv = conversationRepository.findById(conversationId)
+        Conversation requestedConversation = conversationRepository.findById(conversationId)
                 .orElse(null);
-        if (conv == null) return;
+        if (requestedConversation == null) return;
+        Conversation conv = resolveCanonicalConversation(requestedConversation);
+        if (!Boolean.TRUE.equals(conv.getIsActive())) return;
         if (conv.getInvitation() == null) return;
 
         User receiver = otherUserOf(conv, sender.getEmail());
@@ -639,7 +667,7 @@ public class ChatService {
         mirrorMessage(conv, saved);
         mirrorUnread(conv, receiver);
 
-        log.info("Appointment card sent to conversation {} for appointment {}", conversationId, appointmentId);
+        log.info("Appointment card sent to conversation {} for appointment {}", conv.getId(), appointmentId);
     }
 
     /**
@@ -664,7 +692,11 @@ public class ChatService {
         return conversationRepository
                 .findByPersonalPairKeyAndIsActiveTrue(personalPairKey(userId1, userId2))
                 .map(Conversation::getId)
-                .orElse(null);
+                .orElseGet(() -> conversationRepository
+                        .findActivePersonalBetweenUsers(userId1, userId2).stream()
+                        .findFirst()
+                        .map(Conversation::getId)
+                        .orElse(null));
     }
 
     /**
@@ -674,12 +706,11 @@ public class ChatService {
     public UUID findConversationIdByInvitation(UUID invitationId) {
         return conversationRepository.findByInvitation_Id(invitationId)
                 .map(this::resolveCanonicalConversation)
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
                 .map(Conversation::getId)
                 .orElseGet(() -> invitationRepository.findById(invitationId)
-                        .flatMap(invitation -> conversationRepository
-                                .findByPersonalPairKeyAndIsActiveTrue(personalPairKey(
-                                        invitation.getSender().getId(), invitation.getReceiver().getId())))
-                        .map(Conversation::getId)
+                        .map(invitation -> findConversationIdByUsers(
+                                invitation.getSender().getId(), invitation.getReceiver().getId()))
                         .orElse(null));
     }
 
@@ -918,12 +949,21 @@ public class ChatService {
     }
 
     private Conversation requireParticipant(UUID conversationId, String email) {
-        Conversation conv = conversationRepository.findById(conversationId)
+        Conversation requestedConversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_NOT_FOUND));
-        if (!isParticipant(conv, email)) {
+        if (!isParticipant(requestedConversation, email)) {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
-        return resolveCanonicalConversation(conv);
+        Conversation canonical = resolveCanonicalConversation(requestedConversation);
+        if (!isParticipant(canonical, email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+        if (sourceTypeOf(canonical) == ConversationSourceType.SKILL_INVITATION
+                && !Boolean.TRUE.equals(canonical.getIsActive())) {
+            // Tuyệt đối không ghi tin mới vào phòng cũ sau khi deduplicate.
+            throw new AppException(ErrorCode.CONVERSATION_NOT_FOUND);
+        }
+        return canonical;
     }
 
     private Conversation resolveCanonicalConversation(Conversation conversation) {
@@ -933,7 +973,11 @@ public class ChatService {
         String pairKey = personalPairKey(
                 conversation.getUserOne().getId(), conversation.getUserTwo().getId());
         return conversationRepository.findByPersonalPairKeyAndIsActiveTrue(pairKey)
-                .orElse(conversation);
+                .orElseGet(() -> conversationRepository.findActivePersonalBetweenUsers(
+                                conversation.getUserOne().getId(), conversation.getUserTwo().getId())
+                        .stream()
+                        .findFirst()
+                        .orElse(conversation));
     }
 
     private boolean isParticipant(Conversation conv, String email) {
@@ -991,6 +1035,11 @@ public class ChatService {
 
     /** @return true nếu là ảnh, false nếu là tài liệu */
     boolean validateFile(MultipartFile file) {
+        return validateFile(file,
+                normalizeOriginalFilename(file != null ? file.getOriginalFilename() : null));
+    }
+
+    private boolean validateFile(MultipartFile file, String originalName) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
@@ -1007,8 +1056,7 @@ public class ChatService {
         // Khi đó suy luận theo đuôi file, nhưng vẫn chỉ nhận đúng danh sách đã
         // cho phép để không mở rộng kiểu upload ngoài ý muốn.
         if (contentType.isBlank() || "application/octet-stream".equals(contentType)) {
-            String fileName = file.getOriginalFilename() != null
-                    ? file.getOriginalFilename().toLowerCase(Locale.ROOT) : "";
+            String fileName = originalName.toLowerCase(Locale.ROOT);
             if (hasExtension(fileName, ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif")) {
                 return true;
             }
@@ -1017,6 +1065,57 @@ public class ChatService {
             }
         }
         throw new AppException(ErrorCode.INVALID_REQUEST);
+    }
+
+    String normalizeOriginalFilename(String originalFilename) {
+        String normalized = originalFilename == null ? "" : originalFilename
+                .replace('\\', '/')
+                .replaceAll("[\\p{Cntrl}]", "_")
+                .trim();
+        int lastSlash = normalized.lastIndexOf('/');
+        if (lastSlash >= 0) normalized = normalized.substring(lastSlash + 1).trim();
+        if (normalized.isBlank() || ".".equals(normalized) || "..".equals(normalized)) {
+            normalized = "attachment";
+        }
+        if (normalized.length() <= MAX_ORIGINAL_FILENAME_LENGTH) return normalized;
+
+        int dot = normalized.lastIndexOf('.');
+        String extension = dot > 0 && normalized.length() - dot <= 20
+                ? normalized.substring(dot) : "";
+        int baseLength = MAX_ORIGINAL_FILENAME_LENGTH - extension.length();
+        return normalized.substring(0, baseLength) + extension;
+    }
+
+    private String requiredUploadField(Map<String, Object> uploadResult, String field) {
+        Object value = uploadResult != null ? uploadResult.get(field) : null;
+        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
+            log.error("Cloudinary upload response missing required field {}", field);
+            throw new AppException(ErrorCode.UPLOAD_FAILED);
+        }
+        return stringValue;
+    }
+
+    private boolean registerAttachmentRollbackCleanup(String publicId, boolean isImage) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return false;
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    log.warn("Chat attachment transaction rolled back; deleting Cloudinary asset {}",
+                            publicId);
+                    cloudinaryService.deleteFile(publicId, isImage);
+                }
+            }
+        });
+        return true;
+    }
+
+    private void cleanupAttachmentImmediatelyIfNeeded(String publicId, boolean isImage,
+                                                       boolean rollbackCleanupRegistered) {
+        if (publicId != null && !rollbackCleanupRegistered) {
+            cloudinaryService.deleteFile(publicId, isImage);
+        }
     }
 
     private boolean hasExtension(String fileName, String... extensions) {

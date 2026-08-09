@@ -26,6 +26,23 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     /** Chat cá nhân duy nhất của một cặp người dùng. */
     Optional<Conversation> findByPersonalPairKeyAndIsActiveTrue(String personalPairKey);
 
+    /**
+     * Fallback cho dữ liệu cũ chưa có personal_pair_key. Không lọc theo
+     * source_type vì cột này từng nullable; community_activity_id mới là dấu
+     * hiệu ổn định để phân biệt chat cá nhân với chat cộng đồng.
+     */
+    @Query("""
+            SELECT c FROM Conversation c
+            WHERE c.communityActivity IS NULL
+              AND c.isActive = true
+              AND ((c.userOne.id = :userId1 AND c.userTwo.id = :userId2)
+                OR (c.userOne.id = :userId2 AND c.userTwo.id = :userId1))
+            ORDER BY c.createdAt ASC
+            """)
+    List<Conversation> findActivePersonalBetweenUsers(
+            @Param("userId1") UUID userId1,
+            @Param("userId2") UUID userId2);
+
     /** Một người tham gia chỉ có một hội thoại trong mỗi hoạt động. */
     Optional<Conversation> findByCommunityActivity_IdAndUserTwo_Id(
             UUID communityActivityId, UUID participantUserId);
