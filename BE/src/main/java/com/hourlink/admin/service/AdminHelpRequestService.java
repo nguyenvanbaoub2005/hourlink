@@ -51,9 +51,14 @@ public class AdminHelpRequestService {
 
     @Transactional(readOnly = true)
     public Page<AdminHelpRequestResponse> getHelpRequests(
-            String title, String requesterName, RequestStatus status, UUID categoryId, Pageable pageable) {
+            String title, String requesterName, String requesterEmail, RequestStatus status, UUID categoryId, String region, Pageable pageable) {
 
         Specification<HelpRequest> spec = Specification.where(null);
+
+        if (region != null && !region.trim().isEmpty()) {
+            String kw = "%" + region.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("region")), kw));
+        }
 
         if (title != null && !title.trim().isEmpty()) {
             String kw = "%" + title.trim().toLowerCase() + "%";
@@ -61,10 +66,11 @@ public class AdminHelpRequestService {
         }
         if (requesterName != null && !requesterName.trim().isEmpty()) {
             String kw = "%" + requesterName.trim().toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.join("requester").get("fullName")), kw),
-                    cb.like(cb.lower(root.join("requester").get("email")), kw)
-            ));
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.join("requester").get("fullName")), kw));
+        }
+        if (requesterEmail != null && !requesterEmail.trim().isEmpty()) {
+            String kw = "%" + requesterEmail.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.join("requester").get("email")), kw));
         }
         if (categoryId != null) {
             spec = spec.and((root, query, cb) ->
@@ -211,6 +217,7 @@ public class AdminHelpRequestService {
                 .title(request.getTitle())
                 .status(request.getStatus())
                 .categoryName(request.getCategory() != null ? request.getCategory().getName() : null)
+                .region(request.getRegion())
                 .requesterId(request.getRequester().getId())
                 .requesterFullName(request.getRequester().getFullName())
                 .requesterEmail(request.getRequester().getEmail())

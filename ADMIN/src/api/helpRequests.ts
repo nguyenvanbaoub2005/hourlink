@@ -8,6 +8,7 @@ export interface AdminHelpRequestResponse {
   title: string;
   status: RequestStatus;
   categoryName: string | null;
+  region: string | null;
   requesterId: string;
   requesterFullName: string;
   requesterEmail: string;
@@ -54,8 +55,10 @@ export const helpRequestsApi = {
     size = 10,
     title = '',
     requesterName = '',
+    requesterEmail = '',
     status = '',
-    categoryId = ''
+    categoryId = '',
+    region = ''
   ) => {
     const response = await api.get<PaginatedHelpRequestResponse>('/admin/help-requests', {
       params: {
@@ -63,8 +66,10 @@ export const helpRequestsApi = {
         size,
         title: title || undefined,
         requesterName: requesterName || undefined,
+        requesterEmail: requesterEmail || undefined,
         status: status || undefined,
         categoryId: categoryId || undefined,
+        region: region || undefined,
       },
     });
     return response.data;

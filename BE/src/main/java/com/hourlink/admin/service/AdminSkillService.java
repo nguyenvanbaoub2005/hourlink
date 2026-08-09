@@ -73,11 +73,16 @@ public class AdminSkillService {
 
     @Transactional(readOnly = true)
     public Page<AdminSkillResponse> getSkills(
-            String skillName, String userName, UUID categoryId,
-            SkillStatus status, SkillLevel level, SessionFormat format,
+            String skillName, String userName, String userEmail, UUID categoryId,
+            SkillStatus status, SkillLevel level, SessionFormat format, String region,
             Pageable pageable) {
 
         Specification<Skill> spec = Specification.where(null);
+
+        if (region != null && !region.trim().isEmpty()) {
+            String kw = "%" + region.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("region")), kw));
+        }
 
         if (skillName != null && !skillName.trim().isEmpty()) {
             String kw = "%" + skillName.trim().toLowerCase() + "%";
@@ -85,10 +90,11 @@ public class AdminSkillService {
         }
         if (userName != null && !userName.trim().isEmpty()) {
             String kw = "%" + userName.trim().toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.join("user").get("fullName")), kw),
-                    cb.like(cb.lower(root.join("user").get("email")), kw)
-            ));
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.join("user").get("fullName")), kw));
+        }
+        if (userEmail != null && !userEmail.trim().isEmpty()) {
+            String kw = "%" + userEmail.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.join("user").get("email")), kw));
         }
         if (categoryId != null) {
             spec = spec.and((root, query, cb) ->
@@ -393,6 +399,8 @@ public class AdminSkillService {
                 .status(skill.getStatus())
                 .level(skill.getLevel())
                 .format(skill.getFormat())
+                .duration(skill.getDuration())
+                .region(skill.getRegion())
                 .categoryName(skill.getCategory() != null ? skill.getCategory().getName() : null)
                 .userId(skill.getUser().getId())
                 .userFullName(skill.getUser().getFullName())

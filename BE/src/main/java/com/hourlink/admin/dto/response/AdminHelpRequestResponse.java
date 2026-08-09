@@ -14,6 +14,7 @@ public class AdminHelpRequestResponse {
     String title;
     RequestStatus status;
     String categoryName;
+    String region;
     UUID requesterId;
     String requesterFullName;
     String requesterEmail;

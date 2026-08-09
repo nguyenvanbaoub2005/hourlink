@@ -79,7 +79,7 @@ export default function SkillsPage() {
   const [totalElements, setTotalElements] = useState(0);
 
   const [filters, setFilters] = useState({
-    skillName: '', userName: '', categoryId: '', status: '', level: '', format: '',
+    skillName: '', userName: '', userEmail: '', categoryId: '', status: '', level: '', format: '', region: '',
   });
 
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export default function SkillsPage() {
   const [hrTotalElements, setHrTotalElements] = useState(0);
 
   const [hrFilters, setHrFilters] = useState({
-    title: '', requesterName: '', categoryId: '', status: '',
+    title: '', requesterName: '', requesterEmail: '', categoryId: '', status: '', region: '',
   });
 
   const [selectedHrId, setSelectedHrId] = useState<string | null>(null);
@@ -128,7 +128,7 @@ export default function SkillsPage() {
     setPage(0);
   };
   const resetFilters = () => {
-    setFilters({ skillName: '', userName: '', categoryId: '', status: '', level: '', format: '' });
+    setFilters({ skillName: '', userName: '', userEmail: '', categoryId: '', status: '', level: '', format: '', region: '' });
     setPage(0);
   };
 
@@ -137,7 +137,7 @@ export default function SkillsPage() {
     setHrPage(0);
   };
   const resetHrFilters = () => {
-    setHrFilters({ title: '', requesterName: '', categoryId: '', status: '' });
+    setHrFilters({ title: '', requesterName: '', requesterEmail: '', categoryId: '', status: '', region: '' });
     setHrPage(0);
   };
 
@@ -147,8 +147,8 @@ export default function SkillsPage() {
     try {
       const res = await skillsApi.getSkills(
         page, size,
-        filters.skillName, filters.userName, filters.categoryId,
-        filters.status, filters.level, filters.format
+        filters.skillName, filters.userName, filters.userEmail, filters.categoryId,
+        filters.status, filters.level, filters.format, filters.region
       );
       setData(res.content);
       setTotalPages(res.totalPages);
@@ -169,7 +169,7 @@ export default function SkillsPage() {
     setHrLoading(true);
     try {
       const res = await helpRequestsApi.getHelpRequests(
-        hrPage, hrSize, hrFilters.title, hrFilters.requesterName, hrFilters.status, hrFilters.categoryId
+        hrPage, hrSize, hrFilters.title, hrFilters.requesterName, hrFilters.requesterEmail, hrFilters.status, hrFilters.categoryId, hrFilters.region
       );
       setHrData(res.content);
       setHrTotalPages(res.totalPages);
@@ -227,8 +227,8 @@ export default function SkillsPage() {
       cell: (info) => {
         const skill = info.row.original;
         return (
-          <div>
-            <p className="font-semibold text-text text-sm">{info.getValue()}</p>
+          <div className="max-w-[300px] whitespace-normal">
+            <p className="font-semibold text-text text-sm line-clamp-2">{info.getValue()}</p>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               {skill.categoryName && (
                 <span className="text-[11px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border">
@@ -274,6 +274,14 @@ export default function SkillsPage() {
         );
       },
     }),
+    skillColumnHelper.accessor('duration', {
+      header: 'Thời lượng',
+      cell: (info) => {
+        const val = info.getValue();
+        if (!val) return <span className="text-text-muted text-sm">—</span>;
+        return <span className="text-sm text-text font-medium">{val} phút</span>;
+      },
+    }),
     skillColumnHelper.display({
       id: 'format',
       header: 'Hình thức',
@@ -287,13 +295,13 @@ export default function SkillsPage() {
         );
       },
     }),
-    skillColumnHelper.accessor('attachmentCount', {
-      header: 'Minh chứng',
-      cell: (info) => (
-        <span className={`text-sm font-medium ${info.getValue() > 0 ? 'text-primary' : 'text-text-muted'}`}>
-          {info.getValue()} file
-        </span>
-      ),
+    skillColumnHelper.accessor('region', {
+      header: 'Khu vực',
+      cell: (info) => {
+        const val = info.getValue();
+        if (!val) return <span className="text-text-muted text-sm">—</span>;
+        return <span className="text-sm text-text">{val}</span>;
+      },
     }),
     skillColumnHelper.accessor('status', {
       header: 'Trạng thái',
@@ -405,6 +413,14 @@ export default function SkillsPage() {
             </div>
           </div>
         );
+      },
+    }),
+    hrColumnHelper.accessor('region', {
+      header: 'Khu vực',
+      cell: (info) => {
+        const val = info.getValue();
+        if (!val) return <span className="text-text-muted text-sm">—</span>;
+        return <span className="text-sm text-text">{val}</span>;
       },
     }),
     hrColumnHelper.accessor('timeCreditAmount', {
@@ -568,7 +584,7 @@ export default function SkillsPage() {
           <div className="flex flex-col gap-4 mb-6">
             {/* Header with + button */}
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-text">Danh sách kỹ năng</p>
+              <p className="text-[15px] font-bold text-text">Danh sách kỹ năng</p>
               <button
                 onClick={() => { setSkillFormMode('create'); setEditingSkillDetail(null); setShowSkillForm(true); }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition"
@@ -577,7 +593,7 @@ export default function SkillsPage() {
               </button>
             </div>
             {/* Row 1: Search */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
                 <input
@@ -592,10 +608,30 @@ export default function SkillsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
                 <input
                   type="text"
-                  placeholder="Tìm người đăng..."
+                  placeholder="Tìm tên người đăng..."
                   className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-lg text-sm text-text transition focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
                   value={filters.userName}
                   onChange={(e) => handleFilterChange('userName', e.target.value)}
+                />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                <input
+                  type="text"
+                  placeholder="Tìm email..."
+                  className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-lg text-sm text-text transition focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                  value={filters.userEmail}
+                  onChange={(e) => handleFilterChange('userEmail', e.target.value)}
+                />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                <input
+                  type="text"
+                  placeholder="Khu vực..."
+                  className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-lg text-sm text-text transition focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                  value={filters.region}
+                  onChange={(e) => handleFilterChange('region', e.target.value)}
                 />
               </div>
             </div>
@@ -680,7 +716,7 @@ export default function SkillsPage() {
                 {skillTable.getHeaderGroups().map((hg) => (
                   <tr key={hg.id} className="bg-surface-2 border-b border-border">
                     {hg.headers.map((header) => (
-                      <th key={header.id} className="px-4 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap">
+                      <th key={header.id} className="px-4 py-3 text-left text-[13px] font-bold text-text uppercase tracking-wider whitespace-nowrap">
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </th>
                     ))}
@@ -735,7 +771,7 @@ export default function SkillsPage() {
           <div className="flex flex-col gap-4 mb-6">
             {/* Header with + button */}
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-text">Danh sách yêu cầu hỗ trợ</p>
+              <p className="text-[15px] font-bold text-text">Danh sách yêu cầu hỗ trợ</p>
               <button
                 onClick={() => { setHrFormMode('create'); setEditingHrDetail(null); setShowHrForm(true); }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition"
@@ -744,7 +780,7 @@ export default function SkillsPage() {
               </button>
             </div>
             {/* Row 1: Search */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
                 <input
@@ -759,10 +795,30 @@ export default function SkillsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
                 <input
                   type="text"
-                  placeholder="Tìm người yêu cầu..."
+                  placeholder="Tìm tên người đăng..."
                   className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-lg text-sm text-text transition focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
                   value={hrFilters.requesterName}
                   onChange={(e) => handleHrFilterChange('requesterName', e.target.value)}
+                />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                <input
+                  type="text"
+                  placeholder="Tìm email..."
+                  className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-lg text-sm text-text transition focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                  value={hrFilters.requesterEmail}
+                  onChange={(e) => handleHrFilterChange('requesterEmail', e.target.value)}
+                />
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={16} />
+                <input
+                  type="text"
+                  placeholder="Khu vực..."
+                  className="w-full pl-10 pr-4 py-2 bg-surface-2 border border-border rounded-lg text-sm text-text transition focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                  value={hrFilters.region}
+                  onChange={(e) => handleHrFilterChange('region', e.target.value)}
                 />
               </div>
             </div>
@@ -824,7 +880,7 @@ export default function SkillsPage() {
                 {hrTable.getHeaderGroups().map((hg) => (
                   <tr key={hg.id} className="bg-surface-2 border-b border-border">
                     {hg.headers.map((header) => (
-                      <th key={header.id} className="px-4 py-3 text-left text-xs font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap">
+                      <th key={header.id} className="px-4 py-3 text-left text-[13px] font-bold text-text uppercase tracking-wider whitespace-nowrap">
                         {flexRender(header.column.columnDef.header, header.getContext())}
                       </th>
                     ))}

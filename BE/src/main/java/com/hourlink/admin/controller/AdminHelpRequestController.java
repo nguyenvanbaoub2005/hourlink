@@ -30,11 +30,13 @@ public class AdminHelpRequestController {
     public ResponseEntity<Page<AdminHelpRequestResponse>> getHelpRequests(
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String requesterName,
+            @RequestParam(required = false) String requesterEmail,
             @RequestParam(required = false) RequestStatus status,
             @RequestParam(required = false) UUID categoryId,
+            @RequestParam(required = false) String region,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(
-                adminHelpRequestService.getHelpRequests(title, requesterName, status, categoryId, pageable));
+                adminHelpRequestService.getHelpRequests(title, requesterName, requesterEmail, status, categoryId, region, pageable));
     }
 
     @GetMapping("/{id}")

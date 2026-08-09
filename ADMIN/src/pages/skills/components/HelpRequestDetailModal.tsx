@@ -69,7 +69,7 @@ export default function HelpRequestDetailModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
           {/* Header */}

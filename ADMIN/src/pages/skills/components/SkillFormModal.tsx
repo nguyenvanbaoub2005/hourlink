@@ -39,6 +39,7 @@ const STATUSES = [
 
 export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initialData, categories }: Props) {
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // User search
   const [nameSearch, setNameSearch] = useState('');
@@ -63,6 +64,7 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
 
   useEffect(() => {
     if (isOpen) {
+      setErrors({});
       setNameSearch(''); setEmailSearch(''); setUserResults([]); setSelectedUser(null);
       if (mode === 'edit' && initialData) {
         setForm({
@@ -106,8 +108,19 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'create' && !selectedUser) { toast.error('Vui lòng chọn người sở hữu kỹ năng'); return; }
-    if (!form.name.trim()) { toast.error('Tên kỹ năng không được để trống'); return; }
+    const newErrors: Record<string, string> = {};
+    if (mode === 'create' && !selectedUser) {
+      newErrors.user = 'Vui lòng tìm và chọn người sở hữu kỹ năng';
+    }
+    if (!form.name.trim()) {
+      newErrors.name = 'Vui lòng nhập tên kỹ năng';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
 
     setLoading(true);
     try {
@@ -161,11 +174,11 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
 
         {/* Body */}
         <div className="overflow-y-auto flex-1">
-          <form id="skill-form" onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form id="skill-form" onSubmit={handleSubmit} noValidate className="p-6 space-y-5">
 
             {/* User picker (only for create) */}
             {mode === 'create' && (
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+              <div className={`bg-slate-50 rounded-xl p-4 border ${errors.user ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   Người sở hữu kỹ năng <span className="text-red-500">*</span>
                 </label>
@@ -182,7 +195,7 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
                       <p className="text-sm font-semibold text-slate-800 truncate">{selectedUser.fullName}</p>
                       <p className="text-xs text-slate-500 truncate">{selectedUser.email}</p>
                     </div>
-                    <button type="button" onClick={() => setSelectedUser(null)} className="text-xs text-red-500 hover:text-red-700 font-medium shrink-0">Đổi</button>
+                    <button type="button" onClick={() => { setSelectedUser(null); if (errors.user) setErrors({...errors, user: ''}); }} className="text-xs text-red-500 hover:text-red-700 font-medium shrink-0">Đổi</button>
                   </div>
                 ) : (
                   <>
@@ -215,7 +228,7 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
                           <button
                             key={u.id}
                             type="button"
-                            onClick={() => setSelectedUser(u)}
+                            onClick={() => { setSelectedUser(u); if (errors.user) setErrors({...errors, user: ''}); }}
                             className="w-full flex items-center gap-3 p-3 hover:bg-primary/5 transition text-left"
                           >
                             <div className="w-8 h-8 rounded-full bg-primary/10 overflow-hidden shrink-0">
@@ -237,6 +250,7 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
                     )}
                   </>
                 )}
+                {errors.user && <p className="text-xs text-red-500 mt-2 font-medium">{errors.user}</p>}
               </div>
             )}
 
@@ -247,12 +261,13 @@ export default function SkillFormModal({ isOpen, onClose, onSuccess, mode, initi
                   Tên kỹ năng <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="text" required maxLength={150}
+                  type="text" maxLength={150}
                   value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  onChange={e => { setForm({ ...form, name: e.target.value }); if (errors.name) setErrors({...errors, name: ''}); }}
                   placeholder="Vd: Lập trình Python cơ bản"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
+                  className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-sm outline-none transition ${errors.name ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'}`}
                 />
+                {errors.name && <p className="text-xs text-red-500 mt-1 font-medium">{errors.name}</p>}
               </div>
 
               <div className="md:col-span-2">

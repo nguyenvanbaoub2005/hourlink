@@ -240,7 +240,7 @@ export default function UsersPage() {
           <p className="text-sm text-text-muted">Xem, tìm kiếm và quản lý toàn bộ tài khoản người dùng HourLink.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setUserFormMode('create'); setEditingUser(null); setIsModalOpen(true); }}
           className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold transition shadow-sm hover:shadow-md"
         >
           <Plus size={18} />
@@ -350,7 +350,7 @@ export default function UsersPage() {
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="bg-surface-2 text-text-muted font-semibold text-[13px] px-4 py-3.5 border-b border-border whitespace-nowrap">
+                    <th key={header.id} className="bg-surface-2 text-text font-bold text-[13px] px-4 py-3.5 border-b border-border whitespace-nowrap uppercase tracking-wider">
                       {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}

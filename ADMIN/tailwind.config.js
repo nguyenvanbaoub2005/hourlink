@@ -10,6 +10,7 @@ export default {
         primary: {
           DEFAULT: 'var(--primary)',
           hover: 'var(--primary-hover)',
+          light: 'var(--primary-light)',
         },
         danger: {
           DEFAULT: 'var(--danger)',
@@ -18,6 +19,7 @@ export default {
         warning: 'var(--warning)',
         success: 'var(--success)',
         info: 'var(--info)',
+        bg: 'var(--bg)',
         surface: {
           DEFAULT: 'var(--surface)',
           2: 'var(--surface-2)',
@@ -28,8 +30,18 @@ export default {
         text: {
           DEFAULT: 'var(--text)',
           muted: 'var(--text-muted)',
+          dim: 'var(--text-dim)',
         },
-      }
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+      },
+      height: {
+        header: 'var(--header-height)',
+      },
+      width: {
+        sidebar: 'var(--sidebar-width)',
+      },
     },
   },
   plugins: [],

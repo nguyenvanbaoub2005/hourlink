@@ -43,6 +43,7 @@ const STATUSES = [
 
 export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode, initialData, categories }: Props) {
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // User search
   const [nameSearch, setNameSearch] = useState('');
@@ -68,6 +69,7 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
 
   useEffect(() => {
     if (isOpen) {
+      setErrors({});
       setNameSearch(''); setEmailSearch(''); setUserResults([]); setSelectedUser(null);
       if (mode === 'edit' && initialData) {
         setForm({
@@ -110,8 +112,19 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'create' && !selectedUser) { toast.error('Vui lòng chọn người yêu cầu hỗ trợ'); return; }
-    if (!form.title.trim()) { toast.error('Tiêu đề không được để trống'); return; }
+    const newErrors: Record<string, string> = {};
+    if (mode === 'create' && !selectedUser) {
+      newErrors.user = 'Vui lòng tìm và chọn người gửi yêu cầu';
+    }
+    if (!form.title.trim()) {
+      newErrors.title = 'Vui lòng nhập tiêu đề yêu cầu';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
 
     setLoading(true);
     try {
@@ -166,11 +179,11 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
 
         {/* Body */}
         <div className="overflow-y-auto flex-1">
-          <form id="help-request-form" onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form id="help-request-form" onSubmit={handleSubmit} noValidate className="p-6 space-y-5">
 
             {/* User picker (only for create) */}
             {mode === 'create' && (
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+              <div className={`bg-slate-50 rounded-xl p-4 border ${errors.user ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200'}`}>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   Người yêu cầu hỗ trợ <span className="text-red-500">*</span>
                 </label>
@@ -187,7 +200,7 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
                       <p className="text-sm font-semibold text-slate-800 truncate">{selectedUser.fullName}</p>
                       <p className="text-xs text-slate-500 truncate">{selectedUser.email}</p>
                     </div>
-                    <button type="button" onClick={() => setSelectedUser(null)} className="text-xs text-red-500 hover:text-red-700 font-medium shrink-0">Đổi</button>
+                    <button type="button" onClick={() => { setSelectedUser(null); if (errors.user) setErrors({...errors, user: ''}); }} className="text-xs text-red-500 hover:text-red-700 font-medium shrink-0">Đổi</button>
                   </div>
                 ) : (
                   <>
@@ -215,7 +228,7 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
                     {!userSearching && userResults.length > 0 && (
                       <div className="bg-white border border-slate-200 rounded-xl max-h-44 overflow-y-auto divide-y divide-slate-100">
                         {userResults.map(u => (
-                          <button key={u.id} type="button" onClick={() => setSelectedUser(u)}
+                          <button key={u.id} type="button" onClick={() => { setSelectedUser(u); if (errors.user) setErrors({...errors, user: ''}); }}
                             className="w-full flex items-center gap-3 p-3 hover:bg-amber-50 transition text-left">
                             <div className="w-8 h-8 rounded-full bg-amber-100 overflow-hidden shrink-0">
                               {u.avatarUrl
@@ -236,6 +249,7 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
                     )}
                   </>
                 )}
+                {errors.user && <p className="text-xs text-red-500 mt-2 font-medium">{errors.user}</p>}
               </div>
             )}
 
@@ -246,12 +260,13 @@ export default function HelpRequestFormModal({ isOpen, onClose, onSuccess, mode,
                   Tiêu đề <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="text" required maxLength={255}
+                  type="text" maxLength={255}
                   value={form.title}
-                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  onChange={e => { setForm({ ...form, title: e.target.value }); if (errors.title) setErrors({...errors, title: ''}); }}
                   placeholder="Vd: Cần người dạy Python cơ bản..."
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
+                  className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-sm outline-none transition ${errors.title ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'}`}
                 />
+                {errors.title && <p className="text-xs text-red-500 mt-1 font-medium">{errors.title}</p>}
               </div>
 
               <div className="md:col-span-2">

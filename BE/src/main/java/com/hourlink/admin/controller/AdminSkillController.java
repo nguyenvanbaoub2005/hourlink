@@ -42,13 +42,15 @@ public class AdminSkillController {
     public ResponseEntity<Page<AdminSkillResponse>> getSkills(
             @RequestParam(required = false) String skillName,
             @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String userEmail,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) SkillStatus status,
             @RequestParam(required = false) SkillLevel level,
             @RequestParam(required = false) SessionFormat format,
+            @RequestParam(required = false) String region,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(
-                adminSkillService.getSkills(skillName, userName, categoryId, status, level, format, pageable));
+                adminSkillService.getSkills(skillName, userName, userEmail, categoryId, status, level, format, region, pageable));
     }
 
     /** Chi tiết kỹ năng bao gồm danh sách minh chứng */

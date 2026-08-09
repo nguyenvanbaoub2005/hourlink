@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usersApi } from '@/api/users';
 import toast from 'react-hot-toast';
 import { X, Upload, Loader2, User } from 'lucide-react';
+import RegionPicker from '@/pages/skills/components/RegionPicker';
 
 interface UserFormModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
     bio: '',
     isVerified: true
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -31,6 +33,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
 
   useEffect(() => {
     if (isOpen) {
+      setErrors({});
       if (mode === 'edit' && initialData) {
         setFormData({
           fullName: initialData.fullName || '',
@@ -63,8 +66,37 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
 
   if (!isOpen) return null;
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Họ và tên không được để trống';
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email không được để trống';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = 'Email không đúng định dạng (VD: name@example.com)';
+    }
+    if (formData.phone.trim() && !/^[0-9+()\s-]{9,15}$/.test(formData.phone.trim())) {
+      newErrors.phone = 'Số điện thoại không đúng định dạng (từ 9 đến 15 chữ số)';
+    }
+    if (mode === 'create') {
+      if (!formData.password) {
+        newErrors.password = 'Mật khẩu không được để trống';
+      } else if (formData.password.length < 8) {
+        newErrors.password = 'Mật khẩu phải có tối thiểu 8 ký tự';
+      }
+    }
+    return newErrors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    setErrors({});
     setLoading(true);
     try {
       if (mode === 'create') {
@@ -92,8 +124,8 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Kích thước ảnh tối đa là 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Kích thước ảnh tối đa là 10MB');
       return;
     }
 
@@ -126,7 +158,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
         </div>
 
         <div className="p-6 overflow-y-auto">
-          <form id="user-form" onSubmit={handleSubmit} className="space-y-5">
+          <form id="user-form" onSubmit={handleSubmit} noValidate className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
               <div className="md:col-span-2">
@@ -159,27 +191,42 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
                       {isUploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                       {isUploading ? 'Đang tải lên...' : 'Chọn ảnh'}
                     </button>
-                    <p className="text-[12px] text-slate-500 mt-1">Hỗ trợ JPG, PNG, WEBP. Tối đa 5MB.</p>
+                    <p className="text-[12px] text-slate-500 mt-1">Hỗ trợ JPG, PNG, WEBP. Tối đa 10MB.</p>
                   </div>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Họ và tên <span className="text-red-500">*</span></label>
-                <input required type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" 
-                  value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
+                <input 
+                  type="text" 
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm outline-none transition ${errors.fullName ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary'}`} 
+                  value={formData.fullName} 
+                  onChange={e => { setFormData({...formData, fullName: e.target.value}); if (errors.fullName) setErrors({...errors, fullName: ''}); }} 
+                />
+                {errors.fullName && <p className="text-xs text-red-500 mt-1 font-medium">{errors.fullName}</p>}
               </div>
               
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Email <span className="text-red-500">*</span></label>
-                <input required type="email" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" 
-                  value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                <input 
+                  type="email" 
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm outline-none transition ${errors.email ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary'}`} 
+                  value={formData.email} 
+                  onChange={e => { setFormData({...formData, email: e.target.value}); if (errors.email) setErrors({...errors, email: ''}); }} 
+                />
+                {errors.email && <p className="text-xs text-red-500 mt-1 font-medium">{errors.email}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Số điện thoại</label>
-                <input type="tel" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" 
-                  value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                <input 
+                  type="tel" 
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm outline-none transition ${errors.phone ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary'}`} 
+                  value={formData.phone} 
+                  onChange={e => { setFormData({...formData, phone: e.target.value}); if (errors.phone) setErrors({...errors, phone: ''}); }} 
+                />
+                {errors.phone && <p className="text-xs text-red-500 mt-1 font-medium">{errors.phone}</p>}
               </div>
 
               <div>
@@ -194,17 +241,23 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
               {mode === 'create' && (
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Mật khẩu <span className="text-red-500">*</span></label>
-                  <input required minLength={8} type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" 
+                  <input 
+                    type="password" 
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-sm outline-none transition ${errors.password ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary'}`} 
                     placeholder="Tối thiểu 8 ký tự"
-                    value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+                    value={formData.password} 
+                    onChange={e => { setFormData({...formData, password: e.target.value}); if (errors.password) setErrors({...errors, password: ''}); }} 
+                  />
+                  {errors.password && <p className="text-xs text-red-500 mt-1 font-medium">{errors.password}</p>}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Khu vực</label>
-                <input type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" 
-                  placeholder="VD: TP. Hồ Chí Minh"
-                  value={formData.region} onChange={e => setFormData({...formData, region: e.target.value})} />
+                <RegionPicker
+                  label="Khu vực"
+                  value={formData.region}
+                  onChange={val => setFormData({...formData, region: val})}
+                />
               </div>
 
               <div>

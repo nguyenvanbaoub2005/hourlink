@@ -192,7 +192,7 @@ export default function SkillDetailModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
           {/* Header */}
@@ -490,7 +490,7 @@ export default function SkillDetailModal({
       {/* ─── Lightbox ─── */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-sm"
           onClick={() => setLightboxUrl(null)}
         >
           <button
@@ -511,7 +511,7 @@ export default function SkillDetailModal({
       {/* ─── Document Viewer (positioned within content area, sidebar+header stay visible) ─── */}
       {docViewerUrl && (
         <div
-          className="fixed z-[60] flex flex-col bg-surface shadow-2xl border-l border-border"
+          className="fixed z-[70] flex flex-col bg-surface shadow-2xl border-l border-border"
           style={{ left: 240, top: 60, right: 0, bottom: 0 }}
           onClick={(e) => e.stopPropagation()}
         >

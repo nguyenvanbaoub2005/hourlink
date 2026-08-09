@@ -15,9 +15,11 @@ export default function CategoryFormModal({ isOpen, onClose, onSuccess, mode, in
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
+      setError('');
       if (mode === 'edit' && initialData) {
         setName(initialData.name);
         setDescription(initialData.description || '');
@@ -30,7 +32,8 @@ export default function CategoryFormModal({ isOpen, onClose, onSuccess, mode, in
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { toast.error('Tên danh mục không được để trống'); return; }
+    if (!name.trim()) { setError('Vui lòng nhập tên danh mục'); return; }
+    setError('');
     setLoading(true);
     try {
       if (mode === 'edit' && initialData) {
@@ -70,7 +73,7 @@ export default function CategoryFormModal({ isOpen, onClose, onSuccess, mode, in
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
               Tên danh mục <span className="text-red-500">*</span>
@@ -78,12 +81,12 @@ export default function CategoryFormModal({ isOpen, onClose, onSuccess, mode, in
             <input
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
-              required
+              onChange={e => { setName(e.target.value); if (error) setError(''); }}
               maxLength={100}
               placeholder="Vd: Lập trình web, Ngoại ngữ..."
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition"
+              className={`w-full px-3 py-2.5 bg-slate-50 border rounded-xl text-sm outline-none transition ${error ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20'}`}
             />
+            {error && <p className="text-xs text-red-500 mt-1 font-medium">{error}</p>}
           </div>
 
           <div>

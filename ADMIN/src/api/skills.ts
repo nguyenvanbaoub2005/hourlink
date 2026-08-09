@@ -12,6 +12,7 @@ export interface AdminSkillResponse {
   status: SkillStatus;
   level: SkillLevel | null;
   format: SkillFormat | null;
+  duration: number | null;
   categoryName: string | null;
   userId: string;
   userFullName: string;
@@ -86,10 +87,12 @@ export const skillsApi = {
     size = 10,
     skillName = '',
     userName = '',
+    userEmail = '',
     categoryId = '',
     status = '',
     level = '',
-    format = ''
+    format = '',
+    region = ''
   ) => {
     const response = await api.get<PaginatedSkillResponse>('/admin/skills', {
       params: {
@@ -97,10 +100,12 @@ export const skillsApi = {
         size,
         skillName: skillName || undefined,
         userName: userName || undefined,
+        userEmail: userEmail || undefined,
         categoryId: categoryId || undefined,
         status: status || undefined,
         level: level || undefined,
         format: format || undefined,
+        region: region || undefined,
       },
     });
     return response.data;

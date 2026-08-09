@@ -20,6 +20,8 @@ public class AdminSkillResponse {
     SkillStatus status;
     SkillLevel level;
     SessionFormat format;
+    Integer duration;
+    String region;
     String categoryName;
     // Người đăng
     UUID userId;

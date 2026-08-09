@@ -16,16 +16,16 @@ export default function Header() {
   const title = PAGE_TITLES[pathname] ?? 'HourLink Admin';
 
   return (
-    <header className="admin-header">
-      <div>
-        <div className="header-title">{title}</div>
-      </div>
-      <div className="header-right">
-        <div className="header-admin-info">
-          <div className="header-admin-name">Quản trị viên</div>
-          <div className="header-admin-role">Administrator</div>
+    <header className="h-[var(--header-height)] bg-surface border-b border-border flex items-center justify-between px-6 sticky top-0 z-50">
+      <div className="text-[17px] font-bold text-text">{title}</div>
+      <div className="flex items-center gap-3">
+        <div className="text-right">
+          <div className="text-[14px] font-bold text-text">Quản trị viên</div>
+          <div className="text-[12px] text-text-muted">Administrator</div>
         </div>
-        <div className="header-avatar">A</div>
+        <div className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-[#047857] to-primary flex items-center justify-center text-[13px] font-semibold text-white cursor-pointer select-none">
+          A
+        </div>
       </div>
     </header>
   );
