@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { File as ExpoFile } from 'expo-file-system';
 import * as Location from 'expo-location';
 import * as Clipboard from 'expo-clipboard';
 import ChatApi from '@api/chat';
@@ -369,7 +370,7 @@ export default function ChatRoomScreen() {
   };
 
   const handleError = (e: any, fallback: string) => {
-    const msg = e?.response?.data?.message ?? fallback;
+    const msg = e?.response?.data?.message ?? e?.message ?? fallback;
     console.error('Chat request failed:', e?.response?.status ?? e?.message ?? e);
     Alert.alert('Lỗi', msg);
   };
@@ -410,7 +411,8 @@ export default function ChatRoomScreen() {
         asset.uri,
         pickedName,
         resolveMimeType(pickedName, asset.mimeType, 'image/jpeg'),
-        asset.fileSize
+        asset.fileSize,
+        asset.file
       );
     } catch (e: any) {
       handleError(e, 'Không thể chọn ảnh. Vui lòng thử lại.');
@@ -437,14 +439,21 @@ export default function ChatRoomScreen() {
         asset.uri,
         pickedName,
         resolveMimeType(pickedName, asset.mimeType),
-        asset.size
+        asset.size,
+        asset.file
       );
     } catch (e: any) {
       handleError(e, 'Không thể chọn tài liệu. Vui lòng thử lại.');
     }
   };
 
-  const uploadFile = async (uri: string, name: string, type: string, size?: number) => {
+  const uploadFile = async (
+    uri: string,
+    name: string,
+    type: string,
+    size?: number,
+    pickedFile?: Blob | null
+  ) => {
     if (!id) return;
     if (size && size > MAX_ATTACHMENT_SIZE) {
       Alert.alert('Tệp quá lớn', 'Ảnh hoặc tài liệu phải có dung lượng tối đa 20 MB.');
@@ -453,13 +462,11 @@ export default function ChatRoomScreen() {
     setSending(true);
     try {
       const formData = new FormData();
-      formData.append('file', {
-        // Giữ nguyên file:// trên iOS và content:// trên Android; React Native
-        // cần URI gốc để đọc dữ liệu file khi dựng multipart body.
-        uri,
-        name,
-        type,
-      } as any);
+      const sourceFile = pickedFile ?? new ExpoFile(uri);
+      const uploadBlob = sourceFile.type === type
+        ? sourceFile
+        : sourceFile.slice(0, sourceFile.size, type);
+      formData.append('file', uploadBlob, name);
       await ChatApi.sendAttachment(id, formData);
       await afterSend();
     } catch (e: any) {

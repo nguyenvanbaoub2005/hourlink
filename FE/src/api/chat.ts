@@ -1,4 +1,51 @@
 import api from './axiosInstance';
+import * as SecureStore from 'expo-secure-store';
+import { fetch as expoFetch } from 'expo/fetch';
+import Config from '@constants/Config';
+import { TOKEN_KEY } from './axiosInstance';
+
+const uploadAttachmentOnce = async (convId: string, formData: FormData, token: string | null) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+  try {
+    return await expoFetch(
+      `${Config.API_URL}/chat/conversations/${convId}/messages/attachment`,
+      {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        // expo/fetch tự dựng multipart boundary cho File/Blob thật.
+        body: formData,
+        signal: controller.signal,
+      }
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const attachmentUploadError = (status: number, data: any) => {
+  const error: any = new Error(data?.message ?? 'Không gửi được tệp đính kèm.');
+  error.response = { status, data };
+  return error;
+};
+
+const sendAttachment = async (convId: string, formData: FormData) => {
+  let token = await SecureStore.getItemAsync(TOKEN_KEY);
+  let response = await uploadAttachmentOnce(convId, formData, token);
+
+  // Upload đi qua expo/fetch nên không dùng trực tiếp interceptor Axios. Nếu
+  // access token vừa hết hạn, gọi một request Axios nhẹ để luồng refresh token
+  // hiện có chạy, sau đó thử upload lại đúng một lần.
+  if (response.status === 401) {
+    await api.get('/chat/unread-count');
+    token = await SecureStore.getItemAsync(TOKEN_KEY);
+    response = await uploadAttachmentOnce(convId, formData, token);
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw attachmentUploadError(response.status, payload);
+  return { data: payload, status: response.status };
+};
 
 /**
  * ChatApi — API calls cho module chat (chức năng 9.10).
@@ -47,13 +94,7 @@ const ChatApi = {
   ) => api.post(`/chat/conversations/${convId}/messages`, data),
 
   /** Gửi hình ảnh hoặc tài liệu (multipart) */
-  sendAttachment: (convId: string, formData: FormData) =>
-    // Không tự đặt Content-Type: Axios/React Native phải tự thêm multipart
-    // boundary. Nếu chỉ đặt "multipart/form-data", request có thể hỏng trước
-    // khi tới backend.
-    api.post(`/chat/conversations/${convId}/messages/attachment`, formData, {
-      timeout: 120000,
-    }),
+  sendAttachment,
 
   /** Đề xuất đổi lịch ngay trong cuộc trò chuyện */
   proposeReschedule: (convId: string, data: { proposedTime: string; note?: string }) =>
