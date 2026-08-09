@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -34,9 +35,11 @@ public class DataInitializer implements CommandLineRunner {
     SkillRepository skillRepository;
     HelpRequestRepository helpRequestRepository;
     PasswordEncoder passwordEncoder;
+    JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
+        fixSchemaColumns();
         createRoleIfNotFound("USER", "ROLE_USER", "Quyền người dùng cá nhân (Individual)");
         createRoleIfNotFound("ORGANIZATION", "ROLE_ORGANIZATION", "Quyền tổ chức / CLB / Trường học");
         createRoleIfNotFound("ADMIN", "ROLE_ADMIN", "Quyền quản trị viên hệ thống");
@@ -44,6 +47,15 @@ public class DataInitializer implements CommandLineRunner {
         createAdminUserIfNotFound("admin@hourlink.vn", "admin123", "Admin Hệ Thống", "ROLE_ADMIN");
         
         initSkillCategories();
+    }
+
+    private void fixSchemaColumns() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE skill MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'VISIBLE'");
+        } catch (Exception ignored) {}
+        try {
+            jdbcTemplate.execute("ALTER TABLE help_request MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'SEARCHING'");
+        } catch (Exception ignored) {}
     }
 
     private void initSkillCategories() {

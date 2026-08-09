@@ -39,7 +39,7 @@ public class HelpRequest extends BaseEntity {
 
     @Column(name = "time_credit_amount", nullable = false)
     @Builder.Default
-    Integer timeCreditAmount = 1;
+    Double timeCreditAmount = 1.0;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)

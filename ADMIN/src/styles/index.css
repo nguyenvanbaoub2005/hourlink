@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Google Font ─────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ─── Design Tokens (referenced by Tailwind config) ─────────── */
+:root {
+  --primary:        #10B981;
+  --primary-hover:  #059669;
+  --primary-light:  rgba(16, 185, 129, 0.12);
+  --danger:         #EF4444;
+  --danger-hover:   #DC2626;
+  --warning:        #F59E0B;
+  --success:        #10B981;
+  --info:           #3B82F6;
+  --bg:             #F8FAFC;
+  --surface:        #FFFFFF;
+  --surface-2:      #F1F5F9;
+  --surface-3:      #E2E8F0;
+  --surface-hover:  rgba(0, 0, 0, 0.03);
+  --text:           #1E293B;
+  --text-muted:     #64748B;
+  --text-dim:       #94A3B8;
+  --border:         #E2E8F0;
+  --border-focus:   rgba(16, 185, 129, 0.5);
+  --sidebar-width:  240px;
+  --header-height:  60px;
+}
+
+/* ─── Global Base ────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--surface-3); border-radius: 99px; }
+
+/* ─── Spinner animation (used by Tailwind animate-spin) ─────── */
+@keyframes spin { to { transform: rotate(360deg); } }

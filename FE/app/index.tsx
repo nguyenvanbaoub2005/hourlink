@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Colors, Fonts, Spacing, Radius } from '../src/constants/Colors';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -23,9 +24,14 @@ export default function SplashScreen() {
     >
       <StatusBar style="light" />
       <View style={styles.logoContainer}>
-        <View style={styles.logoIcon}>
-          <Text style={styles.logoLetter}>H</Text>
-        </View>
+        <LinearGradient
+          colors={['#059669', '#10B981']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.logoIcon}
+        >
+          <Ionicons name="timer-outline" size={50} color="#FFF" strokeWidth={1.5} />
+        </LinearGradient>
         <Text style={styles.title}>HourLink</Text>
         <Text style={styles.subtitle}>Trao đổi thời gian - Kết nối cộng đồng</Text>
       </View>
@@ -54,13 +60,15 @@ const styles = StyleSheet.create({
   logoIcon: {
     width: 90,
     height: 90,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: Radius.xl,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
   logoLetter: {
     fontSize: 50,

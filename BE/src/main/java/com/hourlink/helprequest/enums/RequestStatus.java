@@ -4,5 +4,6 @@ public enum RequestStatus {
     SEARCHING,
     ASSIGNED,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    DELETED
 }

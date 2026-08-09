@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AuthApi from '@api/auth';
 import { useAuthStore } from '@store/authStore';
+import Logo from '@components/Logo';
 import { Alert } from 'react-native';
 import UserApi from '@api/user';
 import * as SecureStore from 'expo-secure-store';
@@ -72,9 +73,7 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           <View style={styles.header}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>H</Text>
-            </View>
+            <Logo size={36} style={{ marginRight: 8 }} />
             <Text style={styles.brandName}>HourLink</Text>
           </View>
 

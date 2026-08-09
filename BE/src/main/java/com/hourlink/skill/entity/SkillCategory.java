@@ -16,4 +16,8 @@ public class SkillCategory extends BaseEntity {
 
     @Column(name = "description", length = 500)
     String description;
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    boolean isDeleted = false;
 }

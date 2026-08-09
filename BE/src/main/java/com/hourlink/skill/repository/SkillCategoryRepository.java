@@ -10,4 +10,6 @@ import java.util.Optional;
 @Repository
 public interface SkillCategoryRepository extends JpaRepository<SkillCategory, UUID> {
     Optional<SkillCategory> findByName(String name);
+    Optional<SkillCategory> findByNameAndIsDeletedFalse(String name);
+    java.util.List<SkillCategory> findAllByIsDeletedFalse();
 }

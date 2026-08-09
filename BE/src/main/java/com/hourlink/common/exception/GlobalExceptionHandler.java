@@ -91,6 +91,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);
         return ResponseEntity.internalServerError()
-                .body(ApiResponse.error(9999, "Lỗi hệ thống, vui lòng thử lại sau"));
+                .body(ApiResponse.error(9999, "Lỗi hệ thống: " + ex.getMessage()));
     }
 }

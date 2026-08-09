@@ -80,6 +80,17 @@ public class User extends BaseEntity {
     @Builder.Default
     double cancelRate = 0.0;
 
+    @Column(name = "admin_notes", columnDefinition = "TEXT")
+    String adminNotes;
+
+    @Column(name = "warning_count", nullable = false)
+    @Builder.Default
+    int warningCount = 0;
+
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    boolean isDeleted = false;
+
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
