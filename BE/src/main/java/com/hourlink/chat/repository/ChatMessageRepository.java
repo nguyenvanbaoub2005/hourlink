@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -56,6 +57,20 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
 
     /** Lấy các card của một lịch hẹn để cập nhật cả MySQL và Firebase. */
     List<ChatMessage> findAllByAppointmentId(UUID appointmentId);
+
+    /** Chuyển nguyên lịch sử từ các phòng trùng sang phòng cá nhân chính. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE ChatMessage m
+            SET m.conversation = :target
+            WHERE m.conversation.id IN :sourceConversationIds
+            """)
+    int moveToConversation(
+            @Param("target") com.hourlink.chat.entity.Conversation target,
+            @Param("sourceConversationIds") Collection<UUID> sourceConversationIds);
+
+    /** Toàn bộ lịch sử để đồng bộ lại Firebase sau khi hợp nhất phòng. */
+    List<ChatMessage> findAllByConversation_IdOrderByCreatedAtAsc(UUID conversationId);
 
     /**
      * Lấy tin nhắn mới nhất còn hiển thị với một user cụ thể trong hội thoại.

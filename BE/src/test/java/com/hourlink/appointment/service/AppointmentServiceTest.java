@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -139,6 +140,27 @@ class AppointmentServiceTest {
         assertEquals(ErrorCode.INVALID_REQUEST, error.getErrorCode());
         assertEquals("Hai bạn đang có một lịch hẹn chưa kết thúc. Hãy hoàn thành hoặc hủy lịch đó trước khi tạo buổi tiếp theo.",
                 error.getMessage());
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void createAppointment_withAnotherInvitationButSameActivePair_isRejected() {
+        authenticate(receiver);
+        Invitation invitation = acceptedInvitation();
+        Appointment active = appointment(AppointmentStatus.CONFIRMED, provider);
+        when(userRepository.findById(provider.getId())).thenReturn(Optional.of(provider));
+        when(userRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
+        when(invitationRepository.findByIdForUpdate(invitation.getId())).thenReturn(Optional.of(invitation));
+        when(appointmentRepository.findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+                eq(invitation.getId()), any())).thenReturn(Optional.empty());
+        when(appointmentRepository.findActiveBetweenUsers(
+                eq(provider.getId()), eq(receiver.getId()), any(), any(Pageable.class)))
+                .thenReturn(List.of(active));
+
+        AppException error = assertThrows(AppException.class,
+                () -> service.createAppointment(createRequest(invitation)));
+
+        assertEquals(ErrorCode.INVALID_REQUEST, error.getErrorCode());
         verify(appointmentRepository, never()).save(any());
     }
 

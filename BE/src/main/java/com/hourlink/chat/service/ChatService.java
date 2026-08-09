@@ -53,9 +53,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -165,39 +168,181 @@ public class ChatService {
             throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
         }
 
-        return conversationRepository.findByInvitation_Id(invitation.getId())
-                .orElseGet(() -> {
-                    Conversation conv = conversationRepository.save(Conversation.builder()
-                            .invitation(invitation)
-                            .sourceType(ConversationSourceType.SKILL_INVITATION)
-                            .userOne(invitation.getSender())
-                            .userTwo(invitation.getReceiver())
-                            .isActive(true)
-                            .build());
+        String pairKey = personalPairKey(invitation.getSender().getId(), invitation.getReceiver().getId());
 
-                    // Tin nhắn hệ thống mở đầu
-                    String skillName = invitation.getSkill() != null
-                            ? invitation.getSkill().getName() : "yêu cầu hỗ trợ";
-                    ChatMessage systemMsg = chatMessageRepository.save(ChatMessage.builder()
-                            .conversation(conv)
-                            .sender(null)
-                            .type(MessageType.SYSTEM)
-                            .content("Lời mời đã được chấp nhận. Hai bạn có thể trao đổi về \""
-                                    + skillName + "\" và thống nhất lịch hẹn.")
-                            .isRead(false)
-                            .build());
+        // Một cặp người chỉ có một chat cá nhân, kể cả khi đổi kỹ năng hoặc gửi
+        // thêm lời mời sau khi buổi trước đã hoàn thành.
+        Conversation existing = conversationRepository
+                .findByPersonalPairKeyAndIsActiveTrue(pairKey)
+                .orElseGet(() -> conversationRepository.findByInvitation_Id(invitation.getId())
+                        .orElse(null));
+        if (existing != null) {
+            return reusePersonalConversation(existing, invitation, pairKey);
+        }
 
-                    conv.setLastMessagePreview(truncate(systemMsg.getContent()));
-                    conv.setLastMessageType(MessageType.SYSTEM);
-                    conv.setLastMessageAt(Instant.now());
-                    conversationRepository.save(conv);
+        Conversation conversation = conversationRepository.save(Conversation.builder()
+                .invitation(invitation)
+                .sourceType(ConversationSourceType.SKILL_INVITATION)
+                .personalPairKey(pairKey)
+                .userOne(invitation.getSender())
+                .userTwo(invitation.getReceiver())
+                .isActive(true)
+                .build());
 
-                    mirrorConversation(conv);
-                    mirrorMessage(conv, systemMsg);
+        appendInvitationSystemMessage(conversation, invitation, false);
+        log.info("Personal conversation {} created for pair {}", conversation.getId(), pairKey);
+        return conversation;
+    }
 
-                    log.info("Conversation created for invitation {}", invitation.getId());
-                    return conv;
-                });
+    private Conversation reusePersonalConversation(Conversation conversation, Invitation invitation,
+                                                     String pairKey) {
+        Invitation currentInvitation = conversation.getInvitation();
+        boolean hasNewerContext = isNewerInvitation(invitation, currentInvitation);
+
+        conversation.setSourceType(ConversationSourceType.SKILL_INVITATION);
+        conversation.setPersonalPairKey(pairKey);
+        conversation.setIsActive(true);
+        // Có một lời mời mới thì đưa phòng đã ẩn trở lại danh sách cho cả hai.
+        if (hasNewerContext) {
+            conversation.setInvitation(invitation);
+            conversation.setHiddenByUserOne(false);
+            conversation.setHiddenByUserTwo(false);
+        }
+        conversationRepository.save(conversation);
+
+        if (hasNewerContext) {
+            appendInvitationSystemMessage(conversation, invitation, true);
+        } else {
+            mirrorConversation(conversation);
+        }
+        return conversation;
+    }
+
+    private void appendInvitationSystemMessage(Conversation conversation, Invitation invitation,
+                                                boolean continuingConversation) {
+        String skillName = invitation.getSkill() != null
+                ? invitation.getSkill().getName() : "yêu cầu hỗ trợ";
+        String content = continuingConversation
+                ? "Lời mời mới về \"" + skillName
+                        + "\" đã được chấp nhận. Hai bạn có thể tiếp tục trao đổi tại đây."
+                : "Lời mời đã được chấp nhận. Hai bạn có thể trao đổi về \""
+                        + skillName + "\" và thống nhất lịch hẹn.";
+        ChatMessage systemMessage = chatMessageRepository.save(ChatMessage.builder()
+                .conversation(conversation)
+                .sender(null)
+                .type(MessageType.SYSTEM)
+                .content(content)
+                .isRead(false)
+                .build());
+
+        conversation.setLastMessagePreview(truncate(content));
+        conversation.setLastMessageType(MessageType.SYSTEM);
+        conversation.setLastMessageAt(systemMessage.getCreatedAt() != null
+                ? systemMessage.getCreatedAt() : Instant.now());
+        conversationRepository.save(conversation);
+        mirrorConversation(conversation);
+        mirrorMessage(conversation, systemMessage);
+    }
+
+    private boolean isNewerInvitation(Invitation candidate, Invitation current) {
+        if (current == null) return true;
+        if (current.getId().equals(candidate.getId())) return false;
+        if (current.getCreatedAt() == null) return candidate.getCreatedAt() != null;
+        return candidate.getCreatedAt() != null
+                && candidate.getCreatedAt().isAfter(current.getCreatedAt());
+    }
+
+    /**
+     * Hợp nhất dữ liệu cũ: giữ phòng cá nhân đầu tiên làm phòng chính, chuyển
+     * toàn bộ tin nhắn sang đó và lưu trữ các phòng trùng. Không xóa lời mời,
+     * tin nhắn hay bằng chứng báo cáo.
+     *
+     * @return số phòng trùng đã được lưu trữ
+     */
+    @Transactional
+    public int consolidateDuplicatePersonalConversations() {
+        List<Conversation> activePersonal = conversationRepository
+                .findAllActiveBySourceType(ConversationSourceType.SKILL_INVITATION);
+        Map<String, List<Conversation>> grouped = new HashMap<>();
+        activePersonal.forEach(conversation -> grouped
+                .computeIfAbsent(personalPairKey(
+                        conversation.getUserOne().getId(), conversation.getUserTwo().getId()),
+                        ignored -> new ArrayList<>())
+                .add(conversation));
+
+        int archivedCount = 0;
+        for (Map.Entry<String, List<Conversation>> entry : grouped.entrySet()) {
+            String pairKey = entry.getKey();
+            List<Conversation> group = entry.getValue();
+            Conversation canonical = group.stream()
+                    .filter(c -> pairKey.equals(c.getPersonalPairKey()))
+                    .findFirst()
+                    .orElseGet(() -> group.stream()
+                            .min(Comparator.comparing(this::conversationCreatedAt))
+                            .orElseThrow());
+
+            if (group.size() == 1) {
+                if (!Objects.equals(canonical.getPersonalPairKey(), pairKey)) {
+                    canonical.setPersonalPairKey(pairKey);
+                    conversationRepository.save(canonical);
+                    mirrorConversation(canonical);
+                }
+                continue;
+            }
+
+            Invitation newestInvitation = group.stream()
+                    .filter(c -> c.getInvitation() != null)
+                    .max(Comparator.comparing(this::invitationContextAt))
+                    .map(Conversation::getInvitation)
+                    .orElse(null);
+            Conversation newestSummary = group.stream()
+                    .max(Comparator.comparing(this::conversationActivityAt))
+                    .orElse(canonical);
+            boolean hiddenByUserOne = group.stream().allMatch(c ->
+                    isHiddenFor(c, canonical.getUserOne().getId()));
+            boolean hiddenByUserTwo = group.stream().allMatch(c ->
+                    isHiddenFor(c, canonical.getUserTwo().getId()));
+
+            List<Conversation> duplicates = group.stream()
+                    .filter(c -> !c.getId().equals(canonical.getId()))
+                    .toList();
+            List<UUID> duplicateIds = duplicates.stream().map(Conversation::getId).toList();
+            chatMessageRepository.moveToConversation(canonical, duplicateIds);
+
+            // Giải phóng hai khóa unique trước khi gắn context mới vào canonical.
+            group.forEach(c -> {
+                c.setInvitation(null);
+                c.setPersonalPairKey(null);
+            });
+            duplicates.forEach(c -> {
+                c.setIsActive(false);
+                c.setHiddenByUserOne(true);
+                c.setHiddenByUserTwo(true);
+            });
+            conversationRepository.saveAll(group);
+            conversationRepository.flush();
+
+            canonical.setInvitation(newestInvitation);
+            canonical.setPersonalPairKey(pairKey);
+            canonical.setIsActive(true);
+            canonical.setHiddenByUserOne(hiddenByUserOne);
+            canonical.setHiddenByUserTwo(hiddenByUserTwo);
+            canonical.setLastMessagePreview(newestSummary.getLastMessagePreview());
+            canonical.setLastMessageType(newestSummary.getLastMessageType());
+            canonical.setLastMessageAt(newestSummary.getLastMessageAt());
+            conversationRepository.save(canonical);
+
+            if (firebaseService.isEnabled()) {
+                chatMessageRepository.findAllByConversation_IdOrderByCreatedAtAsc(canonical.getId())
+                        .forEach(message -> mirrorMessage(canonical, message));
+                duplicates.forEach(this::mirrorConversation);
+            }
+            mirrorConversation(canonical);
+            archivedCount += duplicates.size();
+            log.info("Merged {} duplicate personal conversations into {} for pair {}",
+                    duplicates.size(), canonical.getId(), pairKey);
+        }
+        return archivedCount;
     }
 
     /**
@@ -517,22 +662,26 @@ public class ChatService {
      * Tìm cuộc trò chuyện giữa hai người dùng bất kỳ.
      */
     public UUID findConversationIdByUsers(UUID userId1, UUID userId2) {
-        return conversationRepository.findAllByParticipantEmail(
-                userRepository.findById(userId1).map(User::getEmail).orElse("")
-        ).stream()
-                .filter(c -> c.getInvitation() != null)
-                .filter(c -> (c.getUserOne().getId().equals(userId1) && c.getUserTwo().getId().equals(userId2))
-                        || (c.getUserOne().getId().equals(userId2) && c.getUserTwo().getId().equals(userId1)))
-                .map(c -> c.getId())
-                .findFirst()
+        return conversationRepository
+                .findByPersonalPairKeyAndIsActiveTrue(personalPairKey(userId1, userId2))
+                .map(Conversation::getId)
                 .orElse(null);
     }
 
-    /** Tìm đúng cuộc trò chuyện gắn với lời mời, tránh nhầm khi hai người có nhiều lời mời. */
+    /**
+     * Mọi lời mời của cùng một cặp người đều trỏ về phòng cá nhân chính.
+     * Nhờ vậy tạo buổi học tiếp theo không sinh thêm một hàng chat.
+     */
     public UUID findConversationIdByInvitation(UUID invitationId) {
         return conversationRepository.findByInvitation_Id(invitationId)
+                .map(this::resolveCanonicalConversation)
                 .map(Conversation::getId)
-                .orElse(null);
+                .orElseGet(() -> invitationRepository.findById(invitationId)
+                        .flatMap(invitation -> conversationRepository
+                                .findByPersonalPairKeyAndIsActiveTrue(personalPairKey(
+                                        invitation.getSender().getId(), invitation.getReceiver().getId())))
+                        .map(Conversation::getId)
+                        .orElse(null));
     }
 
     /** Đánh dấu toàn bộ tin nhắn của người kia là đã đọc */
@@ -775,7 +924,17 @@ public class ChatService {
         if (!isParticipant(conv, email)) {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
-        return conv;
+        return resolveCanonicalConversation(conv);
+    }
+
+    private Conversation resolveCanonicalConversation(Conversation conversation) {
+        if (sourceTypeOf(conversation) == ConversationSourceType.COMMUNITY_ACTIVITY) {
+            return conversation;
+        }
+        String pairKey = personalPairKey(
+                conversation.getUserOne().getId(), conversation.getUserTwo().getId());
+        return conversationRepository.findByPersonalPairKeyAndIsActiveTrue(pairKey)
+                .orElse(conversation);
     }
 
     private boolean isParticipant(Conversation conv, String email) {
@@ -785,6 +944,38 @@ public class ChatService {
 
     private User otherUserOf(Conversation conv, String email) {
         return conv.getUserOne().getEmail().equals(email) ? conv.getUserTwo() : conv.getUserOne();
+    }
+
+    static String personalPairKey(UUID userId1, UUID userId2) {
+        String first = userId1.toString();
+        String second = userId2.toString();
+        return first.compareTo(second) <= 0
+                ? first + ":" + second
+                : second + ":" + first;
+    }
+
+    private Instant conversationCreatedAt(Conversation conversation) {
+        return conversation.getCreatedAt() != null ? conversation.getCreatedAt() : Instant.EPOCH;
+    }
+
+    private Instant conversationActivityAt(Conversation conversation) {
+        return conversation.getLastMessageAt() != null
+                ? conversation.getLastMessageAt() : conversationCreatedAt(conversation);
+    }
+
+    private Instant invitationContextAt(Conversation conversation) {
+        Invitation invitation = conversation.getInvitation();
+        if (invitation != null && invitation.getCreatedAt() != null) {
+            return invitation.getCreatedAt();
+        }
+        return conversationCreatedAt(conversation);
+    }
+
+    private boolean isHiddenFor(Conversation conversation, UUID userId) {
+        if (conversation.getUserOne().getId().equals(userId)) {
+            return conversation.isHiddenByUserOne();
+        }
+        return conversation.isHiddenByUserTwo();
     }
 
     /** Chặn có hiệu lực hai chiều: một bên chặn thì cả hai đều không gửi được */
@@ -930,10 +1121,12 @@ public class ChatService {
 
         Invitation invitation = conv.getInvitation();
         CommunityActivity activity = conv.getCommunityActivity();
-        Appointment activeAppointment = invitation == null ? null : appointmentRepository
-                .findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
-                        invitation.getId(), ACTIVE_APPOINTMENT_STATUSES)
-                .orElse(null);
+        Appointment activeAppointment = sourceTypeOf(conv) == ConversationSourceType.COMMUNITY_ACTIVITY
+                ? null
+                : appointmentRepository.findActiveBetweenUsers(
+                                conv.getUserOne().getId(), conv.getUserTwo().getId(),
+                                ACTIVE_APPOINTMENT_STATUSES, PageRequest.of(0, 1))
+                        .stream().findFirst().orElse(null);
 
         return ConversationResponse.builder()
                 .id(conv.getId())

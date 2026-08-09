@@ -103,8 +103,15 @@ public class AppointmentService {
             invitation = invitationRepository.findByIdForUpdate(req.getInvitationId())
                     .orElseThrow(() -> new AppException(ErrorCode.INVITATION_NOT_FOUND));
             validateInvitationForAppointment(invitation, provider, receiver);
-            if (appointmentRepository.findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
-                    invitation.getId(), BLOCKING_NEXT_SESSION_STATUSES).isPresent()) {
+            boolean sameInvitationIsActive = appointmentRepository
+                    .findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
+                            invitation.getId(), BLOCKING_NEXT_SESSION_STATUSES)
+                    .isPresent();
+            boolean pairHasActiveAppointment = !sameInvitationIsActive
+                    && !appointmentRepository.findActiveBetweenUsers(
+                            provider.getId(), receiver.getId(), BLOCKING_NEXT_SESSION_STATUSES,
+                            PageRequest.of(0, 1)).isEmpty();
+            if (sameInvitationIsActive || pairHasActiveAppointment) {
                 throw new AppException(ErrorCode.INVALID_REQUEST,
                         "Hai bạn đang có một lịch hẹn chưa kết thúc. Hãy hoàn thành hoặc hủy lịch đó trước khi tạo buổi tiếp theo.");
             }

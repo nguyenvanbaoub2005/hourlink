@@ -227,7 +227,25 @@ export default function ChatRoomScreen() {
       // nhất biết được người kia là ai (dùng để phân biệt tin của mình/của họ)
       try {
         const res = await ChatApi.getConversation(id);
-        if (!cancelled) setConversation(res.data?.data ?? null);
+        const loaded: Conversation | null = res.data?.data ?? null;
+        if (cancelled) return;
+        // Thông báo cũ có thể còn giữ ID của phòng đã được BE lưu trữ sau khi
+        // hợp nhất. Chuyển sang ID chính để REST và Firebase cùng nghe một phòng.
+        if (loaded?.id && loaded.id !== id) {
+          router.replace({
+            pathname: '/chat/[id]' as any,
+            params: {
+              id: loaded.id,
+              otherName: loaded.otherUserName,
+              otherUserId: loaded.otherUserId,
+              otherAvatarUrl: loaded.otherUserAvatarUrl ?? '',
+              skillName: loaded.communityActivityTitle ?? loaded.skillName ?? '',
+              sourceType: loaded.sourceType,
+            },
+          });
+          return;
+        }
+        setConversation(loaded);
       } catch (e) {
         console.log('Lỗi tải hội thoại:', e);
       }
@@ -260,7 +278,16 @@ export default function ChatRoomScreen() {
             }));
           // Cập nhật restValidIds với tin mới nhận được
           normalised.forEach((m: any) => restValidIds.current.add(m.id));
-          setMessages(normalised as ChatMessage[]);
+          // Không thay toàn bộ lịch sử REST bằng snapshot Firebase. Khi dữ liệu
+          // cũ vừa được hợp nhất, REST có thể đã có các tin chưa mirror xong.
+          setMessages((current) => {
+            const merged = new Map<string, ChatMessage>();
+            current.forEach((message) => merged.set(message.id, message));
+            normalised.forEach((message: any) => merged.set(message.id, message as ChatMessage));
+            return [...merged.values()]
+              .filter((message) => !hiddenMsgIds.current.has(message.id))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          });
           markRead();
         });
         if (unsub) {
