@@ -29,6 +29,8 @@ import java.time.Instant;
         @Index(name = "idx_conv_community_activity", columnList = "community_activity_id"),
         @Index(name = "idx_conv_last_msg_at",  columnList = "last_message_at")
 }, uniqueConstraints = {
+        @UniqueConstraint(name = "uq_conv_personal_pair",
+                columnNames = {"personal_pair_key"}),
         @UniqueConstraint(name = "uq_conv_community_participant",
                 columnNames = {"community_activity_id", "user_two_id"})
 })
@@ -51,6 +53,15 @@ public class Conversation extends BaseEntity {
             columnDefinition = "VARCHAR(30) DEFAULT 'SKILL_INVITATION'")
     @Builder.Default
     ConversationSourceType sourceType = ConversationSourceType.SKILL_INVITATION;
+
+    /**
+     * Khóa ổn định của chat cá nhân, ghép từ hai UUID đã sắp xếp.
+     *
+     * <p>Chỉ chat lời mời dùng khóa này. Chat cộng đồng để null để một tổ chức
+     * và một người dùng vẫn có thể có phòng riêng cho từng hoạt động.</p>
+     */
+    @Column(name = "personal_pair_key", length = 73)
+    String personalPairKey;
 
     /** Người thứ nhất: sender lời mời hoặc tổ chức hoạt động. */
     @ManyToOne(fetch = FetchType.LAZY)

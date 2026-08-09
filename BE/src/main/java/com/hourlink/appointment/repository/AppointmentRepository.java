@@ -30,6 +30,20 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     Optional<Appointment> findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
             UUID invitationId, List<AppointmentStatus> statuses);
 
+    /** Lịch đang hoạt động mới nhất của một cặp người, không phụ thuộc lời mời nào. */
+    @Query("""
+            SELECT a FROM Appointment a
+            WHERE ((a.provider.id = :firstUserId AND a.receiver.id = :secondUserId)
+                OR (a.provider.id = :secondUserId AND a.receiver.id = :firstUserId))
+              AND a.status IN :statuses
+            ORDER BY a.createdAt DESC
+            """)
+    List<Appointment> findActiveBetweenUsers(
+            @Param("firstUserId") UUID firstUserId,
+            @Param("secondUserId") UUID secondUserId,
+            @Param("statuses") List<AppointmentStatus> statuses,
+            Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Appointment a WHERE a.id = :id")
     Optional<Appointment> findByIdForUpdate(@Param("id") UUID id);

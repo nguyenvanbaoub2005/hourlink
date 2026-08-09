@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { Directory, File as ExpoFile, Paths } from 'expo-file-system';
 import * as Location from 'expo-location';
 import * as Clipboard from 'expo-clipboard';
 import ChatApi from '@api/chat';
@@ -57,6 +58,57 @@ const REPORT_REASONS: { value: ChatReportReason; label: string; icon: string }[]
 
 /** Khoảng thời gian poll khi Firebase chưa cấu hình (chế độ dự phòng) */
 const POLL_INTERVAL_MS = 4000;
+const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024;
+// Native picker chỉ cho phép một request tại một thời điểm. Đặt mutex ở cấp
+// module để khóa vẫn còn hiệu lực khi route phòng cũ được replace sang phòng
+// canonical và ChatRoomScreen bị remount.
+let attachmentPickerInProgress = false;
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};
+
+const fileNameFromUri = (uri: string) => {
+  const rawName = uri.split('/').pop()?.split('?')[0];
+  if (!rawName) return undefined;
+  try {
+    return decodeURIComponent(rawName);
+  } catch {
+    return rawName;
+  }
+};
+
+const safeUploadFileName = (name: string) => {
+  const cleaned = name
+    .replace(/[\\/:*?"<>|\r\n]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return `file_${Date.now()}`;
+
+  // Cột original_name ở BE dài 255 ký tự; giữ khoảng trống cho encoding/header.
+  if (cleaned.length <= 180) return cleaned;
+  const dotIndex = cleaned.lastIndexOf('.');
+  const extension = dotIndex > 0 ? cleaned.slice(dotIndex, dotIndex + 21) : '';
+  return `${cleaned.slice(0, 180 - extension.length)}${extension}`;
+};
+
+const resolveMimeType = (fileName: string, declaredType?: string | null, fallback = 'application/octet-stream') => {
+  const normalized = declaredType?.split(';')[0].trim().toLowerCase();
+  if (normalized && normalized !== 'application/octet-stream') return normalized;
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  return (extension && MIME_BY_EXTENSION[extension]) || fallback;
+};
 
 // Helper tạo danh sách 14 ngày tới
 const getNextDays = (count = 14) => {
@@ -116,6 +168,7 @@ export default function ChatRoomScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [pickerBusy, setPickerBusy] = useState(false);
   const [input, setInput] = useState('');
   const [realtime, setRealtime] = useState(false);
 
@@ -133,6 +186,8 @@ export default function ChatRoomScreen() {
   const [reportReason, setReportReason] = useState<ChatReportReason | null>(null);
   const [reportNote, setReportNote] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(() => new Set());
+  const [previewImageFailed, setPreviewImageFailed] = useState(false);
   const [rescheduleVisible, setRescheduleVisible] = useState(false);
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [meetingVisible, setMeetingVisible] = useState(false);
@@ -180,16 +235,37 @@ export default function ChatRoomScreen() {
   const unsubscribeRef = useRef<null | (() => void)>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const normaliseMessage = useCallback((message: any): ChatMessage | null => {
+    if (!message?.id) return null;
+    return {
+      ...message,
+      isRecalled: message.isRecalled || message.recalled || false,
+    } as ChatMessage;
+  }, []);
+
+  const upsertMessage = useCallback((message: any) => {
+    const normalised = normaliseMessage(message);
+    if (!normalised || hiddenMsgIds.current.has(normalised.id)) return;
+
+    restValidIds.current.add(normalised.id);
+    setMessages((current) => {
+      const merged = new Map(current.map((item) => [item.id, item]));
+      merged.set(normalised.id, normalised);
+      return [...merged.values()]
+        .filter((item) => !hiddenMsgIds.current.has(item.id))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    });
+  }, [normaliseMessage]);
+
   // ─── Tải lịch sử tin nhắn qua REST ──────────────────────────────────────
   const fetchMessages = useCallback(async () => {
     if (!id) return;
     try {
       const res = await ChatApi.getMessages(id, 0, 50);
       const raw: any[] = res.data?.data?.content ?? [];
-      const normalised = raw.map((m: any) => ({
-        ...m,
-        isRecalled: m.isRecalled || m.recalled || false,
-      }));
+      const normalised = raw
+        .map(normaliseMessage)
+        .filter((message): message is ChatMessage => Boolean(message));
       // Ghi lại ground truth từ REST: chỉ những tin này mới hợp lệ
       // Firebase listener sẽ dùng để lọc bỏ tin đã ẩn
       restValidIds.current = new Set(normalised.map((m: any) => m.id));
@@ -205,7 +281,7 @@ export default function ChatRoomScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, normaliseMessage]);
 
   // ─── Đánh dấu đã đọc ────────────────────────────────────────────────────
   const markRead = useCallback(async () => {
@@ -222,12 +298,37 @@ export default function ChatRoomScreen() {
   useEffect(() => {
     let cancelled = false;
 
+    const startPolling = () => {
+      if (cancelled || pollRef.current) return;
+      setRealtime(false);
+      void fetchMessages();
+      pollRef.current = setInterval(fetchMessages, POLL_INTERVAL_MS);
+    };
+
     const setup = async () => {
       // Lấy thông tin hội thoại trước — khi mở từ thông báo, đây là nguồn duy
       // nhất biết được người kia là ai (dùng để phân biệt tin của mình/của họ)
       try {
         const res = await ChatApi.getConversation(id);
-        if (!cancelled) setConversation(res.data?.data ?? null);
+        const loaded: Conversation | null = res.data?.data ?? null;
+        if (cancelled) return;
+        // Thông báo cũ có thể còn giữ ID của phòng đã được BE lưu trữ sau khi
+        // hợp nhất. Chuyển sang ID chính để REST và Firebase cùng nghe một phòng.
+        if (loaded?.id && loaded.id !== id) {
+          router.replace({
+            pathname: '/chat/[id]' as any,
+            params: {
+              id: loaded.id,
+              otherName: loaded.otherUserName,
+              otherUserId: loaded.otherUserId,
+              otherAvatarUrl: loaded.otherUserAvatarUrl ?? '',
+              skillName: loaded.communityActivityTitle ?? loaded.skillName ?? '',
+              sourceType: loaded.sourceType,
+            },
+          });
+          return;
+        }
+        setConversation(loaded);
       } catch (e) {
         console.log('Lỗi tải hội thoại:', e);
       }
@@ -260,8 +361,22 @@ export default function ChatRoomScreen() {
             }));
           // Cập nhật restValidIds với tin mới nhận được
           normalised.forEach((m: any) => restValidIds.current.add(m.id));
-          setMessages(normalised as ChatMessage[]);
+          // Không thay toàn bộ lịch sử REST bằng snapshot Firebase. Khi dữ liệu
+          // cũ vừa được hợp nhất, REST có thể đã có các tin chưa mirror xong.
+          setMessages((current) => {
+            const merged = new Map<string, ChatMessage>();
+            current.forEach((message) => merged.set(message.id, message));
+            normalised.forEach((message: any) => merged.set(message.id, message as ChatMessage));
+            return [...merged.values()]
+              .filter((message) => !hiddenMsgIds.current.has(message.id))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          });
           markRead();
+        }, (error) => {
+          console.log('[chat] Realtime lỗi, chuyển sang đồng bộ REST:', error.message);
+          unsubscribeRef.current?.();
+          unsubscribeRef.current = null;
+          startPolling();
         });
         if (unsub) {
           unsubscribeRef.current = unsub;
@@ -271,8 +386,7 @@ export default function ChatRoomScreen() {
       }
 
       // Dự phòng: Firebase chưa cấu hình → poll định kỳ
-      setRealtime(false);
-      pollRef.current = setInterval(fetchMessages, POLL_INTERVAL_MS);
+      startPolling();
     };
 
     setup();
@@ -281,7 +395,10 @@ export default function ChatRoomScreen() {
       cancelled = true;
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
     };
   }, [id, fetchMessages, markRead]);
 
@@ -303,14 +420,38 @@ export default function ChatRoomScreen() {
   );
 
   // ─── Gửi tin nhắn ───────────────────────────────────────────────────────
-  const afterSend = async () => {
+  const afterSend = async (response?: any) => {
     setInput('');
-    if (!realtime) await fetchMessages();
+    // REST là nguồn ghi chính. Hiển thị ngay message server vừa trả về thay vì
+    // chờ Firestore mirror, sau đó luôn reconcile lại lịch sử từ REST.
+    const returnedMessage = response?.data?.data ?? response?.data;
+    upsertMessage(returnedMessage);
+    await fetchMessages();
   };
 
   const handleError = (e: any, fallback: string) => {
-    const msg = e?.response?.data?.message ?? fallback;
-    Alert.alert('Lỗi', msg);
+    const rawMessage = e?.response?.data?.message ?? e?.message ?? fallback;
+    const pickerAlreadyOpen = /different (document|image) picking in progress/i.test(rawMessage);
+    const msg = pickerAlreadyOpen
+      ? 'Trình chọn tệp đang mở. Vui lòng hoàn tất hoặc đóng trình chọn hiện tại rồi thử lại.'
+      : rawMessage;
+    const stage = e?.uploadStage;
+    const title = stage === 'prepare'
+      ? 'Không đọc được tệp'
+      : stage === 'upload'
+        ? 'Không tải được tệp'
+        : stage === 'server'
+          ? 'Máy chủ từ chối tệp'
+          : 'Lỗi';
+    // Đây là lỗi đã được UI xử lý. Dùng log để Expo dev overlay không hiện
+    // thêm một banner đỏ gây hiểu nhầm là ứng dụng phát sinh lỗi thứ hai.
+    console.log('Chat request failed:', {
+      stage,
+      status: e?.response?.status,
+      message: e?.message,
+      cause: e?.cause,
+    });
+    Alert.alert(title, msg);
   };
 
   const sendText = async () => {
@@ -319,8 +460,8 @@ export default function ChatRoomScreen() {
 
     setSending(true);
     try {
-      await ChatApi.sendMessage(id, { type: 'TEXT', content });
-      await afterSend();
+      const response = await ChatApi.sendMessage(id, { type: 'TEXT', content });
+      await afterSend(response);
     } catch (e: any) {
       handleError(e, 'Không gửi được tin nhắn. Vui lòng thử lại.');
     } finally {
@@ -329,63 +470,159 @@ export default function ChatRoomScreen() {
   };
 
   const sendImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Cần quyền truy cập', 'Vui lòng cho phép HourLink truy cập thư viện ảnh.');
-      return;
+    if (attachmentPickerInProgress || sending || loading || !conversation) return;
+    attachmentPickerInProgress = true;
+    setPickerBusy(true);
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần quyền truy cập', 'Vui lòng cho phép HourLink truy cập thư viện ảnh.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      // Chỉ đóng sheet sau khi native picker đã trả kết quả để không vừa
+      // dismiss một RN Modal vừa present picker trong cùng một frame trên iOS.
+      setAttachSheetVisible(false);
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const pickedName = asset.fileName ?? fileNameFromUri(asset.uri) ?? `image_${Date.now()}.jpg`;
+      await uploadFile(
+        asset.uri,
+        pickedName,
+        resolveMimeType(pickedName, asset.mimeType, 'image/jpeg'),
+        asset.fileSize,
+        asset.file
+      );
+    } catch (e: any) {
+      handleError(e, 'Không thể chọn ảnh. Vui lòng thử lại.');
+    } finally {
+      setAttachSheetVisible(false);
+      attachmentPickerInProgress = false;
+      setPickerBusy(false);
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    const asset = result.assets[0];
-    await uploadFile(
-      asset.uri,
-      asset.fileName ?? `image_${Date.now()}.jpg`,
-      asset.mimeType ?? 'image/jpeg'
-    );
   };
 
   const sendDocument = async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      ],
-      copyToCacheDirectory: true,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
+    if (attachmentPickerInProgress || sending || loading || !conversation) return;
+    attachmentPickerInProgress = true;
+    setPickerBusy(true);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ],
+        copyToCacheDirectory: true,
+      });
+      setAttachSheetVisible(false);
+      if (result.canceled || !result.assets?.[0]) return;
 
-    const asset = result.assets[0];
-    await uploadFile(
-      asset.uri,
-      asset.name ?? `file_${Date.now()}`,
-      asset.mimeType ?? 'application/octet-stream'
-    );
+      const asset = result.assets[0];
+      const pickedName = asset.name ?? fileNameFromUri(asset.uri) ?? `file_${Date.now()}`;
+      await uploadFile(
+        asset.uri,
+        pickedName,
+        resolveMimeType(pickedName, asset.mimeType),
+        asset.size,
+        asset.file
+      );
+    } catch (e: any) {
+      handleError(e, 'Không thể chọn tài liệu. Vui lòng thử lại.');
+    } finally {
+      setAttachSheetVisible(false);
+      attachmentPickerInProgress = false;
+      setPickerBusy(false);
+    }
   };
 
-  const uploadFile = async (uri: string, name: string, type: string) => {
+  const uploadFile = async (
+    uri: string,
+    name: string,
+    type: string,
+    size?: number,
+    pickedFile?: Blob | null
+  ) => {
     if (!id) return;
+    let stagingDirectory: Directory | null = null;
     setSending(true);
     try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
-        name,
-        type,
-      } as any);
-      await ChatApi.sendAttachment(id, formData);
-      await afterSend();
+      const fileName = safeUploadFileName(name);
+      let uploadUri = uri;
+      let actualSize = size ?? 0;
+      let sourceFile: ExpoFile | null = null;
+
+      if (Platform.OS === 'web') {
+        if (!pickedFile) {
+          const error: any = new Error('Trình duyệt không còn quyền đọc tệp. Vui lòng chọn lại.');
+          error.uploadStage = 'prepare';
+          throw error;
+        }
+        actualSize = pickedFile.size;
+      } else {
+        sourceFile = new ExpoFile(uri);
+        if (!sourceFile.exists) {
+          const error: any = new Error('Tệp đã chọn không còn tồn tại hoặc ứng dụng không có quyền đọc.');
+          error.uploadStage = 'prepare';
+          throw error;
+        }
+        actualSize = sourceFile.size;
+      }
+
+      if (actualSize <= 0) {
+        const error: any = new Error('Tệp đang trống hoặc không đọc được dung lượng.');
+        error.uploadStage = 'prepare';
+        throw error;
+      }
+      if (actualSize > MAX_ATTACHMENT_SIZE) {
+        const error: any = new Error('Ảnh hoặc tài liệu phải có dung lượng tối đa 20 MB.');
+        error.uploadStage = 'prepare';
+        throw error;
+      }
+
+      if (sourceFile) {
+        // uploadAsync lấy basename URI làm filename multipart. Sao chép native
+        // vào thư mục tạm giúp giữ đúng tên gốc mà không đọc file vào JS/RAM.
+        stagingDirectory = new Directory(
+          Paths.cache,
+          `chat-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        );
+        stagingDirectory.create({ intermediates: true, idempotent: true });
+        const stagedFile = new ExpoFile(stagingDirectory, fileName);
+        sourceFile.copy(stagedFile);
+        if (!stagedFile.exists || stagedFile.size !== actualSize) {
+          const error: any = new Error('Không thể chuẩn bị bản sao tạm của tệp để tải lên.');
+          error.uploadStage = 'prepare';
+          throw error;
+        }
+        uploadUri = stagedFile.uri;
+      }
+
+      const response = await ChatApi.sendAttachment(id, {
+        uri: uploadUri,
+        mimeType: type,
+        webFile: pickedFile ?? undefined,
+        fileName,
+      });
+      await afterSend(response);
     } catch (e: any) {
       handleError(e, 'Không gửi được tệp. Vui lòng thử lại.');
     } finally {
+      if (stagingDirectory?.exists) {
+        try {
+          stagingDirectory.delete();
+        } catch (cleanupError) {
+          console.log('[chat] Không xóa được tệp upload tạm:', cleanupError);
+        }
+      }
       setSending(false);
     }
   };
@@ -414,13 +651,13 @@ export default function ChatRoomScreen() {
         // reverse geocode có thể thất bại — không sao, vẫn gửi toạ độ
       }
 
-      await ChatApi.sendMessage(id, {
+      const response = await ChatApi.sendMessage(id, {
         type: 'LOCATION',
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
         locationLabel: label,
       });
-      await afterSend();
+      await afterSend(response);
     } catch (e: any) {
       handleError(e, 'Không lấy được vị trí. Vui lòng thử lại.');
     } finally {
@@ -434,10 +671,10 @@ export default function ChatRoomScreen() {
 
     setSending(true);
     try {
-      await ChatApi.sendMessage(id, { type: 'MEETING_LINK', meetingLink: link });
+      const response = await ChatApi.sendMessage(id, { type: 'MEETING_LINK', meetingLink: link });
       setMeetingVisible(false);
       setMeetingLink('');
-      await afterSend();
+      await afterSend(response);
     } catch (e: any) {
       handleError(e, 'Không gửi được link họp. Vui lòng thử lại.');
     } finally {
@@ -452,10 +689,10 @@ export default function ChatRoomScreen() {
 
     setSending(true);
     try {
-      await ChatApi.proposeReschedule(id, { proposedTime: time });
+      const response = await ChatApi.proposeReschedule(id, { proposedTime: time });
       setRescheduleVisible(false);
       setRescheduleTime('');
-      await afterSend();
+      await afterSend(response);
       Alert.alert('Đã gửi', 'Đề xuất đổi lịch đã được gửi tới người kia.');
     } catch (e: any) {
       handleError(e, 'Không gửi được đề xuất. Vui lòng thử lại.');
@@ -565,6 +802,7 @@ export default function ChatRoomScreen() {
 
   // ─── Menu đính kèm ──────────────────────────────────────────────────────
   const openAttachMenu = () => {
+    if (attachmentPickerInProgress || sending || loading || !conversation) return;
     setAttachSheetVisible(true);
   };
 
@@ -638,6 +876,39 @@ export default function ChatRoomScreen() {
     );
   };
 
+  const openDocument = async (url?: string) => {
+    if (!url) {
+      Alert.alert('Không mở được tài liệu', 'Tin nhắn không có đường dẫn tải tài liệu.');
+      return;
+    }
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert('Không mở được tài liệu', 'Thiết bị chưa có ứng dụng phù hợp để mở tệp này.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error('[chat] Open document failed:', error);
+      Alert.alert(
+        'Không mở được tài liệu',
+        'Đường dẫn tài liệu không còn khả dụng hoặc thiết bị không hỗ trợ định dạng này.'
+      );
+    }
+  };
+
+  const markImageFailed = (messageId: string) => {
+    setFailedImageIds((current) => new Set(current).add(messageId));
+  };
+
+  const retryImage = (messageId: string) => {
+    setFailedImageIds((current) => {
+      const next = new Set(current);
+      next.delete(messageId);
+      return next;
+    });
+  };
+
   // ─── Render một bong bóng tin nhắn ──────────────────────────────────────
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
     if (item.type === 'SYSTEM') {
@@ -679,8 +950,29 @@ export default function ChatRoomScreen() {
         )}
 
         {item.type === 'IMAGE' && (
-          <TouchableOpacity onPress={() => setPreviewImage(item.attachmentUrl ?? null)}>
-            <Image source={{ uri: item.attachmentUrl }} style={styles.msgImage} />
+          <TouchableOpacity
+            onPress={() => {
+              if (failedImageIds.has(item.id)) {
+                retryImage(item.id);
+              } else if (item.attachmentUrl) {
+                setPreviewImageFailed(false);
+                setPreviewImage(item.attachmentUrl);
+              }
+            }}
+          >
+            {failedImageIds.has(item.id) || !item.attachmentUrl ? (
+              <View style={[styles.msgImage, styles.imageError]}>
+                <Ionicons name="image-outline" size={30} color={Colors.textMuted} />
+                <Text style={styles.imageErrorText}>Không tải được ảnh</Text>
+                {!!item.attachmentUrl && <Text style={styles.imageRetryText}>Nhấn để thử lại</Text>}
+              </View>
+            ) : (
+              <Image
+                source={{ uri: item.attachmentUrl }}
+                style={styles.msgImage}
+                onError={() => markImageFailed(item.id)}
+              />
+            )}
             {!!item.content && (
               <Text style={[styles.msgText, isMine && styles.msgTextMine, { marginTop: 6 }]}>
                 {item.content}
@@ -692,7 +984,7 @@ export default function ChatRoomScreen() {
         {item.type === 'DOCUMENT' && (
           <TouchableOpacity
             style={styles.fileRow}
-            onPress={() => item.attachmentUrl && Linking.openURL(item.attachmentUrl)}
+            onPress={() => void openDocument(item.attachmentUrl)}
           >
             <Ionicons
               name={fileIconOf(item.originalName) as any}
@@ -1020,7 +1312,11 @@ export default function ChatRoomScreen() {
 
         {/* ── Ô soạn tin ───────────────────────────────────────── */}
         <View style={styles.composer}>
-          <TouchableOpacity onPress={openAttachMenu} style={styles.attachBtn} disabled={sending}>
+          <TouchableOpacity
+            onPress={openAttachMenu}
+            style={styles.attachBtn}
+            disabled={sending || pickerBusy || loading || !conversation}
+          >
             <Ionicons name="attach" size={24} color={Colors.textMuted} />
           </TouchableOpacity>
 
@@ -1317,14 +1613,22 @@ export default function ChatRoomScreen() {
             <Text style={styles.sheetTitle}>Thêm nội dung</Text>
             
             <View style={{ marginTop: 20, flexDirection: 'row', flexWrap: 'wrap', gap: 20, justifyContent: 'center' }}>
-              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); sendImage(); }}>
+              <TouchableOpacity
+                style={[styles.attachOption, pickerBusy && { opacity: 0.45 }]}
+                disabled={pickerBusy || sending}
+                onPress={() => void sendImage()}
+              >
                 <View style={[styles.attachOptionIcon, { backgroundColor: '#E0F2FE' }]}>
                   <Ionicons name="image" size={26} color="#0284C7" />
                 </View>
                 <Text style={styles.attachOptionText}>Hình ảnh</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.attachOption} onPress={() => { setAttachSheetVisible(false); sendDocument(); }}>
+              <TouchableOpacity
+                style={[styles.attachOption, pickerBusy && { opacity: 0.45 }]}
+                disabled={pickerBusy || sending}
+                onPress={() => void sendDocument()}
+              >
                 <View style={[styles.attachOptionIcon, { backgroundColor: '#F3E8FF' }]}>
                   <Ionicons name="document-text" size={26} color="#9333EA" />
                 </View>
@@ -1477,12 +1781,25 @@ export default function ChatRoomScreen() {
           <TouchableOpacity style={styles.imageClose} onPress={() => setPreviewImage(null)}>
             <Ionicons name="close" size={30} color="#FFFFFF" />
           </TouchableOpacity>
-          {!!previewImage && (
+          {!!previewImage && !previewImageFailed && (
             <Image
               source={{ uri: previewImage }}
               style={{ width: '95%', height: '80%' }}
               resizeMode="contain"
+              onError={() => setPreviewImageFailed(true)}
             />
+          )}
+          {!!previewImage && previewImageFailed && (
+            <View style={styles.previewImageError}>
+              <Ionicons name="image-outline" size={48} color="#CBD5E1" />
+              <Text style={styles.previewImageErrorText}>Không tải được ảnh này</Text>
+              <TouchableOpacity
+                style={styles.previewImageRetry}
+                onPress={() => setPreviewImageFailed(false)}
+              >
+                <Text style={styles.previewImageRetryText}>Thử lại</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </Modal>
@@ -1744,6 +2061,9 @@ const styles = StyleSheet.create({
   msgTimeMine: { color: '#D1FAE5' },
 
   msgImage: { width: 210, height: 210, borderRadius: 12, backgroundColor: '#E2E8F0' },
+  imageError: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 },
+  imageErrorText: { marginTop: 8, fontSize: 13, fontWeight: '600', color: '#475569' },
+  imageRetryText: { marginTop: 3, fontSize: 11, color: Colors.secondary },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 190 },
   fileName: { fontSize: 13, fontWeight: '600', color: '#1E293B' },
@@ -1849,6 +2169,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageClose: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
+  previewImageError: { alignItems: 'center', paddingHorizontal: 24 },
+  previewImageErrorText: { marginTop: 12, color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  previewImageRetry: {
+    marginTop: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  previewImageRetryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
 
   // Attachment Bottom Sheet
   attachOption: { alignItems: 'center', width: 70 },

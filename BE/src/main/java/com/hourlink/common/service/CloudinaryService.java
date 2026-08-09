@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * CloudinaryService — Xử lý upload và xoá file trên Cloudinary.
@@ -31,17 +33,64 @@ public class CloudinaryService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> uploadFile(MultipartFile file, String folder) throws IOException {
         String contentType = file.getContentType() != null ? file.getContentType() : "";
-        boolean isImage = contentType.startsWith("image/");
+        return uploadFile(file, folder, contentType.startsWith("image/"));
+    }
 
-        Map<String, Object> options = ObjectUtils.asMap(
-                "folder", folder,
-                "resource_type", isImage ? "image" : "raw",
-                "use_filename", true,
-                "unique_filename", true,
-                "overwrite", false
-        );
+    /**
+     * Upload với loại tài nguyên đã được tầng nghiệp vụ xác thực. Cách này xử
+     * lý đúng file ảnh mà thiết bị gửi lên dưới MIME application/octet-stream.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> uploadFile(MultipartFile file, String folder,
+                                          boolean isImage) throws IOException {
+
+        Map<String, Object> options = isImage
+                ? ObjectUtils.asMap(
+                        "folder", folder,
+                        "resource_type", "image",
+                        "use_filename", true,
+                        "unique_filename", true,
+                        "overwrite", false)
+                : ObjectUtils.asMap(
+                        "folder", folder,
+                        "resource_type", "raw",
+                        // Cloudinary yêu cầu public_id của raw asset có phần mở
+                        // rộng. MultipartFile được chuyển thành byte[] nên phải
+                        // gắn public_id rõ ràng để URL tải xuống vẫn có .pdf/.docx.
+                        "public_id", rawPublicId(file),
+                        "overwrite", false);
 
         return (Map<String, Object>) cloudinary.uploader().upload(file.getBytes(), options);
+    }
+
+    String rawPublicId(MultipartFile file) {
+        String originalName = file.getOriginalFilename() != null
+                ? file.getOriginalFilename().replace('\\', '/') : "";
+        int slash = originalName.lastIndexOf('/');
+        if (slash >= 0) originalName = originalName.substring(slash + 1);
+        int dot = originalName.lastIndexOf('.');
+        String extensionFromName = dot >= 0
+                ? originalName.substring(dot).toLowerCase(Locale.ROOT) : "";
+        String extensionFromMime = extensionForContentType(file.getContentType());
+        String extension = !".bin".equals(extensionFromMime)
+                ? extensionFromMime : extensionFromName;
+        if (!extension.matches("\\.[a-z0-9]{1,10}")) {
+            extension = ".bin";
+        }
+        return "file_" + UUID.randomUUID() + extension;
+    }
+
+    private String extensionForContentType(String contentType) {
+        String normalized = contentType != null
+                ? contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT) : "";
+        return switch (normalized) {
+            case "application/pdf" -> ".pdf";
+            case "application/msword" -> ".doc";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> ".docx";
+            case "application/vnd.ms-powerpoint" -> ".ppt";
+            case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> ".pptx";
+            default -> ".bin";
+        };
     }
 
     /**

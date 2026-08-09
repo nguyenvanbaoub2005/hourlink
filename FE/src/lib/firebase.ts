@@ -99,6 +99,7 @@ export function isRealtimeReady(): boolean {
 export function listenToMessages(
   conversationId: string,
   onChange: (messages: any[]) => void,
+  onError?: (error: Error) => void,
   max = 100
 ): Unsubscribe | null {
   if (!db || !signedIn) return null;
@@ -112,7 +113,10 @@ export function listenToMessages(
   return onSnapshot(
     q,
     (snap) => onChange(snap.docs.map((d) => d.data())),
-    (err) => console.log('[firebase] Lỗi nghe tin nhắn:', err.message)
+    (err) => {
+      console.log('[firebase] Lỗi nghe tin nhắn:', err.message);
+      onError?.(err);
+    }
   );
 }
 

@@ -1,6 +1,7 @@
 package com.hourlink.chat.repository;
 
 import com.hourlink.chat.entity.Conversation;
+import com.hourlink.chat.enums.ConversationSourceType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,6 +23,26 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     /** Đã tồn tại cuộc trò chuyện cho lời mời này chưa */
     boolean existsByInvitation_Id(UUID invitationId);
 
+    /** Chat cá nhân duy nhất của một cặp người dùng. */
+    Optional<Conversation> findByPersonalPairKeyAndIsActiveTrue(String personalPairKey);
+
+    /**
+     * Fallback cho dữ liệu cũ chưa có personal_pair_key. Không lọc theo
+     * source_type vì cột này từng nullable; community_activity_id mới là dấu
+     * hiệu ổn định để phân biệt chat cá nhân với chat cộng đồng.
+     */
+    @Query("""
+            SELECT c FROM Conversation c
+            WHERE c.communityActivity IS NULL
+              AND c.isActive = true
+              AND ((c.userOne.id = :userId1 AND c.userTwo.id = :userId2)
+                OR (c.userOne.id = :userId2 AND c.userTwo.id = :userId1))
+            ORDER BY c.createdAt ASC
+            """)
+    List<Conversation> findActivePersonalBetweenUsers(
+            @Param("userId1") UUID userId1,
+            @Param("userId2") UUID userId2);
+
     /** Một người tham gia chỉ có một hội thoại trong mỗi hoạt động. */
     Optional<Conversation> findByCommunityActivity_IdAndUserTwo_Id(
             UUID communityActivityId, UUID participantUserId);
@@ -32,8 +53,19 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
      */
     @Query("""
             SELECT c FROM Conversation c
-            WHERE c.userOne.email = :email OR c.userTwo.email = :email
+            WHERE (c.userOne.email = :email OR c.userTwo.email = :email)
+              AND c.isActive = true
             ORDER BY COALESCE(c.lastMessageAt, c.createdAt) DESC
             """)
     List<Conversation> findAllByParticipantEmail(@Param("email") String email);
+
+    /** Dùng một lần khi khởi động để hợp nhất dữ liệu chat cá nhân cũ bị trùng. */
+    @Query("""
+            SELECT c FROM Conversation c
+            WHERE c.sourceType = :sourceType
+              AND c.isActive = true
+            ORDER BY c.createdAt ASC
+            """)
+    List<Conversation> findAllActiveBySourceType(
+            @Param("sourceType") ConversationSourceType sourceType);
 }

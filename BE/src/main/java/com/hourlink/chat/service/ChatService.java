@@ -49,13 +49,20 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -78,6 +85,7 @@ public class ChatService {
 
     private static final String CLOUDINARY_FOLDER = "chat_attachments";
     private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20MB
+    private static final int MAX_ORIGINAL_FILENAME_LENGTH = 255;
 
     private static final List<AppointmentStatus> ACTIVE_APPOINTMENT_STATUSES = List.of(
             AppointmentStatus.PENDING,
@@ -89,7 +97,8 @@ public class ChatService {
     );
 
     private static final List<String> ALLOWED_IMAGE_TYPES = List.of(
-            "image/jpeg", "image/png", "image/gif", "image/webp");
+            "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+            "image/heic", "image/heif");
 
     private static final List<String> ALLOWED_DOC_TYPES = List.of(
             "application/pdf",
@@ -165,39 +174,177 @@ public class ChatService {
             throw new AppException(ErrorCode.CHAT_NOT_ALLOWED);
         }
 
-        return conversationRepository.findByInvitation_Id(invitation.getId())
-                .orElseGet(() -> {
-                    Conversation conv = conversationRepository.save(Conversation.builder()
-                            .invitation(invitation)
-                            .sourceType(ConversationSourceType.SKILL_INVITATION)
-                            .userOne(invitation.getSender())
-                            .userTwo(invitation.getReceiver())
-                            .isActive(true)
-                            .build());
+        String pairKey = personalPairKey(invitation.getSender().getId(), invitation.getReceiver().getId());
 
-                    // Tin nhắn hệ thống mở đầu
-                    String skillName = invitation.getSkill() != null
-                            ? invitation.getSkill().getName() : "yêu cầu hỗ trợ";
-                    ChatMessage systemMsg = chatMessageRepository.save(ChatMessage.builder()
-                            .conversation(conv)
-                            .sender(null)
-                            .type(MessageType.SYSTEM)
-                            .content("Lời mời đã được chấp nhận. Hai bạn có thể trao đổi về \""
-                                    + skillName + "\" và thống nhất lịch hẹn.")
-                            .isRead(false)
-                            .build());
+        // Một cặp người chỉ có một chat cá nhân, kể cả khi đổi kỹ năng hoặc gửi
+        // thêm lời mời sau khi buổi trước đã hoàn thành.
+        Conversation existing = conversationRepository
+                .findByPersonalPairKeyAndIsActiveTrue(pairKey)
+                .orElseGet(() -> conversationRepository.findByInvitation_Id(invitation.getId())
+                        .orElse(null));
+        if (existing != null) {
+            return reusePersonalConversation(existing, invitation, pairKey);
+        }
 
-                    conv.setLastMessagePreview(truncate(systemMsg.getContent()));
-                    conv.setLastMessageType(MessageType.SYSTEM);
-                    conv.setLastMessageAt(Instant.now());
-                    conversationRepository.save(conv);
+        Conversation conversation = conversationRepository.save(Conversation.builder()
+                .invitation(invitation)
+                .sourceType(ConversationSourceType.SKILL_INVITATION)
+                .personalPairKey(pairKey)
+                .userOne(invitation.getSender())
+                .userTwo(invitation.getReceiver())
+                .isActive(true)
+                .build());
 
-                    mirrorConversation(conv);
-                    mirrorMessage(conv, systemMsg);
+        appendInvitationSystemMessage(conversation, invitation, false);
+        log.info("Personal conversation {} created for pair {}", conversation.getId(), pairKey);
+        return conversation;
+    }
 
-                    log.info("Conversation created for invitation {}", invitation.getId());
-                    return conv;
-                });
+    private Conversation reusePersonalConversation(Conversation conversation, Invitation invitation,
+                                                     String pairKey) {
+        Invitation currentInvitation = conversation.getInvitation();
+        boolean hasNewerContext = isNewerInvitation(invitation, currentInvitation);
+
+        conversation.setSourceType(ConversationSourceType.SKILL_INVITATION);
+        conversation.setPersonalPairKey(pairKey);
+        conversation.setIsActive(true);
+        // Có một lời mời mới thì đưa phòng đã ẩn trở lại danh sách cho cả hai.
+        if (hasNewerContext) {
+            conversation.setInvitation(invitation);
+            conversation.setHiddenByUserOne(false);
+            conversation.setHiddenByUserTwo(false);
+        }
+        conversationRepository.save(conversation);
+
+        if (hasNewerContext) {
+            appendInvitationSystemMessage(conversation, invitation, true);
+        } else {
+            mirrorConversation(conversation);
+        }
+        return conversation;
+    }
+
+    private void appendInvitationSystemMessage(Conversation conversation, Invitation invitation,
+                                                boolean continuingConversation) {
+        String skillName = invitation.getSkill() != null
+                ? invitation.getSkill().getName() : "yêu cầu hỗ trợ";
+        String content = continuingConversation
+                ? "Lời mời mới về \"" + skillName
+                        + "\" đã được chấp nhận. Hai bạn có thể tiếp tục trao đổi tại đây."
+                : "Lời mời đã được chấp nhận. Hai bạn có thể trao đổi về \""
+                        + skillName + "\" và thống nhất lịch hẹn.";
+        ChatMessage systemMessage = chatMessageRepository.save(ChatMessage.builder()
+                .conversation(conversation)
+                .sender(null)
+                .type(MessageType.SYSTEM)
+                .content(content)
+                .isRead(false)
+                .build());
+
+        conversation.setLastMessagePreview(truncate(content));
+        conversation.setLastMessageType(MessageType.SYSTEM);
+        conversation.setLastMessageAt(systemMessage.getCreatedAt() != null
+                ? systemMessage.getCreatedAt() : Instant.now());
+        conversationRepository.save(conversation);
+        mirrorConversation(conversation);
+        mirrorMessage(conversation, systemMessage);
+    }
+
+    private boolean isNewerInvitation(Invitation candidate, Invitation current) {
+        if (current == null) return true;
+        if (current.getId().equals(candidate.getId())) return false;
+        if (current.getCreatedAt() == null) return candidate.getCreatedAt() != null;
+        return candidate.getCreatedAt() != null
+                && candidate.getCreatedAt().isAfter(current.getCreatedAt());
+    }
+
+    /**
+     * Hợp nhất dữ liệu cũ: giữ phòng cá nhân đầu tiên làm phòng chính, chuyển
+     * toàn bộ tin nhắn sang đó và lưu trữ các phòng trùng. Không xóa lời mời,
+     * tin nhắn hay bằng chứng báo cáo.
+     *
+     * @return số phòng trùng đã được lưu trữ
+     */
+    @Transactional
+    public int consolidateDuplicatePersonalConversations() {
+        List<Conversation> activePersonal = conversationRepository
+                .findAllActiveBySourceType(ConversationSourceType.SKILL_INVITATION);
+        Map<String, List<Conversation>> grouped = new HashMap<>();
+        activePersonal.forEach(conversation -> grouped
+                .computeIfAbsent(personalPairKey(
+                        conversation.getUserOne().getId(), conversation.getUserTwo().getId()),
+                        ignored -> new ArrayList<>())
+                .add(conversation));
+
+        int archivedCount = 0;
+        for (Map.Entry<String, List<Conversation>> entry : grouped.entrySet()) {
+            String pairKey = entry.getKey();
+            List<Conversation> group = entry.getValue();
+            Conversation canonical = group.stream()
+                    .filter(c -> pairKey.equals(c.getPersonalPairKey()))
+                    .findFirst()
+                    .orElseGet(() -> group.stream()
+                            .min(Comparator.comparing(this::conversationCreatedAt))
+                            .orElseThrow());
+
+            if (group.size() == 1) {
+                if (!Objects.equals(canonical.getPersonalPairKey(), pairKey)) {
+                    canonical.setPersonalPairKey(pairKey);
+                    conversationRepository.save(canonical);
+                }
+                continue;
+            }
+
+            Invitation newestInvitation = group.stream()
+                    .filter(c -> c.getInvitation() != null)
+                    .max(Comparator.comparing(this::invitationContextAt))
+                    .map(Conversation::getInvitation)
+                    .orElse(null);
+            Conversation newestSummary = group.stream()
+                    .max(Comparator.comparing(this::conversationActivityAt))
+                    .orElse(canonical);
+            boolean hiddenByUserOne = group.stream().allMatch(c ->
+                    isHiddenFor(c, canonical.getUserOne().getId()));
+            boolean hiddenByUserTwo = group.stream().allMatch(c ->
+                    isHiddenFor(c, canonical.getUserTwo().getId()));
+
+            List<Conversation> duplicates = group.stream()
+                    .filter(c -> !c.getId().equals(canonical.getId()))
+                    .toList();
+            List<UUID> duplicateIds = duplicates.stream().map(Conversation::getId).toList();
+            chatMessageRepository.moveToConversation(canonical, duplicateIds);
+
+            // Giải phóng hai khóa unique trước khi gắn context mới vào canonical.
+            group.forEach(c -> {
+                c.setInvitation(null);
+                c.setPersonalPairKey(null);
+            });
+            duplicates.forEach(c -> {
+                c.setIsActive(false);
+                c.setHiddenByUserOne(true);
+                c.setHiddenByUserTwo(true);
+            });
+            conversationRepository.saveAll(group);
+            conversationRepository.flush();
+
+            canonical.setInvitation(newestInvitation);
+            canonical.setPersonalPairKey(pairKey);
+            canonical.setIsActive(true);
+            canonical.setHiddenByUserOne(hiddenByUserOne);
+            canonical.setHiddenByUserTwo(hiddenByUserTwo);
+            canonical.setLastMessagePreview(newestSummary.getLastMessagePreview());
+            canonical.setLastMessageType(newestSummary.getLastMessageType());
+            canonical.setLastMessageAt(newestSummary.getLastMessageAt());
+            conversationRepository.save(canonical);
+
+            // Không mirror các phòng cũ ngay trong transaction bảo trì. MySQL là
+            // nguồn sự thật; FE tải lịch sử qua REST và các tin mới vẫn được
+            // mirror realtime sau khi transaction này hoàn tất.
+            archivedCount += duplicates.size();
+            log.info("Merged {} duplicate personal conversations into {} for pair {}",
+                    duplicates.size(), canonical.getId(), pairKey);
+        }
+        return archivedCount;
     }
 
     /**
@@ -263,8 +410,13 @@ public class ChatService {
     /** Danh sách cuộc trò chuyện của tôi, mới nhất trước */
     public List<ConversationResponse> getMyConversations() {
         String email = SecurityUtil.getCurrentUserEmail();
-        return conversationRepository.findAllByParticipantEmail(email)
-                .stream()
+        Map<UUID, Conversation> canonicalConversations = new LinkedHashMap<>();
+        conversationRepository.findAllByParticipantEmail(email).stream()
+                .map(this::resolveCanonicalConversation)
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+                .forEach(c -> canonicalConversations.putIfAbsent(c.getId(), c));
+
+        return canonicalConversations.values().stream()
                 .filter(c -> {
                     if (c.getUserOne().getEmail().equals(email)) return !c.isHiddenByUserOne();
                     return !c.isHiddenByUserTwo();
@@ -389,30 +541,48 @@ public class ChatService {
         User receiver = otherUserOf(conv, email);
 
         requireNotBlocked(sender, receiver);
-        boolean isImage = validateFile(file);
+        String originalName = normalizeOriginalFilename(file != null ? file.getOriginalFilename() : null);
+        boolean isImage = validateFile(file, originalName);
+
+        String uploadedPublicId = null;
+        boolean rollbackCleanupRegistered = false;
 
         try {
-            Map<String, Object> uploadResult = cloudinaryService.uploadFile(file, CLOUDINARY_FOLDER);
+            Map<String, Object> uploadResult = cloudinaryService.uploadFile(
+                    file, CLOUDINARY_FOLDER, isImage);
+            uploadedPublicId = requiredUploadField(uploadResult, "public_id");
+            rollbackCleanupRegistered = registerAttachmentRollbackCleanup(uploadedPublicId, isImage);
+            String secureUrl = requiredUploadField(uploadResult, "secure_url");
 
             ChatMessage saved = chatMessageRepository.save(ChatMessage.builder()
                     .conversation(conv)
                     .sender(sender)
                     .type(isImage ? MessageType.IMAGE : MessageType.DOCUMENT)
                     .content(caption)
-                    .attachmentUrl((String) uploadResult.get("secure_url"))
-                    .publicId((String) uploadResult.get("public_id"))
-                    .originalName(file.getOriginalFilename())
+                    .attachmentUrl(secureUrl)
+                    .publicId(uploadedPublicId)
+                    .originalName(originalName)
                     .fileSize(file.getSize())
                     .isRead(false)
                     .build());
 
-            String preview = isImage ? "🖼️ Hình ảnh" : "📄 " + file.getOriginalFilename();
+            String preview = isImage ? "🖼️ Hình ảnh" : "📄 " + originalName;
             afterMessageSent(conv, saved, sender, receiver, preview);
             return mapToMessageResponse(saved);
 
         } catch (IOException e) {
+            cleanupAttachmentImmediatelyIfNeeded(uploadedPublicId, isImage,
+                    rollbackCleanupRegistered);
             log.error("Upload đính kèm chat thất bại: {}", e.getMessage());
             throw new AppException(ErrorCode.UPLOAD_FAILED);
+        } catch (RuntimeException e) {
+            cleanupAttachmentImmediatelyIfNeeded(uploadedPublicId, isImage,
+                    rollbackCleanupRegistered);
+            if (uploadedPublicId == null && !(e instanceof AppException)) {
+                log.error("Cloudinary upload đính kèm chat thất bại: {}", e.getMessage());
+                throw new AppException(ErrorCode.UPLOAD_FAILED);
+            }
+            throw e;
         }
     }
 
@@ -469,9 +639,11 @@ public class ChatService {
     public void sendAppointmentCardInternal(UUID conversationId, UUID appointmentId, String appointmentData,
                                             User sender) {
         if (conversationId == null) return;
-        Conversation conv = conversationRepository.findById(conversationId)
+        Conversation requestedConversation = conversationRepository.findById(conversationId)
                 .orElse(null);
-        if (conv == null) return;
+        if (requestedConversation == null) return;
+        Conversation conv = resolveCanonicalConversation(requestedConversation);
+        if (!Boolean.TRUE.equals(conv.getIsActive())) return;
         if (conv.getInvitation() == null) return;
 
         User receiver = otherUserOf(conv, sender.getEmail());
@@ -495,7 +667,7 @@ public class ChatService {
         mirrorMessage(conv, saved);
         mirrorUnread(conv, receiver);
 
-        log.info("Appointment card sent to conversation {} for appointment {}", conversationId, appointmentId);
+        log.info("Appointment card sent to conversation {} for appointment {}", conv.getId(), appointmentId);
     }
 
     /**
@@ -517,22 +689,29 @@ public class ChatService {
      * Tìm cuộc trò chuyện giữa hai người dùng bất kỳ.
      */
     public UUID findConversationIdByUsers(UUID userId1, UUID userId2) {
-        return conversationRepository.findAllByParticipantEmail(
-                userRepository.findById(userId1).map(User::getEmail).orElse("")
-        ).stream()
-                .filter(c -> c.getInvitation() != null)
-                .filter(c -> (c.getUserOne().getId().equals(userId1) && c.getUserTwo().getId().equals(userId2))
-                        || (c.getUserOne().getId().equals(userId2) && c.getUserTwo().getId().equals(userId1)))
-                .map(c -> c.getId())
-                .findFirst()
-                .orElse(null);
+        return conversationRepository
+                .findByPersonalPairKeyAndIsActiveTrue(personalPairKey(userId1, userId2))
+                .map(Conversation::getId)
+                .orElseGet(() -> conversationRepository
+                        .findActivePersonalBetweenUsers(userId1, userId2).stream()
+                        .findFirst()
+                        .map(Conversation::getId)
+                        .orElse(null));
     }
 
-    /** Tìm đúng cuộc trò chuyện gắn với lời mời, tránh nhầm khi hai người có nhiều lời mời. */
+    /**
+     * Mọi lời mời của cùng một cặp người đều trỏ về phòng cá nhân chính.
+     * Nhờ vậy tạo buổi học tiếp theo không sinh thêm một hàng chat.
+     */
     public UUID findConversationIdByInvitation(UUID invitationId) {
         return conversationRepository.findByInvitation_Id(invitationId)
+                .map(this::resolveCanonicalConversation)
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
                 .map(Conversation::getId)
-                .orElse(null);
+                .orElseGet(() -> invitationRepository.findById(invitationId)
+                        .map(invitation -> findConversationIdByUsers(
+                                invitation.getSender().getId(), invitation.getReceiver().getId()))
+                        .orElse(null));
     }
 
     /** Đánh dấu toàn bộ tin nhắn của người kia là đã đọc */
@@ -770,12 +949,35 @@ public class ChatService {
     }
 
     private Conversation requireParticipant(UUID conversationId, String email) {
-        Conversation conv = conversationRepository.findById(conversationId)
+        Conversation requestedConversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_NOT_FOUND));
-        if (!isParticipant(conv, email)) {
+        if (!isParticipant(requestedConversation, email)) {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
-        return conv;
+        Conversation canonical = resolveCanonicalConversation(requestedConversation);
+        if (!isParticipant(canonical, email)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+        if (sourceTypeOf(canonical) == ConversationSourceType.SKILL_INVITATION
+                && !Boolean.TRUE.equals(canonical.getIsActive())) {
+            // Tuyệt đối không ghi tin mới vào phòng cũ sau khi deduplicate.
+            throw new AppException(ErrorCode.CONVERSATION_NOT_FOUND);
+        }
+        return canonical;
+    }
+
+    private Conversation resolveCanonicalConversation(Conversation conversation) {
+        if (sourceTypeOf(conversation) == ConversationSourceType.COMMUNITY_ACTIVITY) {
+            return conversation;
+        }
+        String pairKey = personalPairKey(
+                conversation.getUserOne().getId(), conversation.getUserTwo().getId());
+        return conversationRepository.findByPersonalPairKeyAndIsActiveTrue(pairKey)
+                .orElseGet(() -> conversationRepository.findActivePersonalBetweenUsers(
+                                conversation.getUserOne().getId(), conversation.getUserTwo().getId())
+                        .stream()
+                        .findFirst()
+                        .orElse(conversation));
     }
 
     private boolean isParticipant(Conversation conv, String email) {
@@ -785,6 +987,38 @@ public class ChatService {
 
     private User otherUserOf(Conversation conv, String email) {
         return conv.getUserOne().getEmail().equals(email) ? conv.getUserTwo() : conv.getUserOne();
+    }
+
+    static String personalPairKey(UUID userId1, UUID userId2) {
+        String first = userId1.toString();
+        String second = userId2.toString();
+        return first.compareTo(second) <= 0
+                ? first + ":" + second
+                : second + ":" + first;
+    }
+
+    private Instant conversationCreatedAt(Conversation conversation) {
+        return conversation.getCreatedAt() != null ? conversation.getCreatedAt() : Instant.EPOCH;
+    }
+
+    private Instant conversationActivityAt(Conversation conversation) {
+        return conversation.getLastMessageAt() != null
+                ? conversation.getLastMessageAt() : conversationCreatedAt(conversation);
+    }
+
+    private Instant invitationContextAt(Conversation conversation) {
+        Invitation invitation = conversation.getInvitation();
+        if (invitation != null && invitation.getCreatedAt() != null) {
+            return invitation.getCreatedAt();
+        }
+        return conversationCreatedAt(conversation);
+    }
+
+    private boolean isHiddenFor(Conversation conversation, UUID userId) {
+        if (conversation.getUserOne().getId().equals(userId)) {
+            return conversation.isHiddenByUserOne();
+        }
+        return conversation.isHiddenByUserTwo();
     }
 
     /** Chặn có hiệu lực hai chiều: một bên chặn thì cả hai đều không gửi được */
@@ -800,17 +1034,95 @@ public class ChatService {
     }
 
     /** @return true nếu là ảnh, false nếu là tài liệu */
-    private boolean validateFile(MultipartFile file) {
+    boolean validateFile(MultipartFile file) {
+        return validateFile(file,
+                normalizeOriginalFilename(file != null ? file.getOriginalFilename() : null));
+    }
+
+    private boolean validateFile(MultipartFile file, String originalName) {
         if (file == null || file.isEmpty()) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new AppException(ErrorCode.INVALID_REQUEST);
         }
-        String contentType = file.getContentType() != null ? file.getContentType() : "";
+        String contentType = file.getContentType() != null
+                ? file.getContentType().split(";", 2)[0].trim().toLowerCase(Locale.ROOT)
+                : "";
         if (ALLOWED_IMAGE_TYPES.contains(contentType)) return true;
         if (ALLOWED_DOC_TYPES.contains(contentType)) return false;
+
+        // Một số picker trên Android/iOS chỉ trả application/octet-stream.
+        // Khi đó suy luận theo đuôi file, nhưng vẫn chỉ nhận đúng danh sách đã
+        // cho phép để không mở rộng kiểu upload ngoài ý muốn.
+        if (contentType.isBlank() || "application/octet-stream".equals(contentType)) {
+            String fileName = originalName.toLowerCase(Locale.ROOT);
+            if (hasExtension(fileName, ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif")) {
+                return true;
+            }
+            if (hasExtension(fileName, ".pdf", ".doc", ".docx", ".ppt", ".pptx")) {
+                return false;
+            }
+        }
         throw new AppException(ErrorCode.INVALID_REQUEST);
+    }
+
+    String normalizeOriginalFilename(String originalFilename) {
+        String normalized = originalFilename == null ? "" : originalFilename
+                .replace('\\', '/')
+                .replaceAll("[\\p{Cntrl}]", "_")
+                .trim();
+        int lastSlash = normalized.lastIndexOf('/');
+        if (lastSlash >= 0) normalized = normalized.substring(lastSlash + 1).trim();
+        if (normalized.isBlank() || ".".equals(normalized) || "..".equals(normalized)) {
+            normalized = "attachment";
+        }
+        if (normalized.length() <= MAX_ORIGINAL_FILENAME_LENGTH) return normalized;
+
+        int dot = normalized.lastIndexOf('.');
+        String extension = dot > 0 && normalized.length() - dot <= 20
+                ? normalized.substring(dot) : "";
+        int baseLength = MAX_ORIGINAL_FILENAME_LENGTH - extension.length();
+        return normalized.substring(0, baseLength) + extension;
+    }
+
+    private String requiredUploadField(Map<String, Object> uploadResult, String field) {
+        Object value = uploadResult != null ? uploadResult.get(field) : null;
+        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
+            log.error("Cloudinary upload response missing required field {}", field);
+            throw new AppException(ErrorCode.UPLOAD_FAILED);
+        }
+        return stringValue;
+    }
+
+    private boolean registerAttachmentRollbackCleanup(String publicId, boolean isImage) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return false;
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    log.warn("Chat attachment transaction rolled back; deleting Cloudinary asset {}",
+                            publicId);
+                    cloudinaryService.deleteFile(publicId, isImage);
+                }
+            }
+        });
+        return true;
+    }
+
+    private void cleanupAttachmentImmediatelyIfNeeded(String publicId, boolean isImage,
+                                                       boolean rollbackCleanupRegistered) {
+        if (publicId != null && !rollbackCleanupRegistered) {
+            cloudinaryService.deleteFile(publicId, isImage);
+        }
+    }
+
+    private boolean hasExtension(String fileName, String... extensions) {
+        for (String extension : extensions) {
+            if (fileName.endsWith(extension)) return true;
+        }
+        return false;
     }
 
     private String snapshotOf(ChatMessage m) {
@@ -930,10 +1242,12 @@ public class ChatService {
 
         Invitation invitation = conv.getInvitation();
         CommunityActivity activity = conv.getCommunityActivity();
-        Appointment activeAppointment = invitation == null ? null : appointmentRepository
-                .findFirstByInvitation_IdAndStatusInOrderByCreatedAtDesc(
-                        invitation.getId(), ACTIVE_APPOINTMENT_STATUSES)
-                .orElse(null);
+        Appointment activeAppointment = sourceTypeOf(conv) == ConversationSourceType.COMMUNITY_ACTIVITY
+                ? null
+                : appointmentRepository.findActiveBetweenUsers(
+                                conv.getUserOne().getId(), conv.getUserTwo().getId(),
+                                ACTIVE_APPOINTMENT_STATUSES, PageRequest.of(0, 1))
+                        .stream().findFirst().orElse(null);
 
         return ConversationResponse.builder()
                 .id(conv.getId())

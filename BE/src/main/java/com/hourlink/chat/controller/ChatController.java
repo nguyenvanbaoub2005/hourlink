@@ -101,7 +101,7 @@ public class ChatController {
     }
 
     @Operation(summary = "Gửi hình ảnh hoặc tài liệu",
-            description = "Tối đa 20MB. Ảnh: jpeg/png/gif/webp. Tài liệu: pdf/doc/docx/ppt/pptx.")
+            description = "Tối đa 20MB. Ảnh: jpeg/png/gif/webp/heic/heif. Tài liệu: pdf/doc/docx/ppt/pptx.")
     @PostMapping(value = "/conversations/{id}/messages/attachment",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<ChatMessageResponse> sendAttachment(

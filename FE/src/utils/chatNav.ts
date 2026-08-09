@@ -23,7 +23,9 @@ export async function openChatWithUser(
   try {
     const res = await ChatApi.getConversations();
     const list: Conversation[] = res.data?.data ?? [];
-    const found = list.find((c) => c.otherUserId === otherUserId);
+    const found = list.find(
+      (c) => c.otherUserId === otherUserId && c.sourceType === 'SKILL_INVITATION'
+    );
 
     if (found) {
       router.push({
@@ -34,6 +36,7 @@ export async function openChatWithUser(
           otherUserId: found.otherUserId,
           otherAvatarUrl: found.otherUserAvatarUrl ?? '',
           skillName: found.skillName ?? '',
+          sourceType: found.sourceType,
         },
       });
       return;
@@ -76,6 +79,7 @@ export async function openChatFromInvitation(
         otherUserId: conv.otherUserId,
         otherAvatarUrl: conv.otherUserAvatarUrl ?? '',
         skillName: conv.skillName ?? '',
+        sourceType: conv.sourceType,
       },
     });
   } catch (e: any) {
