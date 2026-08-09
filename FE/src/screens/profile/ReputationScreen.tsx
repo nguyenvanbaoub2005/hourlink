@@ -5,16 +5,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import RatingApi from '@api/rating';
 import UserApi from '@api/user';
 import { useAuthStore } from '@store/authStore';
 import type { RatingResponse, BadgeResponse, UserResponse } from '@types';
 import Avatar from '@components/Avatar';
+import { getBadgeVisual } from '@utils/badgeVisual';
 
 export default function ReputationScreen() {
   const router = useRouter();
+  const { tab } = useLocalSearchParams<{ tab?: string | string[] }>();
+  const requestedTab = Array.isArray(tab) ? tab[0] : tab;
   const { user } = useAuthStore();
 
   const [profile, setProfile] = useState<UserResponse | null>(null);
@@ -24,7 +27,13 @@ export default function ReputationScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'RATINGS' | 'BADGES'>('RATINGS');
+  const [activeTab, setActiveTab] = useState<'RATINGS' | 'BADGES'>(
+    requestedTab === 'BADGES' ? 'BADGES' : 'RATINGS'
+  );
+
+  React.useEffect(() => {
+    setActiveTab(requestedTab === 'BADGES' ? 'BADGES' : 'RATINGS');
+  }, [requestedTab]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -151,11 +160,12 @@ export default function ReputationScreen() {
     const opacity = status === 'LOCKED' ? 0.5 : 1;
     const bgColor = status === 'LOCKED' ? '#F1F5F9' : (status === 'PASSED' ? '#F8FAFC' : '#FEF3C7');
     const borderColor = status === 'LOCKED' ? 'transparent' : (status === 'PASSED' ? Colors.border : '#FCD34D');
+    const visual = getBadgeVisual(item.code);
 
     return (
       <View style={[styles.badgeCard, { opacity, borderColor, backgroundColor: status === 'EARNED' ? '#fff' : '#FAFAFA' }]}>
         <View style={[styles.badgeIconWrap, { backgroundColor: bgColor }]}>
-          <Ionicons name="ribbon-outline" size={27} color={status === 'LOCKED' ? '#64748B' : '#D97706'} />
+          <Ionicons name={visual.icon} size={27} color={status === 'LOCKED' ? '#64748B' : visual.color} />
         </View>
         <View style={styles.badgeInfo}>
           <Text style={[styles.badgeName, status === 'LOCKED' && { color: Colors.textMuted }]}>

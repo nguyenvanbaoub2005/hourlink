@@ -11,8 +11,9 @@ import { Colors, Spacing, Radius } from '@constants/Colors';
 import SkillApi from '@api/skill';
 import RatingApi from '@api/rating';
 import { openChatWithUser } from '@utils/chatNav';
-import type { RatingResponse } from '@types';
+import type { BadgeResponse, RatingResponse } from '@types';
 import Avatar from '@components/Avatar';
+import { getBadgeVisual } from '@utils/badgeVisual';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -58,6 +59,28 @@ export default function ExploreScreen() {
 
   const [tutorRatings, setTutorRatings] = useState<RatingResponse[]>([]);
   const [loadingRatings, setLoadingRatings] = useState<boolean>(false);
+  const [tutorBadges, setTutorBadges] = useState<BadgeResponse[]>([]);
+
+  useEffect(() => {
+    if (!selectedSkill || !modalVisible) {
+      setTutorBadges([]);
+      return;
+    }
+
+    let cancelled = false;
+    setTutorBadges([]);
+    RatingApi.getUserBadges(selectedSkill.userId)
+      .then((res) => {
+        if (!cancelled) setTutorBadges(res.data?.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setTutorBadges([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSkill?.userId, modalVisible]);
 
   useEffect(() => {
     if (selectedSkill && modalVisible && modalTab === 'reviews') {
@@ -585,6 +608,32 @@ export default function ExploreScreen() {
                         </Text>
                       </View>
 
+                      <View style={styles.tutorBadgeSection}>
+                        <View style={styles.tutorBadgeHeader}>
+                          <Text style={styles.tutorBadgeTitle}>Huy hiệu đã đạt</Text>
+                          <View style={styles.tutorBadgeCount}>
+                            <Text style={styles.tutorBadgeCountText}>{tutorBadges.length}</Text>
+                          </View>
+                        </View>
+                        {tutorBadges.length > 0 ? (
+                          <View style={styles.tutorBadgeGrid}>
+                            {tutorBadges.map((badge) => {
+                              const visual = getBadgeVisual(badge.code);
+                              return (
+                                <View key={badge.id} style={styles.tutorBadgeCard}>
+                                  <View style={[styles.tutorBadgeIcon, { backgroundColor: visual.background }]}>
+                                    <Ionicons name={visual.icon} size={20} color={visual.color} />
+                                  </View>
+                                  <Text style={styles.tutorBadgeName} numberOfLines={2}>{badge.name}</Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        ) : (
+                          <Text style={styles.tutorBadgeEmpty}>Người này chưa đạt huy hiệu nào.</Text>
+                        )}
+                      </View>
+
                       <View style={styles.infoCard}>
                         <View style={styles.infoRowItem}>
                           <Text style={styles.infoRowLabel}>Khu vực</Text>
@@ -887,6 +936,16 @@ const styles = StyleSheet.create({
   tabContent: { paddingBottom: 20 },
   bioCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
   bioText: { fontSize: 14, color: '#334155', lineHeight: 22 },
+  tutorBadgeSection: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
+  tutorBadgeHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
+  tutorBadgeTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
+  tutorBadgeCount: { minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EDE9FE' },
+  tutorBadgeCountText: { fontSize: 11, fontWeight: '700', color: '#7C3AED' },
+  tutorBadgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tutorBadgeCard: { width: '48%', flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: Radius.md, backgroundColor: '#F8FAFC' },
+  tutorBadgeIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  tutorBadgeName: { flex: 1, fontSize: 12, fontWeight: '600', color: '#334155' },
+  tutorBadgeEmpty: { fontSize: 12, color: Colors.textMuted, fontStyle: 'italic' },
   infoCard: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, borderWidth: 1, borderColor: '#F1F5F9' },
   infoRowItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   infoRowLabel: { fontSize: 13, color: '#64748B' },

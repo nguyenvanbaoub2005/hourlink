@@ -1,6 +1,7 @@
 package com.hourlink.user.dto;
 
 import com.hourlink.skill.dto.response.SkillResponse;
+import com.hourlink.rating.dto.response.BadgeResponse;
 import com.hourlink.user.enums.UserType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -43,4 +44,7 @@ public class PublicProfileResponse {
 
     /** Các kỹ năng người này đang chia sẻ (chỉ những kỹ năng đang hiển thị) */
     List<SkillResponse> skills;
+
+    /** Các huy hiệu đã đạt, được phép hiển thị trên hồ sơ công khai. */
+    List<BadgeResponse> badges;
 }
