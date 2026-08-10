@@ -138,4 +138,28 @@ class AdminUserServiceRoleTest {
         verify(walletService).initWallet(created.capture());
         assertEquals("new-user@hourlink.vn", created.getValue().getEmail());
     }
+
+    @Test
+    void resetPassword_rejectsAdminTarget() {
+        UUID adminId = UUID.randomUUID();
+        User admin = User.builder()
+                .fullName("Quản trị viên")
+                .email("admin@hourlink.vn")
+                .passwordHash("old-hash")
+                .userType(UserType.admin)
+                .build();
+        admin.setId(adminId);
+        when(userRepository.findById(adminId)).thenReturn(Optional.of(admin));
+        when(userRoleRepository.existsByUser_IdAndRole_RoleCode(adminId, "ROLE_ADMIN"))
+                .thenReturn(true);
+
+        assertThrows(BadRequestException.class, () -> service.resetPassword(adminId));
+
+        verify(passwordEncoder, never()).encode(org.mockito.ArgumentMatchers.anyString());
+        verify(userRepository, never()).save(admin);
+        verify(emailService, never()).sendResetPasswordEmail(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString());
+    }
 }

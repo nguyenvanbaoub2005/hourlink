@@ -60,6 +60,7 @@ public class AdminReportService {
      */
     public Page<AdminReportResponse> getReports(
             String search,
+            UUID userId,
             AdminReportSource source,
             ReportStatus status,
             ReportTargetType targetType,
@@ -71,9 +72,15 @@ public class AdminReportService {
 
         List<AdminReportResponse> reports = new ArrayList<>();
         reportRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
-                .stream().map(this::toGeneralSummary).forEach(reports::add);
+                .stream()
+                .filter(report -> userId == null || isGeneralReportRelatedToUser(report, userId))
+                .map(this::toGeneralSummary)
+                .forEach(reports::add);
         chatReportRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
-                .stream().map(this::toChatSummary).forEach(reports::add);
+                .stream()
+                .filter(report -> userId == null || isChatReportRelatedToUser(report, userId))
+                .map(this::toChatSummary)
+                .forEach(reports::add);
 
         Instant from = dateFrom == null ? null : dateFrom.atStartOfDay(REPORT_ZONE).toInstant();
         Instant toExclusive = dateTo == null ? null : dateTo.plusDays(1).atStartOfDay(REPORT_ZONE).toInstant();
@@ -94,6 +101,34 @@ public class AdminReportService {
         int start = (int) Math.min(pageable.getOffset(), filtered.size());
         int end = Math.min(start + pageable.getPageSize(), filtered.size());
         return new PageImpl<>(filtered.subList(start, end), pageable, filtered.size());
+    }
+
+    /**
+     * Một báo cáo chung liên quan tới người dùng khi họ là người gửi báo cáo
+     * hoặc là chủ thể thực tế của đối tượng bị báo cáo.
+     */
+    private boolean isGeneralReportRelatedToUser(Report report, UUID userId) {
+        if (userId.equals(report.getReporterId())) {
+            return true;
+        }
+        return switch (report.getTargetType()) {
+            case USER -> userId.equals(report.getTargetId());
+            case MESSAGE -> chatMessageRepository.findById(report.getTargetId())
+                    .map(ChatMessage::getSender)
+                    .map(User::getId)
+                    .filter(userId::equals)
+                    .isPresent();
+            case CONTENT -> communityActivityRepository.findById(report.getTargetId())
+                    .map(CommunityActivity::getOrganizer)
+                    .map(User::getId)
+                    .filter(userId::equals)
+                    .isPresent();
+        };
+    }
+
+    private boolean isChatReportRelatedToUser(ChatReport report, UUID userId) {
+        return userId.equals(userId(report.getReporter()))
+                || userId.equals(userId(report.getReportedUser()));
     }
 
     public AdminReportStatsResponse getStats() {

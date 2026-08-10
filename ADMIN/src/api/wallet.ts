@@ -148,6 +148,11 @@ export const walletApi = {
     return response.data;
   },
 
+  initializeWallet: async (userId: string) => {
+    const response = await api.post<AdminWalletDetail>(`/admin/wallet/wallets/${userId}/initialize`);
+    return response.data;
+  },
+
   getTransactions: async (filters: TransactionFilters) => {
     const response = await api.get<PaginatedResponse<AdminWalletTransaction>>('/admin/wallet/transactions', {
       params: {

@@ -95,6 +95,70 @@ class AdminWalletServiceTest {
     }
 
     @Test
+    void initializeWallet_createsOnlyMissingWalletAndWritesAdminAudit() {
+        User admin = user("Admin", "admin@hourlink.vn");
+        User target = user("Người dùng cũ", "legacy@hourlink.vn");
+        Wallet initialized = wallet(target, 5, 0, 5, 0);
+        when(userRepository.findByEmail(admin.getEmail())).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdForUpdate(target.getId())).thenReturn(Optional.of(target));
+        when(walletRepository.findByUserId(target.getId())).thenReturn(Optional.empty());
+        when(walletService.initWallet(target)).thenReturn(initialized);
+
+        var response = service.initializeWallet(target.getId(), admin.getEmail());
+
+        assertEquals(initialized.getId(), response.walletId());
+        assertEquals(5, response.balance(), 0.0001);
+        verify(walletService).initWallet(target);
+        verify(userAdminActionRepository).save(any(UserAdminAction.class));
+    }
+
+    @Test
+    void initializeWallet_existingWalletIsIdempotent() {
+        User admin = user("Admin", "admin@hourlink.vn");
+        User target = user("Người dùng", "user@hourlink.vn");
+        Wallet existing = wallet(target, 8, 0, 8, 0);
+        when(userRepository.findByEmail(admin.getEmail())).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdForUpdate(target.getId())).thenReturn(Optional.of(target));
+        when(walletRepository.findByUserId(target.getId())).thenReturn(Optional.of(existing));
+
+        var response = service.initializeWallet(target.getId(), admin.getEmail());
+
+        assertEquals(existing.getId(), response.walletId());
+        verify(walletService, never()).initWallet(any());
+        verify(userAdminActionRepository, never()).save(any());
+    }
+
+    @Test
+    void initializeWallet_rejectsDeletedTarget() {
+        User admin = user("Admin", "admin@hourlink.vn");
+        User deleted = user("Đã xóa", "deleted@hourlink.vn");
+        deleted.setDeleted(true);
+        when(userRepository.findByEmail(admin.getEmail())).thenReturn(Optional.of(admin));
+        when(userRepository.findByIdForUpdate(deleted.getId())).thenReturn(Optional.of(deleted));
+
+        AppException deletedError = assertThrows(AppException.class,
+                () -> service.initializeWallet(deleted.getId(), admin.getEmail()));
+
+        assertTrue(deletedError.getMessage().contains("vô hiệu hóa"));
+        verify(walletService, never()).initWallet(any());
+    }
+
+    @Test
+    void initializeWallet_rejectsAdminTarget() {
+        User actor = user("Admin actor", "actor@hourlink.vn");
+        User target = user("Admin target", "target@hourlink.vn");
+        when(userRepository.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));
+        when(userRepository.findByIdForUpdate(target.getId())).thenReturn(Optional.of(target));
+        when(userRoleRepository.existsByUser_IdAndRole_RoleCode(target.getId(), "ROLE_ADMIN"))
+                .thenReturn(true);
+
+        assertThrows(AppException.class,
+                () -> service.initializeWallet(target.getId(), actor.getEmail()));
+
+        verify(walletService, never()).initWallet(any());
+    }
+
+    @Test
     void adjust_negativeAmountCannotMakeAvailableBalanceNegative() {
         User admin = user("Admin", "admin@hourlink.vn");
         User target = user("Người dùng", "user@hourlink.vn");

@@ -88,7 +88,11 @@ export default function CommunityPage() {
   });
 
   const refresh = async () => {
-    await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+    const results = await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+    if (results.some((result) => result.isError)) {
+      toast.error('Không thể cập nhật đầy đủ dữ liệu cộng đồng');
+      return;
+    }
     toast.success('Đã cập nhật dữ liệu cộng đồng');
   };
   const clearFilters = () => {

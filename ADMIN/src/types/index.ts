@@ -68,11 +68,12 @@ export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   totalAppointments: number;
+  activeAppointments: number;
   completedToday: number;
   totalTimeCredits: number;
   pendingReports: number;
-  openDisputes: number;
   lockedAccounts: number;
+  generatedAt: string;
 }
 
 export interface ChartDataPoint {

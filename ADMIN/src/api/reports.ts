@@ -55,6 +55,7 @@ export interface ReportStats {
 export interface ReportFilters {
   page: number;
   size: number;
+  userId?: string;
   search?: string;
   status?: ReportStatus | '';
   targetType?: ReportTargetType | '';
@@ -86,6 +87,12 @@ export const reportsApi = {
     });
     return response.data;
   },
+
+  getReportsForUser: async (
+    userId: string,
+    page = 0,
+    size = 10,
+  ): Promise<PaginatedResponse<AdminReport>> => reportsApi.getReports({ page, size, userId }),
 
   getStats: async () => {
     const response = await api.get<ReportStats>('/admin/reports/stats');

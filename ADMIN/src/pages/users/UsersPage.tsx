@@ -6,7 +6,7 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table';
-import { Search, Filter, ShieldAlert, BadgeCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Plus, Edit, Eye, KeyRound, Trash2 } from 'lucide-react';
+import { Search, Filter, ShieldAlert, BadgeCheck, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, RotateCcw, Plus, Edit, Eye, KeyRound, UserX } from 'lucide-react';
 import UserFormModal from './components/UserFormModal';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
@@ -19,6 +19,7 @@ export default function UsersPage() {
   
   const [data, setData] = useState<AdminUserResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   
   const [page, setPage] = useState(0);
   const [size] = useState(10);
@@ -42,6 +43,7 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const response = await usersApi.getUsers(
         page, size, 
@@ -53,6 +55,10 @@ export default function UsersPage() {
       setTotalElements(response.totalElements);
     } catch (error) {
       console.error("Failed to fetch users:", error);
+      setData([]);
+      setTotalPages(0);
+      setTotalElements(0);
+      setFetchError('Không thể tải danh sách người dùng. Vui lòng kiểm tra kết nối Backend rồi thử lại.');
     } finally {
       setLoading(false);
     }
@@ -137,6 +143,11 @@ export default function UsersPage() {
                   <ShieldAlert size={13}/> Đã bị khoá
                 </span>
               )}
+              {user.deleted && (
+                <span className="inline-flex items-center gap-1 text-[12px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                  <UserX size={13}/> Đã vô hiệu hóa
+                </span>
+              )}
             </div>
           );
         }
@@ -188,10 +199,12 @@ export default function UsersPage() {
                   e.stopPropagation();
                   setDeleteUserTarget(user);
                 }}
-                className="p-1.5 rounded-lg hover:bg-red-100 text-text-muted hover:text-danger transition"
-                title={`Xóa người dùng ${user.fullName}`}
+                className="p-1.5 rounded-lg hover:bg-red-100 text-text-muted hover:text-danger transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-muted"
+                title={`Vô hiệu hóa tài khoản ${user.fullName}`}
+                disabled={user.deleted}
+                aria-disabled={user.deleted}
               >
-                <Trash2 size={15} />
+                <UserX size={15} />
               </button>
             </div>
           );
@@ -362,6 +375,19 @@ export default function UsersPage() {
                 <tr>
                   <td colSpan={columns.length} className="text-center p-8 text-text-muted">Đang tải dữ liệu...</td>
                 </tr>
+              ) : fetchError ? (
+                <tr>
+                  <td colSpan={columns.length} className="p-8 text-center">
+                    <p className="font-medium text-danger">{fetchError}</p>
+                    <button
+                      type="button"
+                      onClick={fetchUsers}
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold text-text hover:bg-surface-2"
+                    >
+                      <RotateCcw size={15} /> Thử lại
+                    </button>
+                  </td>
+                </tr>
               ) : table.getRowModel().rows.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length} className="text-center p-8 text-text-muted">Không tìm thấy kết quả nào.</td>
@@ -460,9 +486,9 @@ export default function UsersPage() {
 
       <Modal
         isOpen={deleteUserTarget !== null}
-        title="Xác nhận xóa người dùng"
-        message={`Bạn có chắc chắn muốn xóa tài khoản người dùng "${deleteUserTarget?.fullName}"?`}
-        confirmText="Xóa tài khoản"
+        title="Xác nhận vô hiệu hóa tài khoản"
+        message={`Tài khoản "${deleteUserTarget?.fullName}" sẽ được đánh dấu ngừng hoạt động (soft delete), không bị xóa khỏi dữ liệu hệ thống. Bạn có chắc chắn không?`}
+        confirmText="Vô hiệu hóa"
         cancelText="Hủy"
         type="danger"
         onCancel={() => setDeleteUserTarget(null)}
@@ -472,10 +498,10 @@ export default function UsersPage() {
           setDeleteUserTarget(null);
           try {
             await usersApi.performAction(user.id, 'SOFT_DELETE');
-            toast.success(`Đã xóa người dùng ${user.fullName} thành công!`);
+            toast.success(`Đã vô hiệu hóa tài khoản ${user.fullName} thành công!`);
             fetchUsers();
           } catch (err: any) {
-            toast.error(err.response?.data?.message || 'Không thể xóa người dùng');
+            toast.error(err.response?.data?.message || 'Không thể vô hiệu hóa tài khoản');
           }
         }}
       />

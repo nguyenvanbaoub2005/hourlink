@@ -157,6 +157,42 @@ public class AdminWalletService {
         return toWalletResponse(wallet);
     }
 
+    /**
+     * Khởi tạo một ví còn thiếu bằng thao tác Admin rõ ràng. Không tự động
+     * backfill khi khởi động hoặc khi đọc dữ liệu để tránh thay đổi tài chính
+     * hàng loạt ngoài ý muốn.
+     */
+    @Transactional
+    public AdminWalletResponse initializeWallet(UUID userId, String adminEmail) {
+        if (adminEmail == null || adminEmail.isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        User target = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        if (target.isDeleted()) {
+            throw invalid("Không thể khởi tạo ví cho tài khoản đã bị vô hiệu hóa");
+        }
+        if (userRoleRepository.existsByUser_IdAndRole_RoleCode(target.getId(), ROLE_ADMIN)) {
+            throw invalid("Không thể khởi tạo ví cho tài khoản quản trị viên");
+        }
+
+        var existing = walletRepository.findByUserId(target.getId());
+        if (existing.isPresent()) {
+            return toWalletResponse(existing.get());
+        }
+
+        Wallet wallet = walletService.initWallet(target);
+        userAdminActionRepository.save(UserAdminAction.builder()
+                .user(target)
+                .admin(admin)
+                .actionType("WALLET_INITIALIZED")
+                .reason("Khởi tạo ví Time Credit còn thiếu với 5 TC ban đầu")
+                .build());
+        return toWalletResponse(wallet);
+    }
+
     public Page<AdminWalletTransactionResponse> getTransactions(
             String search,
             UUID userId,

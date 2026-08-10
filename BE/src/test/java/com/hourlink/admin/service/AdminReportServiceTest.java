@@ -15,6 +15,7 @@ import com.hourlink.chat.enums.MessageType;
 import com.hourlink.chat.repository.ChatMessageRepository;
 import com.hourlink.chat.repository.ChatReportRepository;
 import com.hourlink.common.exception.AppException;
+import com.hourlink.community.entity.CommunityActivity;
 import com.hourlink.community.repository.CommunityActivityRepository;
 import com.hourlink.report.entity.Report;
 import com.hourlink.report.enums.ReportReason;
@@ -36,6 +37,7 @@ import org.springframework.data.domain.Sort;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -104,7 +106,7 @@ class AdminReportServiceTest {
         when(chatReportRepository.findAll(any(Sort.class))).thenReturn(List.of(chatReport));
 
         Page<AdminReportResponse> result = service.getReports(
-                null, null, null, null, "SCAM", null, null,
+                null, null, null, null, null, "SCAM", null, null,
                 PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
 
         assertEquals(1, result.getTotalElements());
@@ -114,6 +116,93 @@ class AdminReportServiceTest {
         assertEquals("SCAM", item.reason());
         assertEquals(ReportStatus.REVIEWING, item.status());
         assertEquals("Người báo cáo", item.reporterName());
+    }
+
+    @Test
+    void getReports_userFilterIncludesGeneralReportsSentByOrTargetingUserDirectly() {
+        User subject = user("Người cần xem", "subject@test.vn");
+        User other = user("Người khác", "other@test.vn");
+        Report sentBySubject = generalReport(subject.getId(), ReportStatus.PENDING, ReportTargetType.USER);
+        sentBySubject.setTargetId(other.getId());
+        Report targetingSubject = generalReport(other.getId(), ReportStatus.REVIEWING, ReportTargetType.USER);
+        targetingSubject.setTargetId(subject.getId());
+        Report unrelated = generalReport(other.getId(), ReportStatus.PENDING, ReportTargetType.USER);
+
+        when(reportRepository.findAll(any(Sort.class)))
+                .thenReturn(List.of(sentBySubject, targetingSubject, unrelated));
+        when(chatReportRepository.findAll(any(Sort.class))).thenReturn(List.of());
+        when(userRepository.findById(subject.getId())).thenReturn(Optional.of(subject));
+        when(userRepository.findById(other.getId())).thenReturn(Optional.of(other));
+
+        Page<AdminReportResponse> result = service.getReports(
+                null, subject.getId(), null, null, null, null, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+
+        assertEquals(2, result.getTotalElements());
+        assertEquals(Set.of(sentBySubject.getId(), targetingSubject.getId()),
+                result.getContent().stream().map(AdminReportResponse::id).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void getReports_userFilterResolvesMessageSenderAndContentOrganizer() {
+        User subject = user("Người cần xem", "subject@test.vn");
+        User other = user("Người khác", "other@test.vn");
+
+        ChatMessage subjectMessage = ChatMessage.builder()
+                .sender(subject).type(MessageType.TEXT).content("Nội dung bị báo cáo").build();
+        subjectMessage.setId(UUID.randomUUID());
+        ChatMessage otherMessage = ChatMessage.builder()
+                .sender(other).type(MessageType.TEXT).content("Không liên quan").build();
+        otherMessage.setId(UUID.randomUUID());
+        CommunityActivity subjectActivity = CommunityActivity.builder()
+                .organizer(subject).title("Hoạt động của subject").description("Mô tả").build();
+        subjectActivity.setId(UUID.randomUUID());
+
+        Report messageReport = generalReport(other.getId(), ReportStatus.PENDING, ReportTargetType.MESSAGE);
+        messageReport.setTargetId(subjectMessage.getId());
+        Report contentReport = generalReport(other.getId(), ReportStatus.PENDING, ReportTargetType.CONTENT);
+        contentReport.setTargetId(subjectActivity.getId());
+        Report unrelated = generalReport(other.getId(), ReportStatus.PENDING, ReportTargetType.MESSAGE);
+        unrelated.setTargetId(otherMessage.getId());
+
+        when(reportRepository.findAll(any(Sort.class)))
+                .thenReturn(List.of(messageReport, contentReport, unrelated));
+        when(chatReportRepository.findAll(any(Sort.class))).thenReturn(List.of());
+        when(chatMessageRepository.findById(subjectMessage.getId())).thenReturn(Optional.of(subjectMessage));
+        when(chatMessageRepository.findById(otherMessage.getId())).thenReturn(Optional.of(otherMessage));
+        when(communityActivityRepository.findById(subjectActivity.getId()))
+                .thenReturn(Optional.of(subjectActivity));
+        when(userRepository.findById(other.getId())).thenReturn(Optional.of(other));
+
+        Page<AdminReportResponse> result = service.getReports(
+                null, subject.getId(), null, null, null, null, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+
+        assertEquals(2, result.getTotalElements());
+        assertEquals(Set.of(messageReport.getId(), contentReport.getId()),
+                result.getContent().stream().map(AdminReportResponse::id).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void getReports_userFilterIncludesChatReportsAsReporterOrReportedUser() {
+        User subject = user("Người cần xem", "subject@test.vn");
+        User other = user("Người khác", "other@test.vn");
+        User third = user("Người thứ ba", "third@test.vn");
+        ChatReport sentBySubject = chatReport(subject, other);
+        ChatReport targetingSubject = chatReport(other, subject);
+        ChatReport unrelated = chatReport(other, third);
+
+        when(reportRepository.findAll(any(Sort.class))).thenReturn(List.of());
+        when(chatReportRepository.findAll(any(Sort.class)))
+                .thenReturn(List.of(sentBySubject, targetingSubject, unrelated));
+
+        Page<AdminReportResponse> result = service.getReports(
+                null, subject.getId(), null, null, null, null, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+
+        assertEquals(2, result.getTotalElements());
+        assertEquals(Set.of(sentBySubject.getId(), targetingSubject.getId()),
+                result.getContent().stream().map(AdminReportResponse::id).collect(java.util.stream.Collectors.toSet()));
     }
 
     @Test
@@ -247,6 +336,25 @@ class AdminReportServiceTest {
                 .build();
         user.setId(UUID.randomUUID());
         return user;
+    }
+
+    private ChatReport chatReport(User reporter, User reportedUser) {
+        ChatMessage message = ChatMessage.builder()
+                .sender(reportedUser)
+                .type(MessageType.TEXT)
+                .content("Tin nhắn")
+                .build();
+        message.setId(UUID.randomUUID());
+        ChatReport report = ChatReport.builder()
+                .reporter(reporter)
+                .reportedUser(reportedUser)
+                .message(message)
+                .reason(ChatReportReason.SPAM)
+                .status(ChatReportStatus.PENDING)
+                .build();
+        report.setId(UUID.randomUUID());
+        report.setCreatedAt(Instant.parse("2026-08-09T12:00:00Z"));
+        return report;
     }
 
     private AdminReportStatusUpdateRequest update(
