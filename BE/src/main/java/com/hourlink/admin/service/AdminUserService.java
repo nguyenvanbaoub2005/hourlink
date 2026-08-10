@@ -21,11 +21,13 @@ import com.hourlink.user.entity.Role;
 import com.hourlink.user.entity.UserRole;
 import com.hourlink.user.repository.RoleRepository;
 import com.hourlink.user.repository.UserRoleRepository;
+import com.hourlink.wallet.service.WalletService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.hourlink.appointment.enums.AppointmentStatus;
 import com.hourlink.helprequest.enums.RequestStatus;
 import com.hourlink.common.exception.BadRequestException;
 import java.util.Arrays;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -46,6 +48,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminUserService {
 
+    private static final String ROLE_USER = "ROLE_USER";
+    private static final String ROLE_ORGANIZATION = "ROLE_ORGANIZATION";
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final Set<String> BUSINESS_ROLES = Set.of(ROLE_USER, ROLE_ORGANIZATION);
+
     private final UserRepository userRepository;
     private final UserAdminActionRepository userAdminActionRepository;
     private final AppointmentRepository appointmentRepository;
@@ -55,6 +62,7 @@ public class AdminUserService {
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
     private final CloudinaryService cloudinaryService;
+    private final WalletService walletService;
 
     @Transactional(readOnly = true)
     public Page<AdminUserResponse> getUsers(String name, String email, String phone, String userType, Boolean locked, Boolean verified, Pageable pageable) {
@@ -148,6 +156,10 @@ public class AdminUserService {
     public void performAction(UUID id, UserActionRequest request, String adminEmail) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (userRoleRepository.existsByUser_IdAndRole_RoleCode(id, ROLE_ADMIN)) {
+            throw new BadRequestException("Không thể cảnh cáo, khóa hoặc xóa tài khoản quản trị viên");
+        }
         
         User admin = userRepository.findByEmail(adminEmail)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
@@ -227,20 +239,18 @@ public class AdminUserService {
 
         user = userRepository.save(user);
 
-        Role userRole = roleRepository.findByRoleCode("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("Role ROLE_USER not found"));
-
-        UserRole mapping = UserRole.builder()
-                .user(user)
-                .role(userRole)
-                .build();
-        userRoleRepository.save(mapping);
+        synchronizeBusinessRole(user, request.getUserType());
+        walletService.initWallet(user);
     }
 
     @Transactional
     public void updateUser(UUID id, AdminUpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (userRoleRepository.existsByUser_IdAndRole_RoleCode(id, ROLE_ADMIN)) {
+            throw new BadRequestException("Không thể thay đổi loại tài khoản quản trị viên tại màn người dùng");
+        }
 
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
             if (userRepository.existsByEmail(request.getEmail())) {
@@ -267,7 +277,8 @@ public class AdminUserService {
             user.setVerified(request.getIsVerified());
         }
 
-        userRepository.save(user);
+        user = userRepository.save(user);
+        synchronizeBusinessRole(user, request.getUserType());
     }
 
     public String uploadAvatar(MultipartFile file) {
@@ -318,6 +329,21 @@ public class AdminUserService {
         StringBuilder result = new StringBuilder();
         for (char c : chars) result.append(c);
         return result.toString();
+    }
+
+    /** Đồng bộ loại tài khoản nghiệp vụ với authority mà Backend thực sự kiểm tra. */
+    private void synchronizeBusinessRole(User user, com.hourlink.user.enums.UserType userType) {
+        String targetRoleCode = userType == com.hourlink.user.enums.UserType.organization
+                ? ROLE_ORGANIZATION
+                : ROLE_USER;
+        Role targetRole = roleRepository.findByRoleCode(targetRoleCode)
+                .orElseThrow(() -> new BadRequestException("Hệ thống chưa khởi tạo quyền " + targetRoleCode));
+
+        userRoleRepository.deleteByUserIdAndRoleCodes(user.getId(), BUSINESS_ROLES);
+        userRoleRepository.save(UserRole.builder()
+                .user(user)
+                .role(targetRole)
+                .build());
     }
 
     private AdminUserResponse mapToResponse(User user) {

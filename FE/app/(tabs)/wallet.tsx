@@ -29,15 +29,17 @@ const TX_CONFIG: Record<WalletTxType, {
   ADJUSTMENT: { label: 'Điều chỉnh',     icon: 'construct',          color: '#64748B', bg: '#F1F5F9', sign: '+' },
 };
 
-const isPositive = (type: WalletTxType) =>
-  ['EARN', 'RELEASE', 'REFUND', 'BONUS', 'ADJUSTMENT'].includes(type);
+const isPositive = (type: WalletTxType, amount: number) =>
+  type === 'ADJUSTMENT'
+    ? amount >= 0
+    : ['EARN', 'RELEASE', 'REFUND', 'BONUS'].includes(type);
 
 // ─── Component giao dịch đơn lẻ ──────────────────────────────
 
 function TransactionItem({ item }: { item: WalletTransaction }) {
   const cfg = TX_CONFIG[item.type] ?? TX_CONFIG.ADJUSTMENT;
-  const positive = isPositive(item.type);
-  const amountText = `${positive ? '+' : item.type === 'HOLD' ? '' : '-'}${item.amount.toFixed(1)} TC`;
+  const positive = isPositive(item.type, item.amount);
+  const amountText = `${positive ? '+' : item.type === 'HOLD' ? '' : '-'}${Math.abs(item.amount).toFixed(1)} TC`;
   const date = new Date(item.createdAt).toLocaleDateString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });

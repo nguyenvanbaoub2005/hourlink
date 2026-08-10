@@ -17,8 +17,10 @@ const TX_CONFIG: Record<WalletTxType, { label: string; icon: any; color: string;
   ADJUSTMENT: { label: 'Điều chỉnh',  icon: 'construct',          color: '#64748B', bg: '#F1F5F9' },
 };
 
-const isPositive = (type: WalletTxType) =>
-  ['EARN', 'RELEASE', 'REFUND', 'BONUS', 'ADJUSTMENT'].includes(type);
+const isPositive = (type: WalletTxType, amount: number) =>
+  type === 'ADJUSTMENT'
+    ? amount >= 0
+    : ['EARN', 'RELEASE', 'REFUND', 'BONUS'].includes(type);
 
 /**
  * WalletDetailScreen — Chi tiết một giao dịch Time Credit.
@@ -49,8 +51,8 @@ export default function WalletDetailScreen() {
   }
 
   const cfg = TX_CONFIG[tx.type] ?? TX_CONFIG.ADJUSTMENT;
-  const positive = isPositive(tx.type);
-  const amountText = `${positive ? '+' : tx.type === 'HOLD' ? '' : '-'}${tx.amount.toFixed(1)} TC`;
+  const positive = isPositive(tx.type, tx.amount);
+  const amountText = `${positive ? '+' : tx.type === 'HOLD' ? '' : '-'}${Math.abs(tx.amount).toFixed(1)} TC`;
   const date = new Date(tx.createdAt).toLocaleDateString('vi-VN', {
     weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',

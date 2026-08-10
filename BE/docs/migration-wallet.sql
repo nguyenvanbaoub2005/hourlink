@@ -42,13 +42,20 @@ ALTER TABLE `wallet_transaction`
   ) COLLATE utf8mb4_unicode_ci NOT NULL,
   ADD COLUMN IF NOT EXISTS `amount`         double         NOT NULL,
   ADD COLUMN IF NOT EXISTS `balance_after`  double         NOT NULL,
-  ADD COLUMN IF NOT EXISTS `description`    text           COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+  ADD COLUMN IF NOT EXISTS `description`    text           COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `reference_type` varchar(50)    COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `reference_id`   binary(16)     DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `idempotency_key` varchar(150)  COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+
+-- ADJUSTMENT lưu amount có dấu: dương là cộng, âm là trừ. Các type khác vẫn dương.
 
 -- Indexes
 ALTER TABLE `wallet_transaction`
   ADD INDEX IF NOT EXISTS `idx_wallet_tx_wallet`      (`wallet_id`),
   ADD INDEX IF NOT EXISTS `idx_wallet_tx_type`        (`type`),
-  ADD INDEX IF NOT EXISTS `idx_wallet_tx_appointment` (`appointment_id`);
+  ADD INDEX IF NOT EXISTS `idx_wallet_tx_appointment` (`appointment_id`),
+  ADD INDEX IF NOT EXISTS `idx_wallet_tx_reference`   (`reference_type`, `reference_id`),
+  ADD UNIQUE INDEX IF NOT EXISTS `uq_wallet_tx_idempotency` (`idempotency_key`);
 
 -- FK đến wallet và appointment
 ALTER TABLE `wallet_transaction`

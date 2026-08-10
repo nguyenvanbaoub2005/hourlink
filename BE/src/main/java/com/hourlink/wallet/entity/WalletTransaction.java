@@ -48,10 +48,12 @@ public class WalletTransaction extends BaseEntity {
     WalletTxType type;
 
     /**
-     * Số lượng Time Credit của giao dịch này (luôn dương).
+     * Số lượng Time Credit của giao dịch này.
+     * Mọi loại giao dịch cũ lưu số dương; riêng ADJUSTMENT lưu giá trị có dấu để
+     * audit chính xác chiều điều chỉnh thủ công.
      * Chiều dương/âm được xác định bởi type:
      *   EARN, RELEASE, REFUND, BONUS, ADJUSTMENT(+) → cộng vào balance
-     *   SPEND, HOLD, ADJUSTMENT(-)                  → trừ khỏi balance
+     *   SPEND, HOLD, ADJUSTMENT(-)                  → trừ khỏi balance.
      */
     @Column(name = "amount", nullable = false)
     Double amount;

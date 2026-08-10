@@ -25,7 +25,7 @@ public class UserAdminAction extends BaseEntity {
     User admin; // The admin who performed the action
 
     @Column(name = "action_type", nullable = false, length = 50)
-    String actionType; // "WARN", "LOCK", "UNLOCK", "SOFT_DELETE"
+    String actionType; // "WARN", "LOCK", "UNLOCK", "SOFT_DELETE", "WALLET_ADJUSTMENT"
 
     @Column(name = "reason", columnDefinition = "TEXT")
     String reason;

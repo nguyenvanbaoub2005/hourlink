@@ -174,6 +174,7 @@ CREATE TABLE `chat_report` (
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
+  `admin_note` text COLLATE utf8mb4_unicode_ci,
   `message_snapshot` text COLLATE utf8mb4_unicode_ci,
   `reason` enum('OFFENSIVE','HARASSMENT','SPAM','SCAM','OUTSIDE_PAYMENT','ASK_CREDENTIALS','OTHER') COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` enum('PENDING','REVIEWED','DISMISSED','ACTIONED') COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -579,7 +580,14 @@ CREATE TABLE `wallet` (
   `id` binary(16) NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `user_id` binary(16) NOT NULL,
+  `balance` double NOT NULL DEFAULT '5',
+  `held_amount` double NOT NULL DEFAULT '0',
+  `total_earned` double NOT NULL DEFAULT '5',
+  `total_used` double NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_wallet_user` (`user_id`),
+  CONSTRAINT `fk_wallet_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- --------------------------------------------------------
 
@@ -592,7 +600,23 @@ CREATE TABLE `wallet_transaction` (
   `id` binary(16) NOT NULL,
   `created_at` datetime(6) NOT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  `wallet_id` binary(16) NOT NULL,
+  `appointment_id` binary(16) DEFAULT NULL,
+  `type` enum('EARN','SPEND','HOLD','RELEASE','REFUND','BONUS','ADJUSTMENT') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` double NOT NULL COMMENT 'ADJUSTMENT uses signed amount; other types use a positive amount',
+  `balance_after` double NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `reference_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reference_id` binary(16) DEFAULT NULL,
+  `idempotency_key` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_wallet_tx_idempotency` (`idempotency_key`),
+  KEY `idx_wallet_tx_wallet` (`wallet_id`),
+  KEY `idx_wallet_tx_type` (`type`),
+  KEY `idx_wallet_tx_appointment` (`appointment_id`),
+  KEY `idx_wallet_tx_reference` (`reference_type`,`reference_id`),
+  CONSTRAINT `fk_wallet_tx_wallet` FOREIGN KEY (`wallet_id`) REFERENCES `wallet` (`id`),
+  CONSTRAINT `fk_wallet_tx_appointment` FOREIGN KEY (`appointment_id`) REFERENCES `appointment` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 

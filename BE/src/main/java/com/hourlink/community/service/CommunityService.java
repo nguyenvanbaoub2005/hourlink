@@ -183,14 +183,16 @@ public class CommunityService {
 
         List<ActivityParticipant> waiting = participantRepo.findByActivityIdAndStatus(
                 activityId, ActivityParticipantStatus.REGISTERED);
+        boolean cancelledByAdmin = isAdmin();
+        String cancelledBy = cancelledByAdmin ? "quản trị viên" : "tổ chức";
         for (ActivityParticipant participant : waiting) {
             participant.setStatus(ActivityParticipantStatus.CANCELLED);
-            participant.setConfirmNote("Hoạt động đã bị tổ chức hủy");
+            participant.setConfirmNote("Hoạt động đã bị " + cancelledBy + " hủy");
             participantRepo.save(participant);
             notificationService.createNotification(
                     participant.getUser(), NotificationType.COMMUNITY_ACTIVITY_CANCELLED,
                     "Hoạt động cộng đồng đã bị hủy",
-                    String.format("Hoạt động %s đã bị tổ chức hủy", activity.getTitle()),
+                    String.format("Hoạt động %s đã bị %s hủy", activity.getTitle(), cancelledBy),
                     activity.getId());
         }
 

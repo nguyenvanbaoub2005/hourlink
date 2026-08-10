@@ -58,6 +58,10 @@ export function notificationTarget(
       : { pathname: '/community/registrations' };
   }
 
+  if (type === 'WALLET_ADJUSTED') {
+    return { pathname: '/(tabs)/wallet' };
+  }
+
   // Loại chưa hỗ trợ điều hướng riêng → về danh sách thông báo
   return { pathname: '/notifications' };
 }

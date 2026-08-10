@@ -61,12 +61,11 @@ public class JwtFilter extends OncePerRequestFilter {
             }
 
             String email = signedJWT.getJWTClaimsSet().getSubject();
-            String scope = signedJWT.getJWTClaimsSet().getStringClaim("scope");
-
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 userRepository.findByEmail(email).ifPresentOrElse(user -> {
+                    String currentScope = authService.resolveCurrentScope(user);
                     var authorities = AuthorityUtils.commaSeparatedStringToAuthorityList(
-                            scope != null ? scope.replace(" ", ",") : "");
+                            currentScope.replace(" ", ","));
                     var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     logger.info("Authenticated user: " + email);

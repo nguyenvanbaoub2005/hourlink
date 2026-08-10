@@ -20,7 +20,7 @@ public class WalletTransactionResponse {
     /** Loại giao dịch */
     WalletTxType type;
 
-    /** Số lượng Time Credit (luôn dương; chiều xác định bởi type) */
+    /** Số lượng Time Credit; riêng ADJUSTMENT có thể âm để thể hiện chiều điều chỉnh. */
     Double amount;
 
     /** Số dư ví ngay sau giao dịch này (snapshot lịch sử) */

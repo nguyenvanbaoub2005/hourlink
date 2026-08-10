@@ -14,7 +14,8 @@ import lombok.experimental.FieldDefaults;
  * - totalEarned : Tổng Time Credit đã kiếm được từ trước tới nay.
  * - totalUsed   : Tổng Time Credit đã sử dụng từ trước tới nay.
  * <p>
- * Invariant: balance + heldAmount = totalEarned - totalUsed + 5 (credit khởi đầu).
+ * Invariant: balance + heldAmount = totalEarned - totalUsed.
+ * Credit khởi đầu đã được tính trong {@code totalEarned}, nên không cộng thêm lần nữa.
  */
 @Entity
 @Table(name = "wallet", indexes = {

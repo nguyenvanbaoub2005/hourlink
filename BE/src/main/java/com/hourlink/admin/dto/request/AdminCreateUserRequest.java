@@ -3,6 +3,7 @@ package com.hourlink.admin.dto.request;
 import com.hourlink.user.enums.UserType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -24,6 +25,7 @@ public class AdminCreateUserRequest {
     @Size(max = 20, message = "Số điện thoại tối đa 20 ký tự")
     private String phone;
 
+    @NotNull(message = "Loại tài khoản không được để trống")
     private UserType userType = UserType.individual;
 
     @Size(max = 200)

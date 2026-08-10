@@ -402,7 +402,7 @@ export interface Wallet {
 export interface WalletTransaction {
   id: string;
   type: WalletTxType;
-  /** Số lượng Time Credit (luôn dương) */
+  /** Số lượng Time Credit; riêng ADJUSTMENT có thể âm khi Admin trừ ví */
   amount: number;
   /** Số dư ví ngay sau giao dịch */
   balanceAfter: number;

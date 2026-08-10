@@ -1,6 +1,7 @@
 package com.hourlink.report.repository;
 
 import com.hourlink.report.entity.Report;
+import com.hourlink.report.enums.ReportStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +15,6 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
 
     boolean existsByReporterIdAndTargetIdAndTargetType(UUID reporterId, UUID targetId,
                                                         com.hourlink.report.enums.ReportTargetType targetType);
+
+    long countByStatus(ReportStatus status);
 }

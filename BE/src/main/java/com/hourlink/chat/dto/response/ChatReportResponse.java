@@ -25,6 +25,7 @@ public class ChatReportResponse {
     String description;
     String evidence;
     ChatReportStatus status;
+    String adminNote;
 
     Instant createdAt;
 }

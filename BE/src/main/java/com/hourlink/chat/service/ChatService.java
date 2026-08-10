@@ -806,6 +806,7 @@ public class ChatService {
                 .description(report.getDescription())
                 .evidence(report.getMessageSnapshot())
                 .status(report.getStatus())
+                .adminNote(report.getAdminNote())
                 .createdAt(report.getCreatedAt())
                 .build();
     }

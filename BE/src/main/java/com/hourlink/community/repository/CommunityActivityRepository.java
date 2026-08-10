@@ -6,6 +6,7 @@ import com.hourlink.community.enums.ActivityStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,7 +18,9 @@ import java.util.UUID;
 import java.time.Instant;
 import java.util.Collection;
 
-public interface CommunityActivityRepository extends JpaRepository<CommunityActivity, UUID> {
+public interface CommunityActivityRepository extends JpaRepository<CommunityActivity, UUID>, JpaSpecificationExecutor<CommunityActivity> {
+
+    long countByStatus(ActivityStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM CommunityActivity a WHERE a.id = :id")

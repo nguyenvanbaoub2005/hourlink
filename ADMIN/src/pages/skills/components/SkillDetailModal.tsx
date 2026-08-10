@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   X, User, BookOpen, MapPin, Clock, Monitor, FileText, Image as ImageIcon,
-  Download, AlertTriangle, EyeOff, Eye, Trash2, Star, CheckCircle, Plus, Loader2, ExternalLink, ZoomIn,
+  Download, AlertTriangle, EyeOff, Eye, Trash2, Star, CheckCircle, Plus, Loader2, ExternalLink,
 } from 'lucide-react';
 import type { AdminSkillDetailResponse, SkillAttachment } from '@/api/skills';
 import { skillsApi } from '@/api/skills';

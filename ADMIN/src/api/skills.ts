@@ -13,6 +13,7 @@ export interface AdminSkillResponse {
   level: SkillLevel | null;
   format: SkillFormat | null;
   duration: number | null;
+  region: string | null;
   categoryName: string | null;
   userId: string;
   userFullName: string;

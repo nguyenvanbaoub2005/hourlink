@@ -55,6 +55,9 @@ public enum NotificationType {
     /** Người dùng được xác nhận tham gia hoạt động và cộng Time Credit */
     COMMUNITY_CREDIT_AWARDED,
 
+    /** Quản trị viên điều chỉnh số dư Time Credit của người dùng */
+    WALLET_ADJUSTED,
+
     /** Tổ chức đánh dấu người đăng ký vắng mặt */
     COMMUNITY_PARTICIPANT_ABSENT,
 

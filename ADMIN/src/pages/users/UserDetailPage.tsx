@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
   ArrowLeft, ShieldAlert, BadgeCheck, MapPin, Briefcase, 
-  Mail, Phone, AlertTriangle, Lock, Unlock, Save, Edit, X, KeyRound
+  Mail, Phone, AlertTriangle, Lock, Unlock, Save, Edit, X, KeyRound,
+  Wallet as WalletIcon, Coins, LockKeyhole, History
 } from 'lucide-react';
 import { usersApi, type AdminUserDetailResponse } from '@/api/users';
+import { walletApi } from '@/api/wallet';
 import Modal from '@/components/ui/Modal';
 import UserFormModal from './components/UserFormModal';
 import toast from 'react-hot-toast';
@@ -23,6 +26,18 @@ export default function UserDetailPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  const walletQuery = useQuery({
+    queryKey: ['admin-user-wallet', id],
+    queryFn: () => walletApi.getWalletDetail(id!),
+    enabled: activeTab === 'wallet' && Boolean(id),
+    retry: false,
+  });
+  const walletTransactionsQuery = useQuery({
+    queryKey: ['admin-user-wallet-transactions', id],
+    queryFn: () => walletApi.getTransactions({ page: 0, size: 6, userId: id! }),
+    enabled: activeTab === 'wallet' && Boolean(id),
+  });
 
   useEffect(() => {
     if (id) fetchUserDetail(id);
@@ -222,7 +237,12 @@ export default function UserDetailPage() {
             </div>
           )}
 
-          {activeTab === 'wallet' && <div className="text-center py-12 text-text-muted">Tính năng Lịch sử Ví & Giao dịch đang được phát triển...</div>}
+          {activeTab === 'wallet' && <UserWalletTab
+            isLoading={walletQuery.isLoading || walletTransactionsQuery.isLoading}
+            isError={walletQuery.isError || walletTransactionsQuery.isError}
+            wallet={walletQuery.data}
+            transactions={walletTransactionsQuery.data?.content ?? []}
+          />}
           {activeTab === 'appointments' && <div className="text-center py-12 text-text-muted">Tính năng Lịch sử Buổi hẹn đang được phát triển...</div>}
           {activeTab === 'reports' && <div className="text-center py-12 text-text-muted">Tính năng Danh sách Báo cáo đang được phát triển...</div>}
 
@@ -412,4 +432,37 @@ export default function UserDetailPage() {
       )}
     </div>
   );
+}
+
+function UserWalletTab({
+  isLoading,
+  isError,
+  wallet,
+  transactions,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  wallet: Awaited<ReturnType<typeof walletApi.getWalletDetail>> | undefined;
+  transactions: Awaited<ReturnType<typeof walletApi.getTransactions>>['content'];
+}) {
+  const formatCredit = (value: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value);
+  const formatDateTime = (value: string) => new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+
+  if (isLoading) return <div className="flex min-h-52 flex-col items-center justify-center text-text-muted"><span className="mb-3 inline-block h-7 w-7 animate-spin rounded-full border-2 border-primary/30 border-t-primary" /><p className="text-sm">Đang tải dữ liệu ví...</p></div>;
+  if (isError || !wallet) return <div className="flex min-h-52 flex-col items-center justify-center rounded-xl bg-surface-2 text-center text-text-muted"><WalletIcon size={32} className="mb-3" /><p className="font-semibold text-text">Chưa thể tải ví người dùng</p><p className="mt-1 text-xs">Tài khoản có thể chưa được khởi tạo ví hoặc Backend chưa sẵn sàng.</p></div>;
+
+  return <div className="space-y-6">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="rounded-xl border border-border bg-emerald-50/60 p-4"><Coins size={18} className="mb-3 text-emerald-600" /><p className="text-xl font-bold text-emerald-700">{formatCredit(wallet.balance)} TC</p><p className="mt-1 text-xs text-text-muted">Khả dụng</p></div>
+      <div className="rounded-xl border border-border bg-amber-50/60 p-4"><LockKeyhole size={18} className="mb-3 text-amber-600" /><p className="text-xl font-bold text-amber-700">{formatCredit(wallet.heldAmount)} TC</p><p className="mt-1 text-xs text-text-muted">Đang giữ</p></div>
+      <div className="rounded-xl border border-border bg-blue-50/60 p-4"><WalletIcon size={18} className="mb-3 text-blue-600" /><p className="text-xl font-bold text-blue-700">{formatCredit(wallet.totalEarned)} TC</p><p className="mt-1 text-xs text-text-muted">Đã kiếm</p></div>
+      <div className="rounded-xl border border-border bg-violet-50/60 p-4"><History size={18} className="mb-3 text-violet-600" /><p className="text-xl font-bold text-violet-700">{formatCredit(wallet.totalUsed)} TC</p><p className="mt-1 text-xs text-text-muted">Đã sử dụng</p></div>
+      <div className={`rounded-xl border p-4 ${wallet.inconsistent ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}><AlertTriangle size={18} className={`mb-3 ${wallet.inconsistent ? 'text-red-600' : 'text-emerald-600'}`} /><p className={`text-sm font-bold ${wallet.inconsistent ? 'text-red-700' : 'text-emerald-700'}`}>{wallet.inconsistent ? `Chênh ${formatCredit(Math.abs(wallet.invariantDifference))} TC` : 'Cân bằng'}</p><p className="mt-1 text-xs text-text-muted">Đối soát sổ cái</p></div>
+    </div>
+
+    <section>
+      <div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-base font-semibold text-text"><History size={17} /> 6 giao dịch gần nhất</h3><span className="text-xs text-text-muted">Cập nhật {formatDateTime(wallet.updatedAt)}</span></div>
+      {transactions.length === 0 ? <p className="rounded-xl bg-surface-2 py-10 text-center text-sm text-text-muted">Ví chưa có giao dịch.</p> : <div className="overflow-x-auto rounded-xl border border-border"><table className="w-full min-w-[720px] text-left text-sm"><thead className="bg-surface-2 text-xs uppercase tracking-wide text-text-muted"><tr><th className="px-4 py-3">Thời gian</th><th className="px-4 py-3">Loại</th><th className="px-4 py-3">Biến động</th><th className="px-4 py-3">Số dư sau</th><th className="px-4 py-3">Nội dung</th></tr></thead><tbody className="divide-y divide-border">{transactions.map((transaction) => <tr key={transaction.id}><td className="whitespace-nowrap px-4 py-3 text-xs text-text-muted">{formatDateTime(transaction.createdAt)}</td><td className="px-4 py-3 font-semibold text-text">{transaction.type}</td><td className={`px-4 py-3 font-bold ${transaction.signedAmount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{transaction.signedAmount >= 0 ? '+' : ''}{formatCredit(transaction.signedAmount)} TC</td><td className="px-4 py-3 font-semibold text-text">{formatCredit(transaction.balanceAfter)} TC</td><td className="max-w-64 truncate px-4 py-3 text-text-muted" title={transaction.description ?? ''}>{transaction.description || 'Không có mô tả'}</td></tr>)}</tbody></table></div>}
+    </section>
+  </div>;
 }
