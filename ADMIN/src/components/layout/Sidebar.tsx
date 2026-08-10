@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Wrench, Flag, Scale,
+  LayoutDashboard, Users, Wrench, Flag,
   Wallet, CalendarDays, Users2, LogOut
 } from 'lucide-react';
 import LogoIcon from '@/components/ui/LogoIcon';
@@ -14,7 +14,6 @@ const mainNavItems = [
   { label: 'Người dùng',     icon: Users,        to: '/users' },
   { label: 'Kỹ năng',        icon: Wrench,       to: '/skills' },
   { label: 'Báo cáo',        icon: Flag,         to: '/reports',      badge: true },
-  { label: 'Tranh chấp',     icon: Scale,        to: '/disputes',     badge: true },
   { label: 'Ví Time Credit',  icon: Wallet,       to: '/wallet' },
   { label: 'Lịch hẹn',       icon: CalendarDays, to: '/appointments' },
   { label: 'Cộng đồng',      icon: Users2,       to: '/community' },

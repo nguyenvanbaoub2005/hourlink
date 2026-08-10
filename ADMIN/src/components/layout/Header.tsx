@@ -5,7 +5,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/users':        'Quản lý Người dùng',
   '/skills':       'Quản lý Kỹ năng',
   '/reports':      'Quản lý Báo cáo',
-  '/disputes':     'Quản lý Tranh chấp',
   '/wallet':       'Ví Time Credit',
   '/appointments': 'Quản lý Lịch hẹn',
   '/community':    'Quản lý Cộng đồng',

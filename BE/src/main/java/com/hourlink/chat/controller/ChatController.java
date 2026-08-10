@@ -21,6 +21,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -160,12 +161,14 @@ public class ChatController {
 
     @Operation(summary = "Admin: danh sách báo cáo tin nhắn")
     @GetMapping("/reports/admin")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<List<ChatReportResponse>> getAllMessageReports() {
         return ApiResponse.success(chatService.getAllMessageReports());
     }
 
     @Operation(summary = "Admin: cập nhật trạng thái báo cáo tin nhắn")
     @PatchMapping("/reports/admin/{reportId}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<ChatReportResponse> updateMessageReportStatus(
             @PathVariable UUID reportId,
             @Valid @RequestBody UpdateChatReportStatusRequest request) {

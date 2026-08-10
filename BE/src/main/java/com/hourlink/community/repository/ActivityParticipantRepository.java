@@ -14,6 +14,12 @@ import java.util.UUID;
 
 public interface ActivityParticipantRepository extends JpaRepository<ActivityParticipant, UUID> {
 
+    interface ActivityStatusCount {
+        UUID getActivityId();
+        ActivityParticipantStatus getStatus();
+        long getTotal();
+    }
+
     /** Kiểm tra user đã đăng ký hoạt động này chưa (status REGISTERED) */
     boolean existsByActivityIdAndUserIdAndStatus(UUID activityId, UUID userId, ActivityParticipantStatus status);
 
@@ -35,5 +41,18 @@ public interface ActivityParticipantRepository extends JpaRepository<ActivityPar
 
     /** Đếm số lượng người đã đăng ký (status = REGISTERED) cho 1 hoạt động */
     long countByActivityIdAndStatus(UUID activityId, ActivityParticipantStatus status);
+
+    long countByStatus(ActivityParticipantStatus status);
+
+    @Query("SELECT COALESCE(SUM(p.actualHours), 0) FROM ActivityParticipant p WHERE p.status = :status")
+    Double sumActualHoursByStatus(@Param("status") ActivityParticipantStatus status);
+
+    @Query("""
+            SELECT p.activity.id AS activityId, p.status AS status, COUNT(p) AS total
+            FROM ActivityParticipant p
+            WHERE p.activity.id IN :activityIds
+            GROUP BY p.activity.id, p.status
+            """)
+    List<ActivityStatusCount> countStatusesByActivityIds(@Param("activityIds") List<UUID> activityIds);
 
 }

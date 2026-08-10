@@ -1,6 +1,7 @@
 package com.hourlink.chat.repository;
 
 import com.hourlink.chat.entity.ChatReport;
+import com.hourlink.chat.enums.ChatReportStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -21,4 +22,6 @@ public interface ChatReportRepository extends JpaRepository<ChatReport, UUID> {
     List<ChatReport> findAllByOrderByCreatedAtDesc();
 
     java.util.Optional<ChatReport> findByIdAndReporter_Email(UUID id, String reporterEmail);
+
+    long countByStatus(ChatReportStatus status);
 }

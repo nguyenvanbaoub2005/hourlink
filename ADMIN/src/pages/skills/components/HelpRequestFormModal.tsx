@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Loader2, HelpCircle, Search } from 'lucide-react';
 import { helpRequestsApi } from '@/api/helpRequests';
-import { skillsApi, type AdminCategoryResponse } from '@/api/skills';
+import type { AdminCategoryResponse } from '@/api/skills';
 import { usersApi, type AdminUserResponse } from '@/api/users';
 import type { AdminHelpRequestDetailResponse } from '@/api/helpRequests';
 import FreeTimePicker from './FreeTimePicker';

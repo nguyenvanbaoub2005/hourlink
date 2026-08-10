@@ -234,13 +234,21 @@ public class AuthService {
     }
 
     private String buildScope(User user) {
-        if (user.getUserRoles() == null || user.getUserRoles().isEmpty()) {
-            return "";
+        return resolveCurrentScope(user);
+    }
+
+    /**
+     * Luôn lấy quyền hiện tại từ DB, không tin scope cũ nằm trong access token.
+     * Với dữ liệu cũ bị lệch userType/user_role, userType quyết định quyền nghiệp vụ;
+     * ROLE_ADMIN chỉ được công nhận khi có mapping thật trong user_role.
+     */
+    public String resolveCurrentScope(User user) {
+        java.util.List<String> storedRoles = userRoleRepository.findRoleCodesByUserId(user.getId());
+        if (storedRoles.contains("ROLE_ADMIN")) {
+            return "ROLE_ADMIN";
         }
-        java.util.StringJoiner stringJoiner = new java.util.StringJoiner(" ");
-        for (UserRole userRole : user.getUserRoles()) {
-            stringJoiner.add(userRole.getRole().getRoleCode());
-        }
-        return stringJoiner.toString();
+        return user.getUserType() == com.hourlink.user.enums.UserType.organization
+                ? "ROLE_ORGANIZATION"
+                : "ROLE_USER";
     }
 }

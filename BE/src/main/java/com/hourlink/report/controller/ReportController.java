@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,12 +48,14 @@ public class ReportController {
 
     @Operation(summary = "Admin: list all reports")
     @GetMapping("/admin")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<List<ReportResponse>> getAllReports() {
         return ApiResponse.success(reportService.getAllReports());
     }
 
     @Operation(summary = "Admin: update report status")
     @PatchMapping("/admin/{reportId}/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ApiResponse<ReportResponse> updateStatus(
             @PathVariable UUID reportId,
             @Valid @RequestBody UpdateReportStatusRequest request) {

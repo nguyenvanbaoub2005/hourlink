@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Loader2, BookOpen, Search, User } from 'lucide-react';
+import { X, Loader2, BookOpen, Search } from 'lucide-react';
 import { skillsApi, type AdminSkillDetailResponse, type AdminCategoryResponse } from '@/api/skills';
 import { usersApi, type AdminUserResponse } from '@/api/users';
 import FreeTimePicker from './FreeTimePicker';

@@ -12,7 +12,6 @@ import UsersPage        from '@/pages/users/UsersPage';
 import UserDetailPage   from '@/pages/users/UserDetailPage';
 import SkillsPage       from '@/pages/skills/SkillsPage';
 import ReportsPage      from '@/pages/reports/ReportsPage';
-import DisputesPage     from '@/pages/disputes/DisputesPage';
 import WalletPage       from '@/pages/wallet/WalletPage';
 import AppointmentsPage from '@/pages/appointments/AppointmentsPage';
 import CommunityPage    from '@/pages/community/CommunityPage';
@@ -46,7 +45,6 @@ function AppRoutes() {
         <Route path="/users/:id"    element={<UserDetailPage />} />
         <Route path="/skills"       element={<SkillsPage />} />
         <Route path="/reports"      element={<ReportsPage />} />
-        <Route path="/disputes"     element={<DisputesPage />} />
         <Route path="/wallet"       element={<WalletPage />} />
         <Route path="/appointments" element={<AppointmentsPage />} />
         <Route path="/community"    element={<CommunityPage />} />

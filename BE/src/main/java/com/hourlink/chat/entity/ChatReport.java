@@ -57,4 +57,8 @@ public class ChatReport extends BaseEntity {
     @Column(name = "status", length = 50, nullable = false)
     @Builder.Default
     ChatReportStatus status = ChatReportStatus.PENDING;
+
+    /** Ghi chú xử lý nội bộ của quản trị viên. */
+    @Column(name = "admin_note", columnDefinition = "TEXT")
+    String adminNote;
 }

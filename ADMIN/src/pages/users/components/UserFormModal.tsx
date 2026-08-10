@@ -104,7 +104,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
         toast.success('Đã thêm người dùng mới thành công!');
       } else {
         await usersApi.updateUser(initialData.id, formData);
-        toast.success('Đã cập nhật thông tin người dùng thành công!');
+        toast.success('Đã cập nhật thông tin và đồng bộ quyền người dùng!');
       }
       onSuccess();
       onClose();
@@ -230,12 +230,13 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Loại tài khoản</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Loại tài khoản & quyền truy cập</label>
                 <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition"
                   value={formData.userType} onChange={e => setFormData({...formData, userType: e.target.value})}>
                   <option value="individual">Cá nhân</option>
                   <option value="organization">Tổ chức</option>
                 </select>
+                <p className="mt-1 text-[12px] text-slate-500">Tổ chức được cấp quyền quản lý hoạt động cộng đồng; Cá nhân dùng quyền người dùng thông thường.</p>
               </div>
 
               {mode === 'create' && (
