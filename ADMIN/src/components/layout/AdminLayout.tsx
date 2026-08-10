@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import Sidebar from './Sidebar';
@@ -5,6 +6,8 @@ import Header from './Header';
 
 export default function AdminLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
 
   if (isLoading) {
     return (
@@ -23,10 +26,10 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="ml-[var(--sidebar-width)] flex-1 flex flex-col min-h-screen min-w-0">
-        <Header />
-        <main className="flex-1 p-6 overflow-x-hidden min-w-0">
+      <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:ml-[var(--sidebar-width)]">
+        <Header onMenuOpen={() => setIsSidebarOpen(true)} />
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-5 lg:p-6">
           <Outlet />
         </main>
       </div>

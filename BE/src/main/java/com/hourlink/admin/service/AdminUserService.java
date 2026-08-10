@@ -14,6 +14,7 @@ import com.hourlink.common.service.EmailService;
 import com.hourlink.common.service.CloudinaryService;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.Map;
 import com.hourlink.admin.dto.request.AdminCreateUserRequest;
 import com.hourlink.admin.dto.request.AdminUpdateUserRequest;
@@ -52,6 +53,7 @@ public class AdminUserService {
     private static final String ROLE_ORGANIZATION = "ROLE_ORGANIZATION";
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private static final Set<String> BUSINESS_ROLES = Set.of(ROLE_USER, ROLE_ORGANIZATION);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final UserAdminActionRepository userAdminActionRepository;
@@ -295,7 +297,11 @@ public class AdminUserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
-        // Generate a secure random password: 2 uppercase + 2 digits + 4 lowercase + 2 special
+        if (userRoleRepository.existsByUser_IdAndRole_RoleCode(userId, ROLE_ADMIN)) {
+            throw new BadRequestException("Không thể đặt lại mật khẩu tài khoản quản trị viên");
+        }
+
+        // Generate a secure random password: 2 uppercase + 2 digits + 4 lowercase + 1 special
         String newPassword = generateRandomPassword();
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -310,25 +316,26 @@ public class AdminUserService {
         String lower = "abcdefghjkmnpqrstuvwxyz";
         String digits = "23456789";
         String special = "@#$%&*";
-        java.util.Random rnd = new java.util.Random();
 
         StringBuilder sb = new StringBuilder();
         // 2 uppercase
-        for (int i = 0; i < 2; i++) sb.append(upper.charAt(rnd.nextInt(upper.length())));
+        for (int i = 0; i < 2; i++) sb.append(upper.charAt(SECURE_RANDOM.nextInt(upper.length())));
         // 2 digits
-        for (int i = 0; i < 2; i++) sb.append(digits.charAt(rnd.nextInt(digits.length())));
+        for (int i = 0; i < 2; i++) sb.append(digits.charAt(SECURE_RANDOM.nextInt(digits.length())));
         // 4 lowercase
-        for (int i = 0; i < 4; i++) sb.append(lower.charAt(rnd.nextInt(lower.length())));
+        for (int i = 0; i < 4; i++) sb.append(lower.charAt(SECURE_RANDOM.nextInt(lower.length())));
         // 1 special
-        sb.append(special.charAt(rnd.nextInt(special.length())));
+        sb.append(special.charAt(SECURE_RANDOM.nextInt(special.length())));
 
-        // Shuffle
-        java.util.List<Character> chars = new java.util.ArrayList<>();
-        for (char c : sb.toString().toCharArray()) chars.add(c);
-        java.util.Collections.shuffle(chars);
-        StringBuilder result = new StringBuilder();
-        for (char c : chars) result.append(c);
-        return result.toString();
+        // Fisher-Yates shuffle using the same cryptographically secure source.
+        char[] chars = sb.toString().toCharArray();
+        for (int i = chars.length - 1; i > 0; i--) {
+            int j = SECURE_RANDOM.nextInt(i + 1);
+            char current = chars[i];
+            chars[i] = chars[j];
+            chars[j] = current;
+        }
+        return new String(chars);
     }
 
     /** Đồng bộ loại tài khoản nghiệp vụ với authority mà Backend thực sự kiểm tra. */

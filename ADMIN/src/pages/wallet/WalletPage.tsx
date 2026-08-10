@@ -283,10 +283,14 @@ export default function WalletPage() {
   };
 
   const refresh = async () => {
-    const tasks: Promise<unknown>[] = [overviewQuery.refetch(), anomaliesQuery.refetch()];
+    const tasks: Promise<{ isError: boolean }>[] = [overviewQuery.refetch(), anomaliesQuery.refetch()];
     if (activeTab === 'wallets') tasks.push(walletsQuery.refetch());
     if (activeTab === 'transactions') tasks.push(transactionsQuery.refetch());
-    await Promise.all(tasks);
+    const results = await Promise.all(tasks);
+    if (results.some((result) => result.isError)) {
+      toast.error('Không thể cập nhật đầy đủ dữ liệu ví');
+      return;
+    }
     toast.success('Đã cập nhật dữ liệu ví');
   };
 

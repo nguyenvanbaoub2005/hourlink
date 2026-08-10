@@ -71,10 +71,7 @@ public class AuthService {
         var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        // isLocked là field primitive boolean => Lombok sinh isLocked()
-        if (user.isLocked()) {
-            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
-        }
+        ensureAccountActive(user);
 
         boolean matched = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
         if (!matched) {
@@ -148,6 +145,7 @@ public class AuthService {
             var email = signedJWT.getJWTClaimsSet().getSubject();
             var user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+            ensureAccountActive(user);
 
             return AuthResponse.builder()
                     .token(generateToken(user, "access", VALID_DURATION))
@@ -192,6 +190,12 @@ public class AuthService {
     public SignedJWT verifyToken(String token, boolean isRefresh) throws ParseException, JOSEException {
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
         SignedJWT signedJWT = SignedJWT.parse(token);
+
+        String expectedType = isRefresh ? "refresh" : "access";
+        String actualType = signedJWT.getJWTClaimsSet().getStringClaim("type");
+        if (!expectedType.equals(actualType)) {
+            throw new AppException(ErrorCode.TOKEN_INVALID);
+        }
 
         Date expiryTime = isRefresh
                 ? new Date(signedJWT.getJWTClaimsSet().getIssueTime()
@@ -250,5 +254,14 @@ public class AuthService {
         return user.getUserType() == com.hourlink.user.enums.UserType.organization
                 ? "ROLE_ORGANIZATION"
                 : "ROLE_USER";
+    }
+
+    private void ensureAccountActive(User user) {
+        if (user.isDeleted()) {
+            throw new AppException(ErrorCode.ACCOUNT_DELETED);
+        }
+        if (user.isLocked()) {
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        }
     }
 }

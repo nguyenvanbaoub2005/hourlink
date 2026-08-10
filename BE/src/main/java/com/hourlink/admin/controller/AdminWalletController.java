@@ -60,6 +60,13 @@ public class AdminWalletController {
         return ResponseEntity.ok(adminWalletService.getWallet(userId));
     }
 
+    @PostMapping("/wallets/{userId}/initialize")
+    public ResponseEntity<AdminWalletResponse> initializeWallet(
+            @PathVariable UUID userId,
+            Authentication authentication) {
+        return ResponseEntity.ok(adminWalletService.initializeWallet(userId, authentication.getName()));
+    }
+
     @GetMapping("/transactions")
     public ResponseEntity<Page<AdminWalletTransactionResponse>> getTransactions(
             @RequestParam(required = false) String search,

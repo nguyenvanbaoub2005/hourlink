@@ -40,6 +40,7 @@ public class AdminReportController {
     @GetMapping
     public ResponseEntity<Page<AdminReportResponse>> getReports(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) AdminReportSource source,
             @RequestParam(required = false) ReportStatus status,
             @RequestParam(required = false) ReportTargetType targetType,
@@ -50,7 +51,7 @@ public class AdminReportController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(adminReportService.getReports(
-                search, source, status, targetType, reason, dateFrom, dateTo, pageable));
+                search, userId, source, status, targetType, reason, dateFrom, dateTo, pageable));
     }
 
     @GetMapping("/stats")

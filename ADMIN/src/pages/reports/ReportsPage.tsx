@@ -220,11 +220,15 @@ export default function ReportsPage() {
   };
 
   const refresh = async () => {
-    await Promise.all([
+    const results = await Promise.all([
       listQuery.refetch(),
       statsQuery.refetch(),
       selectedId ? detailQuery.refetch() : Promise.resolve(),
     ]);
+    if (results.some((result) => result && 'isError' in result && result.isError)) {
+      toast.error('Không thể cập nhật đầy đủ dữ liệu báo cáo');
+      return;
+    }
     toast.success('Đã cập nhật dữ liệu báo cáo');
   };
 

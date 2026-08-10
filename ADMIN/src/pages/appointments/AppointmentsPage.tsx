@@ -60,7 +60,11 @@ export default function AppointmentsPage() {
   });
 
   const refresh = async () => {
-    await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+    const results = await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+    if (results.some((result) => result.isError)) {
+      toast.error('Không thể cập nhật đầy đủ dữ liệu lịch hẹn');
+      return;
+    }
     toast.success('Đã cập nhật dữ liệu lịch hẹn');
   };
   const clearFilters = () => {

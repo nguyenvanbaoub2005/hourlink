@@ -38,6 +38,7 @@ public enum ErrorCode {
     OTP_INVALID(1007,              "Mã OTP không đúng hoặc đã hết hạn",        HttpStatus.BAD_REQUEST),
     NEW_PASSWORD_SAME_AS_OLD(1008, "Mật khẩu mới phải khác mật khẩu cũ",      HttpStatus.BAD_REQUEST),
     ACCOUNT_NOT_VERIFIED(1009,     "Tài khoản chưa được xác minh",             HttpStatus.FORBIDDEN),
+    ACCOUNT_DELETED(1010,          "Tài khoản đã bị vô hiệu hóa",              HttpStatus.FORBIDDEN),
 
     // ─── Skill (2xxx) ─────────────────────────────────────────────────
     SKILL_NOT_FOUND(2001,          "Không tìm thấy kỹ năng",                   HttpStatus.NOT_FOUND),

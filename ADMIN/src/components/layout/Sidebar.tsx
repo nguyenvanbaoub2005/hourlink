@@ -1,7 +1,8 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import {
   LayoutDashboard, Users, Wrench, Flag,
-  Wallet, CalendarDays, Users2, LogOut
+  Wallet, CalendarDays, Users2, LogOut, X
 } from 'lucide-react';
 import LogoIcon from '@/components/ui/LogoIcon';
 import { useAuthStore } from '@/store/authStore';
@@ -31,17 +32,35 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 const sectionLabel = 'text-[11px] font-bold uppercase tracking-[0.05em] text-text-muted px-5 py-2.5 pb-1.5';
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { logout, email } = useAuthStore();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    onClose();
+  }, [pathname]);
 
   const handleLogout = async () => {
     await logout();
+    onClose();
     navigate('/login');
   };
 
   return (
-    <aside className="w-[var(--sidebar-width)] h-screen fixed top-0 left-0 bg-surface border-r border-border flex flex-col z-[100] overflow-hidden transition-transform duration-200">
+    <>
+      <button
+        type="button"
+        aria-label="Đóng menu quản trị"
+        onClick={onClose}
+        className={`fixed inset-0 z-[90] bg-slate-900/45 transition-opacity lg:hidden ${isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+      />
+      <aside className={`fixed left-0 top-0 z-[100] flex h-screen w-[var(--sidebar-width)] flex-col overflow-hidden border-r border-border bg-surface transition-transform duration-200 lg:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
 
       {/* ── Logo ── */}
       <div className="flex items-center gap-2.5 px-5 h-[var(--header-height)] border-b border-border shrink-0">
@@ -50,6 +69,14 @@ export default function Sidebar() {
         </div>
         <span className="text-[15px] font-bold text-text tracking-[-0.3px]">HourLink</span>
         <span className="ml-auto text-[9px] font-semibold bg-primary/[0.12] text-primary px-1.5 py-0.5 rounded">ADMIN</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Đóng menu"
+          className="-mr-2 rounded-lg p-1.5 text-text-muted hover:bg-surface-2 hover:text-text lg:hidden"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* ── Navigation ── */}
@@ -90,6 +117,7 @@ export default function Sidebar() {
           Đăng xuất
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
