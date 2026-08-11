@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import UserApi from '@api/user';
 import type { UserResponse, ProfileUpdateRequest } from '@types';
+import RegionPickerModal from '@components/RegionPickerModal';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -176,12 +177,9 @@ export default function EditProfileScreen() {
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Khu vực</Text>
-          <TextInput
-            style={styles.input}
+          <RegionPickerModal
             value={profile.region}
-            onChangeText={(text) => setProfile({ ...profile, region: text })}
-            placeholder="Thành phố, Quận..."
-            placeholderTextColor={Colors.textMuted}
+            onSelect={(text) => setProfile({ ...profile, region: text })}
           />
         </View>
 

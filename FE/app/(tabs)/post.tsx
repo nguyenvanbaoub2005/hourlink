@@ -10,6 +10,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
 import AiMatchingApi from '@api/aimatching';
+import RegionPickerModal from '@components/RegionPickerModal';
 
 // ─── Types ─────────────────────────────────────────────────
 type Category = { id: string; name: string };
@@ -444,10 +445,9 @@ export default function PostScreen() {
 
         {/* Region */}
         <Text style={styles.label}>Khu vực</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="VD: TP.HCM, Hà Nội, Huế, Online toàn quốc"
-          value={region} onChangeText={setRegion}
+        <RegionPickerModal 
+          value={region} 
+          onSelect={setRegion} 
         />
 
         <View style={{ height: 100 }} />
