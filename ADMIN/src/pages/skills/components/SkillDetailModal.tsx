@@ -524,8 +524,8 @@ export default function SkillDetailModal({
       {/* ─── Document Viewer (positioned within content area, sidebar+header stay visible) ─── */}
       {docViewerUrl && (
         <div
-          className="fixed z-[70] flex flex-col bg-surface shadow-2xl border-l border-border"
-          style={{ left: 240, top: 60, right: 0, bottom: 0 }}
+          className="fixed z-[9999] flex flex-col bg-surface shadow-2xl"
+          style={{ left: 0, top: 0, right: 0, bottom: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Toolbar */}
