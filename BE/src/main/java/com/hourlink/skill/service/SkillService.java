@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Comparator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -28,6 +29,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SkillService {
+    private static final List<String> DEFAULT_CATEGORY_ORDER = List.of(
+            "Lập trình", "Ngôn ngữ", "Thiết kế", "Kinh doanh",
+            "Giáo dục", "Sức khỏe", "Nghệ thuật", "Khác"
+    );
+
     private final SkillRepository skillRepository;
     private final SkillCategoryRepository categoryRepository;
     private final UserRepository userRepository;
@@ -48,7 +54,7 @@ public class SkillService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        SkillCategory category = categoryRepository.findById(request.getCategoryId())
+        SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND)); // Or create specific CATEGORY_NOT_FOUND
 
         Skill skill = Skill.builder()
@@ -87,7 +93,7 @@ public class SkillService {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
 
-        SkillCategory category = categoryRepository.findById(request.getCategoryId())
+        SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         skill.setName(request.getName());
@@ -117,10 +123,6 @@ public class SkillService {
     }
 
     public List<com.hourlink.skill.dto.response.SkillCategoryResponse> getCategories() {
-        List<String> order = List.of(
-                "Lập trình", "Ngôn ngữ", "Thiết kế", "Kinh doanh",
-                "Giáo dục", "Sức khỏe", "Nghệ thuật", "Khác"
-        );
         String currentEmail = SecurityUtil.getCurrentUserEmailOrNull();
         UUID currentUserId = currentEmail == null
                 ? null
@@ -132,14 +134,9 @@ public class SkillService {
                                 Function.identity()));
 
         return categoryRepository.findAllByIsDeletedFalse().stream()
-                .sorted((a, b) -> {
-                    int idxA = order.indexOf(a.getName());
-                    int idxB = order.indexOf(b.getName());
-                    if (idxA != -1 && idxB != -1) return Integer.compare(idxA, idxB);
-                    if ("Khác".equals(a.getName())) return 1;
-                    if ("Khác".equals(b.getName())) return -1;
-                    return a.getName().compareTo(b.getName());
-                })
+                .sorted(Comparator
+                        .comparingInt((SkillCategory category) -> categoryOrder(category.getName()))
+                        .thenComparing(SkillCategory::getName, String.CASE_INSENSITIVE_ORDER))
                 .map(c -> {
                     SkillRepository.CategoryStatsProjection stats = statsByCategory.get(c.getId());
                     return com.hourlink.skill.dto.response.SkillCategoryResponse.builder()
@@ -151,6 +148,22 @@ public class SkillService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Giữ thứ tự quen thuộc của các danh mục mặc định, chèn danh mục do admin
+     * tạo ngay trước "Khác" và sắp xếp các danh mục động theo tên.
+     */
+    private int categoryOrder(String categoryName) {
+        int defaultIndex = DEFAULT_CATEGORY_ORDER.indexOf(categoryName);
+        int otherIndex = DEFAULT_CATEGORY_ORDER.size() - 1;
+        if (defaultIndex >= 0 && defaultIndex < otherIndex) {
+            return defaultIndex;
+        }
+        if ("Khác".equals(categoryName)) {
+            return otherIndex + 1;
+        }
+        return otherIndex;
     }
 
     @Transactional

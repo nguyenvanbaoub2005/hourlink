@@ -154,7 +154,7 @@ public class AdminHelpRequestService {
 
         SkillCategory category = null;
         if (request.getCategoryId() != null) {
-            category = categoryRepository.findById(request.getCategoryId()).orElse(null);
+            category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId()).orElse(null);
         }
 
         HelpRequest helpRequest = HelpRequest.builder()
@@ -201,7 +201,7 @@ public class AdminHelpRequestService {
             helpRequest.setStatus(request.getStatus());
         }
         if (request.getCategoryId() != null) {
-            SkillCategory category = categoryRepository.findById(request.getCategoryId()).orElse(null);
+            SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId()).orElse(null);
             helpRequest.setCategory(category);
         } else {
             helpRequest.setCategory(null);

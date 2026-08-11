@@ -70,6 +70,25 @@ class SkillServiceTest {
     }
 
     @Test
+    void getCategories_includesAdminCreatedCategoryWithStatsBeforeOtherCategory() {
+        SkillCategory other = category("Khác");
+        SkillCategory custom = category("Ẩm thực");
+        SkillCategory art = category("Nghệ thuật");
+        SkillCategory programming = category("Lập trình");
+        when(skillRepository.summarizeVisibleCategories(null))
+                .thenReturn(List.of(stats(custom.getId(), 4, 2)));
+        when(categoryRepository.findAllByIsDeletedFalse())
+                .thenReturn(List.of(other, custom, art, programming));
+
+        var result = service.getCategories();
+
+        assertEquals(List.of("Lập trình", "Nghệ thuật", "Ẩm thực", "Khác"),
+                result.stream().map(item -> item.getName()).toList());
+        assertEquals(4, result.get(2).getSkillCount());
+        assertEquals(2, result.get(2).getSupporterCount());
+    }
+
+    @Test
     void searchSkills_returnsOnlyVisibleSkillsFromActiveUsersAndCategories() {
         SkillCategory activeCategory = category("Nghệ thuật");
         SkillCategory deletedCategory = category("Danh mục đã xóa");

@@ -23,8 +23,8 @@ type CategoryItem = {
   id: string;
   name: string;
   description?: string;
-  supporterCount?: number;
-  skillCount?: number;
+  supporterCount: number;
+  skillCount: number;
 };
 type SkillItem = {
   id: string;
@@ -44,6 +44,63 @@ type SkillItem = {
   userCompletedSessions?: number;
   userRegion?: string;
   userOccupation?: string;
+};
+
+type CategoryVisual = { icon: IoniconName; color: string; background: string };
+
+const FALLBACK_CATEGORY_VISUALS: CategoryVisual[] = [
+  { icon: 'bulb-outline', color: '#0891B2', background: '#CFFAFE' },
+  { icon: 'construct-outline', color: '#EA580C', background: '#FFEDD5' },
+  { icon: 'earth-outline', color: '#16A34A', background: '#DCFCE7' },
+  { icon: 'sparkles-outline', color: '#9333EA', background: '#F3E8FF' },
+  { icon: 'shapes-outline', color: '#E11D48', background: '#FFE4E6' },
+  { icon: 'compass-outline', color: '#0284C7', background: '#E0F2FE' },
+];
+
+const stableTextHash = (value: string) => {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+};
+
+const getCategoryVisual = (name: string, id: string): CategoryVisual => {
+  const lower = name.trim().toLocaleLowerCase('vi-VN');
+  if (lower.includes('lập trình') || lower.includes('công nghệ')) return { icon: 'code-slash-outline', color: '#2563EB', background: '#DBEAFE' };
+  if (lower.includes('ngôn ngữ')) return { icon: 'language-outline', color: '#7C3AED', background: '#EDE9FE' };
+  if (lower.includes('thiết kế')) return { icon: 'color-palette-outline', color: '#DB2777', background: '#FCE7F3' };
+  if (lower.includes('kinh doanh') || lower.includes('tài chính')) return { icon: 'bar-chart-outline', color: '#D97706', background: '#FEF3C7' };
+  if (lower.includes('giáo dục')) return { icon: 'book-outline', color: '#059669', background: '#D1FAE5' };
+  if (lower.includes('sức khỏe') || lower.includes('thể thao')) return { icon: 'fitness-outline', color: '#DC2626', background: '#FEE2E2' };
+  if (lower.includes('nghệ thuật') || lower.includes('âm nhạc')) return { icon: 'musical-notes-outline', color: '#4F46E5', background: '#E0E7FF' };
+  if (lower.includes('ẩm thực') || lower.includes('nấu ăn')) return { icon: 'restaurant-outline', color: '#C2410C', background: '#FFEDD5' };
+  if (lower.includes('khoa học')) return { icon: 'flask-outline', color: '#0F766E', background: '#CCFBF1' };
+  if (lower === 'khác') return { icon: 'grid-outline', color: '#475569', background: '#F1F5F9' };
+
+  return FALLBACK_CATEGORY_VISUALS[stableTextHash(`${id}:${lower}`) % FALLBACK_CATEGORY_VISUALS.length];
+};
+
+const normalizeCategory = (value: unknown): CategoryItem | null => {
+  if (!value || typeof value !== 'object') return null;
+
+  const raw = value as Record<string, unknown>;
+  const id = String(raw.id ?? '').trim();
+  const name = String(raw.name ?? '').trim();
+  if (!id || !name) return null;
+
+  const normalizeCount = (count: unknown) => {
+    const parsed = Number(count);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+  };
+
+  return {
+    id,
+    name,
+    description: typeof raw.description === 'string' ? raw.description : undefined,
+    supporterCount: normalizeCount(raw.supporterCount ?? raw.supporter_count),
+    skillCount: normalizeCount(raw.skillCount ?? raw.skill_count),
+  };
 };
 
 export default function ExploreScreen() {
@@ -109,9 +166,18 @@ export default function ExploreScreen() {
   const fetchCategories = async () => {
     try {
       const res = await SkillApi.getCategories();
-      if (res.data && res.data.data) {
-        setCategories(res.data.data);
-      }
+      const rawCategories = Array.isArray(res.data?.data) ? res.data.data : [];
+      const uniqueCategories = new Map<string, CategoryItem>();
+      rawCategories.forEach((rawCategory: unknown) => {
+        const category = normalizeCategory(rawCategory);
+        if (category) uniqueCategories.set(category.id, category);
+      });
+
+      const nextCategories = Array.from(uniqueCategories.values());
+      setCategories(nextCategories);
+      setSelectedCategoryId((currentId) => (
+        currentId && !uniqueCategories.has(currentId) ? null : currentId
+      ));
     } catch (e) {
       console.log('Lỗi tải danh mục:', e);
     }
@@ -137,7 +203,6 @@ export default function ExploreScreen() {
       setSkills([]);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
@@ -155,7 +220,11 @@ export default function ExploreScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchSkills(true), fetchCategories()]);
+    try {
+      await Promise.all([fetchSkills(true), fetchCategories()]);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleSearchSubmit = () => {
@@ -179,18 +248,6 @@ export default function ExploreScreen() {
       case 'EXPERT': return 'Chuyên gia';
       default: return lvl || 'Cơ bản';
     }
-  };
-
-  const getCategoryVisual = (name: string): { icon: IoniconName; color: string; background: string } => {
-    const lower = name.toLowerCase();
-    if (lower.includes('lập trình')) return { icon: 'code-slash-outline', color: '#2563EB', background: '#DBEAFE' };
-    if (lower.includes('ngôn ngữ')) return { icon: 'language-outline', color: '#7C3AED', background: '#EDE9FE' };
-    if (lower.includes('thiết kế')) return { icon: 'color-palette-outline', color: '#DB2777', background: '#FCE7F3' };
-    if (lower.includes('kinh doanh')) return { icon: 'bar-chart-outline', color: '#D97706', background: '#FEF3C7' };
-    if (lower.includes('giáo dục')) return { icon: 'book-outline', color: '#059669', background: '#D1FAE5' };
-    if (lower.includes('sức khỏe')) return { icon: 'fitness-outline', color: '#DC2626', background: '#FEE2E2' };
-    if (lower.includes('nghệ thuật')) return { icon: 'musical-notes-outline', color: '#4F46E5', background: '#E0E7FF' };
-    return { icon: 'grid-outline', color: '#475569', background: '#F1F5F9' };
   };
 
   const renderAvatar = (item: SkillItem) => {
@@ -252,7 +309,7 @@ export default function ExploreScreen() {
           <View style={styles.categoryGrid}>
             {categories.map((cat) => {
               const active = selectedCategoryId === cat.id;
-              const categoryVisual = getCategoryVisual(cat.name);
+              const categoryVisual = getCategoryVisual(cat.name, cat.id);
               return (
                 <TouchableOpacity
                   key={cat.id}
@@ -271,7 +328,7 @@ export default function ExploreScreen() {
                   </View>
                   <Text
                     style={[styles.catCardName, active && styles.catCardNameActive, active && { color: categoryVisual.color }]}
-                    numberOfLines={1}
+                    numberOfLines={2}
                   >
                     {cat.name}
                   </Text>
@@ -281,7 +338,7 @@ export default function ExploreScreen() {
                     adjustsFontSizeToFit
                     minimumFontScale={0.72}
                   >
-                    {cat.supporterCount ?? 0} người hỗ trợ
+                    {cat.supporterCount} người hỗ trợ
                   </Text>
                 </TouchableOpacity>
               );
@@ -824,6 +881,7 @@ const styles = StyleSheet.create({
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
   categoryCard: {
     width: (SCREEN_WIDTH - Spacing.md * 2 - 30) / 4,
+    minHeight: 116,
     backgroundColor: '#fff',
     borderRadius: Radius.lg,
     paddingVertical: 12,
@@ -839,7 +897,7 @@ const styles = StyleSheet.create({
   },
   categoryCardActive: { borderWidth: 1.5 },
   catIconCircle: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  catCardName: { fontSize: 12, fontWeight: '600', color: '#334155', textAlign: 'center' },
+  catCardName: { minHeight: 30, fontSize: 12, lineHeight: 15, fontWeight: '600', color: '#334155', textAlign: 'center' },
   catCardNameActive: { fontWeight: '700' },
   catStatText: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
   catStatTextActive: { fontWeight: '600' },

@@ -36,7 +36,7 @@ public class HelpRequestService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        SkillCategory category = categoryRepository.findById(request.getCategoryId())
+        SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         HelpRequest helpRequest = HelpRequest.builder()
@@ -77,7 +77,7 @@ public class HelpRequestService {
             throw new AppException(ErrorCode.REQUEST_NOT_FOUND);
         }
 
-        SkillCategory category = categoryRepository.findById(request.getCategoryId())
+        SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
         helpRequest.setTitle(request.getTitle());
