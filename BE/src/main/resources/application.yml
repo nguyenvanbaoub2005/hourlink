@@ -1,11 +1,13 @@
 server:
-  port: 8080
+  port: 8085
   servlet:
     context-path: /api
 
 spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:BE/.env[.properties]
   datasource:
-    url: jdbc:mysql://localhost:3307/hourlink_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
+    url: jdbc:mysql://localhost:3308/hourlink_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true&characterEncoding=UTF-8
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -26,7 +28,8 @@ spring:
   servlet:
     multipart:
       max-file-size: 20MB
-      max-request-size: 20MB
+      # Chừa phần multipart boundary/headers trong khi file vẫn bị giới hạn 20MB.
+      max-request-size: 21MB
 
   mail:
     host: smtp.gmail.com
@@ -53,6 +56,14 @@ jwt:
   signerKey: ${JWT_SIGNER_KEY:hourlink-super-secret-key-time-credit-exchange-platform-2024-very-long-for-hs512-64bytes}
   valid-duration: 86400        # 1 ngày (giây)
   refreshable-duration: 604800 # 7 ngày (giây)
+
+# Firebase (chat realtime — chức năng 9.10)
+# Mặc định đọc từ classpath nên KHÔNG phụ thuộc thư mục chạy app:
+#   đặt file service-account tại BE/src/main/resources/firebase-service-account.json
+# Nếu chưa có file: chat vẫn chạy qua REST, chỉ mất realtime.
+firebase:
+  credentials: ${FIREBASE_CREDENTIALS:classpath:firebase-service-account.json}
+  database-url: ${FIREBASE_DATABASE_URL:}
 
 # Cloudinary
 cloudinary:

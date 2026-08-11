@@ -3,11 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
 import { Colors } from '@constants/Colors';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const { unreadCount } = useNotificationStore();
+
+
 
   // Đang đọc token từ SecureStore → hiển thị màn hình chờ
   if (isLoading) {
@@ -58,6 +60,31 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="post"
+        options={{
+          title: 'Đăng bài',
+          tabBarIcon: ({ color, size }) => (
+            <View style={{
+              top: -15, // Dời lên trên một chút để không đè chữ
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: '#38bdf8', // Light blue background
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+              elevation: 4
+            }}>
+              <Ionicons name="add" size={32} color="#fff" />
+            </View>
+          ),
+          tabBarLabelStyle: { marginTop: 0 }
+        }}
+      />
+      <Tabs.Screen
         name="appointments"
         options={{
           title: 'Lịch hẹn',
@@ -69,22 +96,20 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="wallet"
         options={{
-          title: 'Ví TC',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet-outline" size={size} color={color} />
-          ),
+          href: null, // Ẩn khỏi tab bar
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Hồ sơ',
+          title: 'Cá nhân',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
-          ),
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          )
         }}
       />
     </Tabs>
   );
 }
+
+

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
@@ -7,33 +7,44 @@ import { useAuthStore } from '@store/authStore';
 import IndividualHomeScreen from '../../src/screens/home/IndividualHomeScreen';
 import OrganizationHomeScreen from '../../src/screens/home/OrganizationHomeScreen';
 import AdminHomeScreen from '../../src/screens/home/AdminHomeScreen';
+import CommunityHomeScreen from '../../src/screens/home/CommunityHomeScreen';
 
 export default function HomeScreen() {
-  const { role } = useAuthStore();
+  const { role, user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<'individual' | 'community'>('individual');
+  const isOrganization = role?.includes('ROLE_ORGANIZATION') || user?.userType === 'organization';
 
   const renderHomeContent = () => {
-    switch (role) {
-      case 'ROLE_USER':
-        return <IndividualHomeScreen />;
-      case 'ROLE_ORGANIZATION':
-        return <OrganizationHomeScreen />;
-      case 'ROLE_ADMIN':
-        return <AdminHomeScreen />;
-      default:
-        return (
-          <View style={styles.center}>
-            <Text style={styles.text}>Lỗi phân quyền: Không xác định được Role ({role || 'null'}).</Text>
-            <Text style={styles.text}>Token cũ không tương thích.</Text>
-            <TouchableOpacity style={{ marginTop: 20, padding: 10, backgroundColor: Colors.danger, borderRadius: 8 }} onPress={() => useAuthStore.getState().logout()}>
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Đăng xuất (Xóa token lỗi)</Text>
-            </TouchableOpacity>
-          </View>
-        );
+    if (isOrganization) {
+      return <OrganizationHomeScreen />;
     }
+
+    if (activeTab === 'community') {
+      return <CommunityHomeScreen />;
+    }
+
+    if (role?.includes('ROLE_ADMIN') || user?.userType === 'admin') {
+      return <AdminHomeScreen />;
+    }
+    return <IndividualHomeScreen />;
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'individual' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('individual')}
+        >
+          <Text style={[styles.tabText, activeTab === 'individual' && styles.tabTextActive]}>{isOrganization ? 'Cộng đồng' : 'Cá nhân'}</Text>
+        </TouchableOpacity>
+        {!isOrganization && <TouchableOpacity
+          style={[styles.tabBtn, activeTab === 'community' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('community')}
+        >
+          <Text style={[styles.tabText, activeTab === 'community' && styles.tabTextActive]}>Cộng đồng</Text>
+        </TouchableOpacity>}
+      </View>
       {renderHomeContent()}
     </SafeAreaView>
   );
@@ -41,6 +52,22 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bgLight },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  text: { color: Colors.textSecondary, fontSize: 16 },
+  tabContainer: { 
+    flexDirection: 'row', 
+    backgroundColor: '#fff', 
+    paddingHorizontal: 16, 
+    paddingTop: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border
+  },
+  tabBtn: { 
+    flex: 1, 
+    alignItems: 'center', 
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent'
+  },
+  tabBtnActive: { borderBottomColor: Colors.primary },
+  tabText: { fontSize: 16, color: Colors.textMuted, fontWeight: '500' },
+  tabTextActive: { color: Colors.primary, fontWeight: 'bold' },
 });

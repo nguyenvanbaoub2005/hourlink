@@ -6,8 +6,11 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AuthApi from '@api/auth';
 import { useAuthStore } from '@store/authStore';
+import Logo from '@components/Logo';
 import { Alert } from 'react-native';
-
+import UserApi from '@api/user';
+import * as SecureStore from 'expo-secure-store';
+import { TOKEN_KEY, REFRESH_KEY } from '@api/axiosInstance';
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -17,23 +20,41 @@ export default function LoginScreen() {
   const setAuth = useAuthStore(state => state.setAuth);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (loading) return;
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
       Alert.alert('Lỗi', 'Vui lòng nhập email và mật khẩu');
+      return;
+    }
+    // BE hiện chỉ hỗ trợ đăng nhập bằng email (LoginRequest validate @Email)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      Alert.alert('Lỗi', 'Email không đúng định dạng');
       return;
     }
 
     try {
       setLoading(true);
-      const response = await AuthApi.login({ email, password });
-      
+      const response = await AuthApi.login({ email: cleanEmail, password });
+
       const { token, refreshToken } = response.data.data;
-      
-      // Since backend doesn't return user info in AuthResponse yet, mock a basic user
-      await setAuth({ id: '1', email, fullName: 'HourLink User' } as any, token, refreshToken);
-      
+
+      // Lưu tạm token vào SecureStore để axiosInstance lấy ra dùng cho request getMyProfile
+      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await SecureStore.setItemAsync(REFRESH_KEY, refreshToken);
+
+      // Fetch hồ sơ thật từ BE
+      const userRes = await UserApi.getMyProfile();
+
+      // Lưu đầy đủ state (user, token) vào store
+      await setAuth(userRes.data.data, token, refreshToken);
+
       router.replace('/(tabs)/home');
     } catch (error: any) {
-      Alert.alert('Đăng nhập thất bại', error.response?.data?.message || 'Có lỗi xảy ra');
+      Alert.alert(
+        'Đăng nhập thất bại',
+        error.response?.data?.message || 'Không thể kết nối máy chủ, vui lòng thử lại'
+      );
     } finally {
       setLoading(false);
     }
@@ -52,19 +73,18 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
           <View style={styles.header}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>H</Text>
-            </View>
+            <Logo size={36} style={{ marginRight: 8 }} />
             <Text style={styles.brandName}>HourLink</Text>
           </View>
 
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Chào mừng trở lại 👋</Text>
+            <Text style={styles.title}>Chào mừng trở lại</Text>
             <Text style={styles.subtitle}>Đăng nhập để tiếp tục kết nối cộng đồng</Text>
           </View>
 
           <View style={styles.formContainer}>
-            <Text style={styles.label}>Email hoặc số điện thoại</Text>
+            {/* BE chưa hỗ trợ đăng nhập bằng SĐT — chỉ hiện Email */}
+            <Text style={styles.label}>Email</Text>
             <View style={styles.inputContainer}>
               <Feather name="mail" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput

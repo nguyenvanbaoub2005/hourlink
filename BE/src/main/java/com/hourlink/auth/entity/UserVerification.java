@@ -5,8 +5,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.Instant;
-
 /**
  * UserVerification — Lưu OTP để xác minh email/phone.
  * TODO: map đầy đủ fields theo DBML schema.

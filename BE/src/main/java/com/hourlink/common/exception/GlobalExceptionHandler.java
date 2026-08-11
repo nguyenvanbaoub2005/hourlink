@@ -1,7 +1,8 @@
 package com.hourlink.common.exception;
+import com.hourlink.common.response.ApiResponse;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
-import com.hourlink.common.response.ApiResponse;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -9,6 +10,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.UUID;
 
@@ -20,9 +22,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<?>> handleAppException(AppException ex) {
         ErrorCode errorCode = ex.getErrorCode();
+        String message = ex.getMessage() == null || ex.getMessage().isBlank()
+                ? errorCode.getMessage()
+                : ex.getMessage();
         return ResponseEntity
                 .status(errorCode.getStatusCode())
-                .body(ApiResponse.error(errorCode.getCode(), errorCode.getMessage()));
+                .body(ApiResponse.error(errorCode.getCode(), message));
     }
 
     /** Xử lý lỗi validate (@NotNull, @Size, @Email...) */
@@ -74,11 +79,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(400, ex.getMessage()));
     }
 
+    /** Xử lý lỗi file quá lớn */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<?>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(400, "Kích thước file quá lớn. Vui lòng chọn file dưới 20MB."));
+    }
+
     /** Fallback — bắt tất cả lỗi chưa xử lý */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleGeneric(Exception ex) {
         log.error("Unhandled exception", ex);
         return ResponseEntity.internalServerError()
-                .body(ApiResponse.error(9999, "Lỗi hệ thống, vui lòng thử lại sau"));
+                .body(ApiResponse.error(9999, "Lỗi hệ thống: " + ex.getMessage()));
     }
 }

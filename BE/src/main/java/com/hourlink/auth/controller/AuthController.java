@@ -1,4 +1,5 @@
 package com.hourlink.auth.controller;
+import com.hourlink.common.response.ApiResponse;
 
 import com.hourlink.auth.dto.request.IntrospectRequest;
 import com.hourlink.auth.dto.request.LoginRequest;
@@ -8,7 +9,7 @@ import com.hourlink.auth.dto.request.RegisterRequest;
 import com.hourlink.auth.dto.response.AuthResponse;
 import com.hourlink.auth.dto.response.IntrospectResponse;
 import com.hourlink.auth.service.AuthService;
-import com.hourlink.common.response.ApiResponse;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;

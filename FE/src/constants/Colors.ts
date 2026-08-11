@@ -16,8 +16,10 @@ export const Colors = {
   bgInput:    '#FFFFFF',  // White inputs
   bgScreen:   '#F8FAFC',  // Very light screen bg
   bgDark:     '#F8FAFC',  // Alias for old screens to avoid errors
+  surface:    '#FFFFFF',  // Alias for legacy card/input screens
 
   // Text
+  text:          '#1E293B',  // Alias for old screens
   textPrimary:   '#1E293B',  // Slate-800
   textSecondary: '#64748B',  // Slate-500
   textMuted:     '#94A3B8',  // Slate-400

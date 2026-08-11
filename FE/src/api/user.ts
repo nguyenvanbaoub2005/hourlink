@@ -1,16 +1,16 @@
 import api from './axiosInstance';
-import type { ApiResponse, PagedResponse } from '@types';
-// TODO: import request/response types as they are implemented
+import type { ApiResponse, UserResponse, PublicUserProfileResponse, ProfileUpdateRequest } from '../types';
 
 /**
  * UserApi — API calls cho module user.
  * Base URL: /users
  */
 const UserApi = {
-  getMyProfile: () => api.get('/users/profile'),
-  updateMyProfile: (data: any) => api.put('/users/profile', data),
-  getUserById: (id: string) => api.get(`/users/{id}`),
-  changePassword: (data: any) => api.post('/users/change-password', data),
+  getMyProfile: () => api.get<ApiResponse<UserResponse>>('/users/profile'),
+  updateMyProfile: (data: ProfileUpdateRequest) => api.put<ApiResponse<UserResponse>>('/users/profile', data),
+  getUserById: (id: string) => api.get<ApiResponse<PublicUserProfileResponse>>(`/users/${id}`),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.post<ApiResponse<void>>('/users/change-password', data),
 };
 
 export default UserApi;

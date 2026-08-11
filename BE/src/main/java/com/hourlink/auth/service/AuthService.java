@@ -26,6 +26,7 @@ import com.hourlink.user.entity.UserRole;
 import com.hourlink.user.repository.RoleRepository;
 import com.hourlink.user.repository.UserRepository;
 import com.hourlink.user.repository.UserRoleRepository;
+import com.hourlink.wallet.service.WalletService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -52,6 +53,7 @@ public class AuthService {
     PasswordEncoder passwordEncoder;
     RoleRepository roleRepository;
     UserRoleRepository userRoleRepository;
+    WalletService walletService;
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -69,10 +71,7 @@ public class AuthService {
         var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        // isLocked là field primitive boolean => Lombok sinh isLocked()
-        if (user.isLocked()) {
-            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
-        }
+        ensureAccountActive(user);
 
         boolean matched = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
         if (!matched) {
@@ -114,6 +113,9 @@ public class AuthService {
         
         user.setUserRoles(java.util.List.of(userRole));
 
+        // Khởi tạo ví Time Credit với balance = 5.0 (credit khởi đầu)
+        walletService.initWallet(user);
+
         return AuthResponse.builder()
                 .token(generateToken(user, "access", VALID_DURATION))
                 .refreshToken(generateToken(user, "refresh", REFRESHABLE_DURATION))
@@ -143,6 +145,7 @@ public class AuthService {
             var email = signedJWT.getJWTClaimsSet().getSubject();
             var user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+            ensureAccountActive(user);
 
             return AuthResponse.builder()
                     .token(generateToken(user, "access", VALID_DURATION))
@@ -188,6 +191,12 @@ public class AuthService {
         JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
         SignedJWT signedJWT = SignedJWT.parse(token);
 
+        String expectedType = isRefresh ? "refresh" : "access";
+        String actualType = signedJWT.getJWTClaimsSet().getStringClaim("type");
+        if (!expectedType.equals(actualType)) {
+            throw new AppException(ErrorCode.TOKEN_INVALID);
+        }
+
         Date expiryTime = isRefresh
                 ? new Date(signedJWT.getJWTClaimsSet().getIssueTime()
                 .toInstant().plus(REFRESHABLE_DURATION, ChronoUnit.SECONDS).toEpochMilli())
@@ -229,13 +238,30 @@ public class AuthService {
     }
 
     private String buildScope(User user) {
-        if (user.getUserRoles() == null || user.getUserRoles().isEmpty()) {
-            return "";
+        return resolveCurrentScope(user);
+    }
+
+    /**
+     * Luôn lấy quyền hiện tại từ DB, không tin scope cũ nằm trong access token.
+     * Với dữ liệu cũ bị lệch userType/user_role, userType quyết định quyền nghiệp vụ;
+     * ROLE_ADMIN chỉ được công nhận khi có mapping thật trong user_role.
+     */
+    public String resolveCurrentScope(User user) {
+        java.util.List<String> storedRoles = userRoleRepository.findRoleCodesByUserId(user.getId());
+        if (storedRoles.contains("ROLE_ADMIN")) {
+            return "ROLE_ADMIN";
         }
-        java.util.StringJoiner stringJoiner = new java.util.StringJoiner(" ");
-        for (UserRole userRole : user.getUserRoles()) {
-            stringJoiner.add(userRole.getRole().getRoleCode());
+        return user.getUserType() == com.hourlink.user.enums.UserType.organization
+                ? "ROLE_ORGANIZATION"
+                : "ROLE_USER";
+    }
+
+    private void ensureAccountActive(User user) {
+        if (user.isDeleted()) {
+            throw new AppException(ErrorCode.ACCOUNT_DELETED);
         }
-        return stringJoiner.toString();
+        if (user.isLocked()) {
+            throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+        }
     }
 }
