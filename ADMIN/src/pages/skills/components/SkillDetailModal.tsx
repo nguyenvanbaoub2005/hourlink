@@ -8,6 +8,7 @@ import { skillsApi } from '@/api/skills';
 import SkillActionModal from './SkillActionModal';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
+import imageCompression from 'browser-image-compression';
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -133,7 +134,19 @@ export default function SkillDetailModal({
 
     try {
       setIsUploading(true);
-      const res = await skillsApi.uploadAttachment(skillId, file);
+
+      // Nếu là file ảnh thì nén trước khi upload, file tài liệu (PDF, DOC...) giữ nguyên
+      let fileToUpload: File = file;
+      if (file.type.startsWith('image/')) {
+        const compressionOptions = {
+          maxSizeMB: 1,            // Giới hạn ảnh minh chứng tối đa 1MB
+          maxWidthOrHeight: 1920,  // Chiều dài/rộng tối đa 1920px
+          useWebWorker: true,
+        };
+        fileToUpload = await imageCompression(file, compressionOptions);
+      }
+
+      const res = await skillsApi.uploadAttachment(skillId, fileToUpload);
       if (res?.data) {
         toast.success('Đã tải minh chứng lên thành công!');
       } else {

@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import UserApi from '@api/user';
 import type { UserResponse, ProfileUpdateRequest } from '@types';
 
@@ -53,13 +54,28 @@ export default function EditProfileScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
-      base64: true,
+      quality: 1, // Chất lượng gốc, để ImageManipulator xử lý
+      // Không lấy base64 ở đây để tiết kiệm bộ nhớ
     });
 
-    if (!result.canceled && result.assets[0].base64) {
-      const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      setProfile({ ...profile, avatarUrl: base64Img });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+
+      // Nén & Resize ảnh avatar về 400x400 JPEG (Giải pháp 1)
+      const manipResult = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 400, height: 400 } }], // Thu nhỏ về 400x400px
+        {
+          compress: 0.7,                              // Nén 70% chất lượng
+          format: ImageManipulator.SaveFormat.JPEG,   // Xuất ra định dạng JPEG
+          base64: true,                               // Lấy chuỗi base64 từ ảnh đã nén
+        }
+      );
+
+      if (manipResult.base64) {
+        const base64Img = `data:image/jpeg;base64,${manipResult.base64}`;
+        setProfile({ ...profile, avatarUrl: base64Img });
+      }
     }
   };
 
