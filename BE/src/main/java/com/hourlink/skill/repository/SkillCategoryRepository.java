@@ -5,11 +5,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.UUID;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface SkillCategoryRepository extends JpaRepository<SkillCategory, UUID> {
-    Optional<SkillCategory> findByName(String name);
-    Optional<SkillCategory> findByNameAndIsDeletedFalse(String name);
-    java.util.List<SkillCategory> findAllByIsDeletedFalse();
+    Optional<SkillCategory> findByIdAndIsDeletedFalse(UUID id);
+    List<SkillCategory> findAllByNameIgnoreCase(String name);
+    List<SkillCategory> findAllByNameIgnoreCaseAndIsDeletedFalse(String name);
+    List<SkillCategory> findAllByIsDeletedFalse();
 }

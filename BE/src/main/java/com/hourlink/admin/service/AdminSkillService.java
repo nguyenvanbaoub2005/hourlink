@@ -217,7 +217,8 @@ public class AdminSkillService {
 
         SkillCategory category = null;
         if (request.getCategoryId() != null) {
-            category = categoryRepository.findById(request.getCategoryId()).orElse(null);
+            category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId())
+                    .orElseThrow(() -> new BadRequestException("Không tìm thấy danh mục"));
         }
 
         Skill skill = Skill.builder()
@@ -261,7 +262,7 @@ public class AdminSkillService {
         }
 
         if (request.getCategoryId() != null) {
-            SkillCategory category = categoryRepository.findById(request.getCategoryId())
+            SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(request.getCategoryId())
                     .orElseThrow(() -> new BadRequestException("Không tìm thấy danh mục"));
             skill.setCategory(category);
         } else {
@@ -318,16 +319,20 @@ public class AdminSkillService {
 
     @Transactional
     public AdminCategoryResponse updateCategory(UUID categoryId, AdminCategoryRequest request) {
-        SkillCategory category = categoryRepository.findById(categoryId)
+        SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(categoryId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy danh mục"));
 
-        if (!category.getName().equals(request.getName()) &&
-                categoryRepository.findByNameAndIsDeletedFalse(request.getName()).isPresent()) {
+        String normalizedName = normalizeCategoryName(request.getName());
+        boolean duplicateName = categoryRepository
+                .findAllByNameIgnoreCaseAndIsDeletedFalse(normalizedName)
+                .stream()
+                .anyMatch(existing -> !existing.getId().equals(categoryId));
+        if (duplicateName) {
             throw new BadRequestException("Tên danh mục đã tồn tại");
         }
 
-        category.setName(request.getName());
-        category.setDescription(request.getDescription());
+        category.setName(normalizedName);
+        category.setDescription(normalizeCategoryDescription(request.getDescription()));
         categoryRepository.save(category);
 
         return AdminCategoryResponse.builder()
@@ -342,16 +347,23 @@ public class AdminSkillService {
 
     @Transactional
     public AdminCategoryResponse createCategory(AdminCategoryCreateRequest request) {
-        if (categoryRepository.findByNameAndIsDeletedFalse(request.getName()).isPresent()) {
+        String normalizedName = normalizeCategoryName(request.getName());
+        if (!categoryRepository
+                .findAllByNameIgnoreCaseAndIsDeletedFalse(normalizedName)
+                .isEmpty()) {
             throw new BadRequestException("Tên danh mục đã tồn tại");
         }
 
-        SkillCategory category = SkillCategory.builder()
-                .name(request.getName())
-                .description(request.getDescription())
-                .build();
+        SkillCategory category = categoryRepository.findAllByNameIgnoreCase(normalizedName)
+                .stream()
+                .filter(SkillCategory::isDeleted)
+                .findFirst()
+                .orElseGet(() -> SkillCategory.builder().build());
+        category.setName(normalizedName);
+        category.setDescription(normalizeCategoryDescription(request.getDescription()));
+        category.setDeleted(false);
         category = categoryRepository.save(category);
-        log.info("Admin created category '{}'", request.getName());
+        log.info("Admin created or restored category '{}'", normalizedName);
 
         return AdminCategoryResponse.builder()
                 .id(category.getId())
@@ -365,7 +377,7 @@ public class AdminSkillService {
 
     @Transactional
     public void deleteCategory(UUID categoryId) {
-        SkillCategory category = categoryRepository.findById(categoryId)
+        SkillCategory category = categoryRepository.findByIdAndIsDeletedFalse(categoryId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy danh mục"));
 
         long skillCount = skillRepository.findAll().stream()
@@ -387,6 +399,18 @@ public class AdminSkillService {
         category.setDeleted(true);
         categoryRepository.save(category);
         log.info("Admin soft-deleted category '{}' (id={})", category.getName(), categoryId);
+    }
+
+    private String normalizeCategoryName(String name) {
+        return name.trim().replaceAll("\\s+", " ");
+    }
+
+    private String normalizeCategoryDescription(String description) {
+        if (description == null) {
+            return null;
+        }
+        String normalized = description.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     // ─── Mappers ──────────────────────────────────────────────────────

@@ -8,10 +8,6 @@ import com.hourlink.user.repository.UserRepository;
 import com.hourlink.user.repository.UserRoleRepository;
 import com.hourlink.skill.entity.SkillCategory;
 import com.hourlink.skill.repository.SkillCategoryRepository;
-import com.hourlink.skill.entity.Skill;
-import com.hourlink.skill.repository.SkillRepository;
-import com.hourlink.helprequest.entity.HelpRequest;
-import com.hourlink.helprequest.repository.HelpRequestRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -32,8 +28,6 @@ public class DataInitializer implements CommandLineRunner {
     UserRepository userRepository;
     UserRoleRepository userRoleRepository;
     SkillCategoryRepository skillCategoryRepository;
-    SkillRepository skillRepository;
-    HelpRequestRepository helpRequestRepository;
     PasswordEncoder passwordEncoder;
     JdbcTemplate jdbcTemplate;
 
@@ -67,48 +61,23 @@ public class DataInitializer implements CommandLineRunner {
         createCategoryIfNotFound("Sức khỏe", "Gym, Yoga, dinh dưỡng, bơi lội, thể thao...");
         createCategoryIfNotFound("Nghệ thuật", "Âm nhạc, hội họa, đàn Guitar, Piano...");
         createCategoryIfNotFound("Khác", "Các kỹ năng và lĩnh vực khác");
-
-        cleanupOldCategories();
-    }
-
-    private void cleanupOldCategories() {
-        List<String> validNames = List.of(
-                "Lập trình", "Ngôn ngữ", "Thiết kế", "Kinh doanh",
-                "Giáo dục", "Sức khỏe", "Nghệ thuật", "Khác"
-        );
-        SkillCategory otherCategory = skillCategoryRepository.findByName("Khác").orElse(null);
-
-        List<SkillCategory> allCategories = skillCategoryRepository.findAll();
-        for (SkillCategory cat : allCategories) {
-            if (!validNames.contains(cat.getName())) {
-                if (otherCategory != null && !cat.getId().equals(otherCategory.getId())) {
-                    List<Skill> skills = skillRepository.findAll();
-                    for (Skill s : skills) {
-                        if (s.getCategory() != null && s.getCategory().getId().equals(cat.getId())) {
-                            s.setCategory(otherCategory);
-                            skillRepository.save(s);
-                        }
-                    }
-                    List<HelpRequest> requests = helpRequestRepository.findAll();
-                    for (HelpRequest r : requests) {
-                        if (r.getCategory() != null && r.getCategory().getId().equals(cat.getId())) {
-                            r.setCategory(otherCategory);
-                            helpRequestRepository.save(r);
-                        }
-                    }
-                }
-                skillCategoryRepository.delete(cat);
-            }
-        }
     }
 
     private void createCategoryIfNotFound(String name, String description) {
-        if (skillCategoryRepository.findByName(name).isEmpty()) {
-            skillCategoryRepository.save(SkillCategory.builder()
-                    .name(name)
-                    .description(description)
-                    .build());
+        List<SkillCategory> matchingCategories =
+                skillCategoryRepository.findAllByNameIgnoreCase(name);
+        if (matchingCategories.stream().anyMatch(category -> !category.isDeleted())) {
+            return;
         }
+
+        SkillCategory category = matchingCategories.stream()
+                .filter(SkillCategory::isDeleted)
+                .findFirst()
+                .orElseGet(() -> SkillCategory.builder().name(name).build());
+        category.setName(name);
+        category.setDescription(description);
+        category.setDeleted(false);
+        skillCategoryRepository.save(category);
     }
 
     private void createRoleIfNotFound(String roleName, String roleCode, String description) {

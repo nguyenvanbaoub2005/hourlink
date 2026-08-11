@@ -13,7 +13,9 @@ const SkillApi = {
   updateSkill: (id: string, data: any) => api.put(`/skill/${id}`, data),
   deleteSkill: (id: string) => api.delete(`/skill/${id}`),
   toggleVisibility: (id: string) => api.patch(`/skill/${id}/toggle-visibility`),
-  getCategories: () => api.get('/skill/categories'),
+  // Cache-bust để danh mục vừa được Admin thêm/sửa xuất hiện ngay khi màn hình
+  // được focus hoặc người dùng kéo để làm mới.
+  getCategories: () => api.get('/skill/categories', { params: { _ts: Date.now() } }),
   searchSkills: (params?: { keyword?: string; categoryId?: string; format?: string; region?: string }) =>
     api.get('/skill/search', { params }),
   // Attachment APIs
