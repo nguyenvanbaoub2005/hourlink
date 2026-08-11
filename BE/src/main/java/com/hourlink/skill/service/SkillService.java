@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -119,7 +121,17 @@ public class SkillService {
                 "Lập trình", "Ngôn ngữ", "Thiết kế", "Kinh doanh",
                 "Giáo dục", "Sức khỏe", "Nghệ thuật", "Khác"
         );
-        return categoryRepository.findAll().stream()
+        String currentEmail = SecurityUtil.getCurrentUserEmailOrNull();
+        UUID currentUserId = currentEmail == null
+                ? null
+                : userRepository.findByEmail(currentEmail).map(User::getId).orElse(null);
+        Map<UUID, SkillRepository.CategoryStatsProjection> statsByCategory =
+                skillRepository.summarizeVisibleCategories(currentUserId).stream()
+                        .collect(Collectors.toMap(
+                                SkillRepository.CategoryStatsProjection::getCategoryId,
+                                Function.identity()));
+
+        return categoryRepository.findAllByIsDeletedFalse().stream()
                 .sorted((a, b) -> {
                     int idxA = order.indexOf(a.getName());
                     int idxB = order.indexOf(b.getName());
@@ -128,11 +140,16 @@ public class SkillService {
                     if ("Khác".equals(b.getName())) return -1;
                     return a.getName().compareTo(b.getName());
                 })
-                .map(c -> com.hourlink.skill.dto.response.SkillCategoryResponse.builder()
-                        .id(c.getId())
-                        .name(c.getName())
-                        .description(c.getDescription())
-                        .build())
+                .map(c -> {
+                    SkillRepository.CategoryStatsProjection stats = statsByCategory.get(c.getId());
+                    return com.hourlink.skill.dto.response.SkillCategoryResponse.builder()
+                            .id(c.getId())
+                            .name(c.getName())
+                            .description(c.getDescription())
+                            .supporterCount(stats == null ? 0 : stats.getSupporterCount())
+                            .skillCount(stats == null ? 0 : stats.getSkillCount())
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 
@@ -166,6 +183,12 @@ public class SkillService {
         List<Skill> skills = skillRepository.findAllByStatus(SkillStatus.VISIBLE);
         return skills.stream()
                 .filter(s -> {
+                    if (s.getUser() == null || s.getUser().isLocked() || s.getUser().isDeleted()) {
+                        return false;
+                    }
+                    if (s.getCategory() == null || s.getCategory().isDeleted()) {
+                        return false;
+                    }
                     if (currentEmail != null && s.getUser() != null && currentEmail.equals(s.getUser().getEmail())) {
                         return false;
                     }

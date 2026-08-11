@@ -1,6 +1,9 @@
+-- LEGACY / KHONG NEN CHAY:
+-- File cu nay gan user va danh muc bang ORDER BY RAND(), khong idempotent va co
+-- the tao noi dung sai linh vuc. Hay dung `seed_demo_balanced.sql` thay the.
+--
 -- =============================================================
--- Seed Data: 60 Skills & 60 Help Requests
--- Chạy trên cơ sở dữ liệu có sẵn bảng user và skill_category
+-- Seed Data: 60 Skills & 60 Help Requests (legacy)
 -- =============================================================
 
 INSERT INTO `skill` (`id`, `created_at`, `updated_at`, `description`, `duration`, `format`, `level`, `name`, `region`, `status`, `category_id`, `user_id`, `free_time`)

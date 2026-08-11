@@ -19,7 +19,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Types
-type CategoryItem = { id: string; name: string; description?: string };
+type CategoryItem = {
+  id: string;
+  name: string;
+  description?: string;
+  supporterCount?: number;
+  skillCount?: number;
+};
 type SkillItem = {
   id: string;
   name: string;
@@ -135,19 +141,21 @@ export default function ExploreScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       fetchSkills();
     }, [selectedCategoryId, selectedFormat, selectedRegion])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchCategories();
+    }, [])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchSkills(true);
+    await Promise.all([fetchSkills(true), fetchCategories()]);
   };
 
   const handleSearchSubmit = () => {
@@ -199,6 +207,7 @@ export default function ExploreScreen() {
 
   // Lấy danh sách kỹ năng nổi bật thực tế từ DB (không tạo dữ liệu giả lập)
   const trendingSkills = Array.from(new Set(skills.map(s => s.name))).slice(0, 10);
+  const visibleSupportCount = new Set(skills.map((skill) => skill.userId || skill.id)).size;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -244,7 +253,6 @@ export default function ExploreScreen() {
             {categories.map((cat) => {
               const active = selectedCategoryId === cat.id;
               const categoryVisual = getCategoryVisual(cat.name);
-              const count = skills.filter(s => s.categoryId === cat.id || s.categoryName === cat.name).length;
               return (
                 <TouchableOpacity
                   key={cat.id}
@@ -267,8 +275,13 @@ export default function ExploreScreen() {
                   >
                     {cat.name}
                   </Text>
-                  <Text style={[styles.catStatText, active && styles.catStatTextActive, active && { color: categoryVisual.color }]}>
-                    {count} kỹ năng
+                  <Text
+                    style={[styles.catStatText, active && styles.catStatTextActive, active && { color: categoryVisual.color }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                  >
+                    {cat.supporterCount ?? 0} người hỗ trợ
                   </Text>
                 </TouchableOpacity>
               );
@@ -358,7 +371,7 @@ export default function ExploreScreen() {
         {/* ── Danh sách kết quả (Người hỗ trợ) ──────────────────────────── */}
         <View style={styles.resultHeader}>
           <Text style={styles.resultTitle}>
-            Danh sách người hỗ trợ ({skills.length})
+            Danh sách người hỗ trợ ({visibleSupportCount})
           </Text>
           {(selectedCategoryId || selectedFormat || selectedRegion || keyword) ? (
             <TouchableOpacity

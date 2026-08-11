@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Pressable } from 'react-native';
 import { Colors, Spacing, Radius } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
@@ -17,6 +17,7 @@ import Logo from '@components/Logo';
 import InvitationApi, { type InvitationResponse } from '@api/invitation';
 import Avatar from '@components/Avatar';
 import { formatDateTimeVi } from '@utils/dateTime';
+import type { AppointmentItem } from '@types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 type HelpRequestItem = {
@@ -46,36 +47,37 @@ export default function IndividualHomeScreen() {
   const { unreadCount } = useNotificationStore();
   const { totalUnread: chatUnread, setTotalUnread: setChatUnread } = useChatStore();
   const [myRequests, setMyRequests] = useState<HelpRequestItem[]>([]);
-  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<AppointmentItem[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<InvitationResponse[]>([]);
   const [firstName, setFirstName] = useState<string>('Bạn');
   const [refreshing, setRefreshing] = useState(false);
   const { wallet, fetchWallet } = useWalletStore();
 
   const fetchData = async () => {
-    const [homeResult, invitationResult] = await Promise.allSettled([
-      Promise.all([
-        HelpRequestApi.getMyRequests(),
-        UserApi.getMyProfile(),
-        AppointmentApi.getMyAppointments('UPCOMING', 0, 1),
-        fetchWallet(),
-      ]),
+    const [requestResult, profileResult, appointmentResult, , invitationResult] = await Promise.allSettled([
+      HelpRequestApi.getMyRequests(),
+      UserApi.getMyProfile(),
+      AppointmentApi.getMyAppointments('UPCOMING', 0, 1),
+      fetchWallet(),
       InvitationApi.getReceived(),
     ]);
 
-    if (homeResult.status === 'fulfilled') {
-      const [reqRes, profileRes, aptRes] = homeResult.value;
-      setMyRequests(reqRes.data.data ?? []);
-      setUpcomingAppointments(aptRes.data.data?.content ?? []);
-
-      if (profileRes.data.data?.fullName) {
-        setFirstName(profileRes.data.data.fullName.split(' ').pop() ?? 'Bạn');
-      } else if (user?.fullName) {
-        setFirstName(user.fullName.split(' ').pop() ?? 'Bạn');
-      }
+    if (requestResult.status === 'fulfilled') {
+      setMyRequests(requestResult.value.data.data ?? []);
     } else {
       setMyRequests([]);
+    }
+
+    if (appointmentResult.status === 'fulfilled') {
+      setUpcomingAppointments(appointmentResult.value.data.data?.content ?? []);
+    } else {
       setUpcomingAppointments([]);
+    }
+
+    if (profileResult.status === 'fulfilled' && profileResult.value.data.data?.fullName) {
+      setFirstName(profileResult.value.data.data.fullName.split(' ').pop() ?? 'Bạn');
+    } else if (user?.fullName) {
+      setFirstName(user.fullName.split(' ').pop() ?? 'Bạn');
     }
 
     if (invitationResult.status === 'fulfilled') {
@@ -110,6 +112,24 @@ export default function IndividualHomeScreen() {
     pathname: '/profile/invitations',
     params: { tab: 'RECEIVED' },
   });
+  const openHelpRequests = () => router.push('/profile/help-requests' as any);
+  const openRequestDetail = (requestId: string) => router.push({
+    pathname: '/profile/help-request/[id]',
+    params: { id: requestId },
+  } as any);
+  const openAiSuggestions = (requestId: string) => router.push({
+    pathname: '/profile/ai-suggest',
+    params: { helpRequestId: requestId },
+  });
+  const openAppointment = (appointmentId: string) => {
+    const normalizedId = appointmentId?.trim();
+    if (!normalizedId) {
+      router.push('/(tabs)/appointments');
+      return;
+    }
+
+    router.push(`/appointment/${encodeURIComponent(normalizedId)}` as any);
+  };
 
   return (
     <ScrollView
@@ -307,14 +327,11 @@ export default function IndividualHomeScreen() {
           <Text style={styles.emptyText}>Chưa có lịch hẹn nào</Text>
         </View>
       ) : (
-        upcomingAppointments.map((apt: any) => (
+        upcomingAppointments.map(apt => (
           <TouchableOpacity 
             key={apt.id} 
             style={styles.requestCard}
-            onPress={() => router.push({
-              pathname: '/appointment/[id]',
-              params: { id: apt.id },
-            })}
+            onPress={() => openAppointment(apt.id)}
           >
             <View style={styles.requestTopRow}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -345,78 +362,152 @@ export default function IndividualHomeScreen() {
       )}
 
       {/* ── Yêu cầu đang hoạt động ───────────────────────────────────────── */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Yêu cầu đang hoạt động</Text>
-        <TouchableOpacity onPress={() => router.push('/profile/help-requests' as any)}>
-          <Text style={styles.seeAll}>Xem thêm</Text>
-        </TouchableOpacity>
-      </View>
-
-      {activeRequests.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Ionicons name="help-circle-outline" size={32} color={Colors.textMuted} />
-          <Text style={styles.emptyText}>Chưa có yêu cầu nào</Text>
-          <TouchableOpacity
-            style={styles.createBtn}
-            onPress={() => router.push('/(tabs)/post' as any)}
-          >
-            <Text style={styles.createBtnText}>+ Đăng yêu cầu ngay</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        activeRequests.map(req => (
-          <View key={req.id} style={styles.requestCard}>
-            <View style={styles.requestTopRow}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={[
-                  styles.badge,
-                  req.status === 'SEARCHING' ? { backgroundColor: '#FEF3C7' } : { backgroundColor: '#D1FAE5' }
-                ]}>
-                  <Text style={[
-                    styles.badgeText,
-                    req.status === 'SEARCHING' ? { color: '#92400E' } : { color: '#065F46' }
-                  ]}>
-                    {req.status === 'SEARCHING' ? 'Đang tìm kiếm' : 'Đã ghép'}
-                  </Text>
-                </View>
-                {req.duration ? (
-                  <View style={[styles.badge, styles.iconBadge, { backgroundColor: '#FFEDD5' }]}>
-                    <Ionicons name="time-outline" size={13} color="#C2410C" />
-                    <Text style={[styles.badgeText, { color: '#C2410C' }]}>{Number((req.duration / 60).toFixed(1))} TC</Text>
-                  </View>
-                ) : null}
-              </View>
+      <View style={styles.activeRequestSection}>
+        <TouchableOpacity
+          style={styles.activeRequestHeader}
+          activeOpacity={0.7}
+          onPress={openHelpRequests}
+          accessibilityRole="button"
+          accessibilityLabel={`Xem tất cả ${activeRequests.length} yêu cầu đang hoạt động`}
+        >
+          <View style={styles.activeRequestHeading}>
+            <View style={styles.activeRequestHeadingIcon}>
+              <Ionicons name="pulse-outline" size={20} color="#047857" />
             </View>
-            <Text style={styles.requestTitle}>{req.title}</Text>
-            {req.description ? (
-              <Text style={styles.requestDesc} numberOfLines={2}>{req.description}</Text>
-            ) : null}
-
-            <View style={styles.cardDivider} />
-            
-            <View style={styles.requestBottomRow}>
-              <View style={styles.requestMetaGroup}>
-                <View style={styles.requestMetaItem}>
-                  <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
-                  <Text style={styles.requestBottomText}>{req.duration || 60} phút</Text>
-                </View>
-                <Text style={styles.requestBottomText}>·</Text>
-                <Text style={styles.requestBottomText}>
-                  {req.format === 'OFFLINE' ? 'Trực tiếp' : req.format === 'BOTH' ? 'Cả hai' : 'Online'}
-                </Text>
-                <View style={styles.requestMetaItem}>
-                  <Ionicons name="chatbubble-outline" size={14} color={Colors.textMuted} />
-                  <Text style={styles.requestBottomText}>{req.responseCount ?? 0} phản hồi</Text>
-                </View>
+            <View style={styles.activeRequestHeadingText}>
+              <View style={styles.activeRequestTitleRow}>
+                <Text style={styles.activeRequestSectionTitle} numberOfLines={1}>Yêu cầu đang hoạt động</Text>
+                {activeRequests.length > 0 && (
+                  <View style={styles.activeRequestCount}>
+                    <Text style={styles.activeRequestCountText}>{activeRequests.length}</Text>
+                  </View>
+                )}
               </View>
-              <View style={styles.aiSuggestBadge}>
-                <Ionicons name="sparkles-outline" size={14} color="#059669" />
-                <Text style={styles.aiSuggestText}>AI gợi ý</Text>
-              </View>
+              <Text style={styles.activeRequestSubtitle}>Theo dõi phản hồi và tìm người hỗ trợ phù hợp</Text>
             </View>
           </View>
-        ))
-      )}
+          <View style={styles.activeRequestSeeAll}>
+            <Text style={styles.activeRequestSeeAllText}>Tất cả</Text>
+            <Ionicons name="chevron-forward" size={16} color="#047857" />
+          </View>
+        </TouchableOpacity>
+
+        {activeRequests.length === 0 ? (
+          <View style={styles.activeRequestEmpty}>
+            <View style={styles.activeRequestEmptyIcon}>
+              <Ionicons name="document-text-outline" size={28} color="#0D9488" />
+            </View>
+            <Text style={styles.activeRequestEmptyTitle}>Bạn chưa có yêu cầu đang mở</Text>
+            <Text style={styles.activeRequestEmptyText}>Đăng nhu cầu để cộng đồng có thể tìm thấy và hỗ trợ bạn.</Text>
+            <TouchableOpacity
+              style={styles.activeRequestCreateButton}
+              activeOpacity={0.8}
+              onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'needHelp' } } as any)}
+            >
+              <Ionicons name="add" size={18} color="#FFFFFF" />
+              <Text style={styles.activeRequestCreateText}>Tạo yêu cầu</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.activeRequestList}>
+            {activeRequests.slice(0, 3).map(req => {
+              const isSearching = req.status === 'SEARCHING';
+              const formatLabel = req.format === 'OFFLINE'
+                ? 'Trực tiếp'
+                : req.format === 'BOTH'
+                  ? 'Linh hoạt'
+                  : 'Trực tuyến';
+
+              return (
+                <Pressable
+                  key={req.id}
+                  style={({ pressed }) => [
+                    styles.activeRequestCard,
+                    isSearching ? styles.activeRequestCardSearching : styles.activeRequestCardMatched,
+                    pressed && styles.activeRequestCardPressed,
+                  ]}
+                  onPress={() => openRequestDetail(req.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xem chi tiết yêu cầu ${req.title}`}
+                >
+                  <View style={styles.activeRequestCardTop}>
+                    <View style={styles.activeRequestBadges}>
+                      <View style={[
+                        styles.activeRequestStatus,
+                        isSearching ? styles.activeRequestStatusSearching : styles.activeRequestStatusMatched,
+                      ]}>
+                        <View style={[
+                          styles.activeRequestStatusDot,
+                          { backgroundColor: isSearching ? '#D97706' : '#059669' },
+                        ]} />
+                        <Text style={[
+                          styles.activeRequestStatusText,
+                          { color: isSearching ? '#92400E' : '#065F46' },
+                        ]}>
+                          {isSearching ? 'Đang tìm người hỗ trợ' : 'Đã kết nối'}
+                        </Text>
+                      </View>
+                      {req.categoryName ? (
+                        <View style={styles.activeRequestCategory}>
+                          <Text style={styles.activeRequestCategoryText} numberOfLines={1}>{req.categoryName}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+                  </View>
+
+                  <Text style={styles.activeRequestCardTitle} numberOfLines={2}>{req.title}</Text>
+                  {req.description ? (
+                    <Text style={styles.activeRequestCardDescription} numberOfLines={2}>{req.description}</Text>
+                  ) : null}
+
+                  <View style={styles.activeRequestMetaRow}>
+                    <View style={styles.activeRequestMetaPill}>
+                      <Ionicons name="time-outline" size={14} color="#475569" />
+                      <Text style={styles.activeRequestMetaText}>{req.duration || 60} phút</Text>
+                    </View>
+                    <View style={styles.activeRequestMetaPill}>
+                      <Ionicons name={req.format === 'OFFLINE' ? 'people-outline' : 'videocam-outline'} size={14} color="#475569" />
+                      <Text style={styles.activeRequestMetaText}>{formatLabel}</Text>
+                    </View>
+                    <View style={styles.activeRequestMetaPill}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={14} color="#475569" />
+                      <Text style={styles.activeRequestMetaText}>{req.responseCount ?? 0}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.activeRequestCardFooter}>
+                    <View style={styles.activeRequestDetailHint}>
+                      <Ionicons name="eye-outline" size={16} color="#475569" />
+                      <Text style={styles.activeRequestDetailHintText}>Xem chi tiết</Text>
+                    </View>
+                    <Pressable
+                      style={({ pressed }) => [styles.activeRequestAiButton, pressed && styles.activeRequestAiButtonPressed]}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        openAiSuggestions(req.id);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xem AI gợi ý cho yêu cầu ${req.title}`}
+                    >
+                      <Ionicons name="sparkles" size={16} color="#047857" />
+                      <Text style={styles.activeRequestAiText}>AI gợi ý</Text>
+                      <Ionicons name="arrow-forward" size={14} color="#047857" />
+                    </Pressable>
+                  </View>
+                </Pressable>
+              );
+            })}
+
+            {activeRequests.length > 3 && (
+              <TouchableOpacity style={styles.activeRequestMoreButton} onPress={openHelpRequests}>
+                <Text style={styles.activeRequestMoreText}>Xem thêm {activeRequests.length - 3} yêu cầu</Text>
+                <Ionicons name="arrow-forward" size={16} color="#047857" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
 
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -525,4 +616,104 @@ const styles = StyleSheet.create({
   requestMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   aiSuggestBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 },
   aiSuggestText: { fontSize: 13, fontWeight: 'bold', color: '#059669' },
+
+  activeRequestSection: {
+    backgroundColor: '#F0FDFA', borderWidth: 1, borderColor: '#CCFBF1',
+    borderRadius: Radius.xl, padding: 14, marginBottom: Spacing.lg,
+  },
+  activeRequestHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 13,
+  },
+  activeRequestHeading: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  activeRequestHeadingIcon: {
+    width: 40, height: 40, borderRadius: 13, backgroundColor: '#CCFBF1',
+    alignItems: 'center', justifyContent: 'center', marginRight: 10,
+  },
+  activeRequestHeadingText: { flex: 1 },
+  activeRequestTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  activeRequestSectionTitle: { flexShrink: 1, color: '#0F172A', fontSize: 15, fontWeight: '800' },
+  activeRequestCount: {
+    minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#0F766E',
+    paddingHorizontal: 6, marginLeft: 7, alignItems: 'center', justifyContent: 'center',
+  },
+  activeRequestCountText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  activeRequestSubtitle: { color: '#64748B', fontSize: 11, marginTop: 3, lineHeight: 15 },
+  activeRequestSeeAll: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+    paddingLeft: 10, paddingRight: 6, paddingVertical: 7, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: '#A7F3D0', marginLeft: 8,
+  },
+  activeRequestSeeAllText: { color: '#047857', fontSize: 12, fontWeight: '700' },
+  activeRequestList: { gap: 10 },
+  activeRequestCard: {
+    backgroundColor: '#FFFFFF', borderRadius: Radius.lg, padding: 14,
+    borderWidth: 1, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  activeRequestCardSearching: { borderColor: '#FDE68A' },
+  activeRequestCardMatched: { borderColor: '#A7F3D0' },
+  activeRequestCardPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
+  activeRequestCardTop: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
+  },
+  activeRequestBadges: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 8 },
+  activeRequestStatus: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 9,
+    paddingVertical: 5, borderRadius: Radius.full,
+  },
+  activeRequestStatusSearching: { backgroundColor: '#FEF3C7' },
+  activeRequestStatusMatched: { backgroundColor: '#D1FAE5' },
+  activeRequestStatusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  activeRequestStatusText: { fontSize: 11, fontWeight: '700' },
+  activeRequestCategory: {
+    flexShrink: 1, backgroundColor: '#F1F5F9', paddingHorizontal: 9,
+    paddingVertical: 5, borderRadius: Radius.full,
+  },
+  activeRequestCategoryText: { color: '#475569', fontSize: 11, fontWeight: '600' },
+  activeRequestCardTitle: { color: '#0F172A', fontSize: 16, lineHeight: 22, fontWeight: '800' },
+  activeRequestCardDescription: { color: '#64748B', fontSize: 13, lineHeight: 19, marginTop: 5 },
+  activeRequestMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 },
+  activeRequestMetaPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F8FAFC',
+    borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: Radius.full,
+  },
+  activeRequestMetaText: { color: '#475569', fontSize: 11, fontWeight: '600' },
+  activeRequestCardFooter: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 11, marginTop: 12,
+  },
+  activeRequestDetailHint: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  activeRequestDetailHintText: { color: '#475569', fontSize: 12, fontWeight: '600' },
+  activeRequestAiButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ECFDF5',
+    paddingHorizontal: 11, paddingVertical: 8, borderRadius: 11,
+    borderWidth: 1, borderColor: '#A7F3D0',
+  },
+  activeRequestAiButtonPressed: { backgroundColor: '#D1FAE5', opacity: 0.82 },
+  activeRequestAiText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  activeRequestMoreButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 9,
+  },
+  activeRequestMoreText: { color: '#047857', fontSize: 13, fontWeight: '700' },
+  activeRequestEmpty: {
+    backgroundColor: '#FFFFFF', borderRadius: Radius.lg, padding: 20,
+    alignItems: 'center', borderWidth: 1, borderColor: '#CCFBF1',
+  },
+  activeRequestEmptyIcon: {
+    width: 52, height: 52, borderRadius: 18, backgroundColor: '#CCFBF1',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+  },
+  activeRequestEmptyTitle: { color: '#0F172A', fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  activeRequestEmptyText: {
+    color: '#64748B', fontSize: 12, lineHeight: 18, textAlign: 'center',
+    marginTop: 5, maxWidth: 280,
+  },
+  activeRequestCreateButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#0F766E',
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 14,
+  },
+  activeRequestCreateText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
 });

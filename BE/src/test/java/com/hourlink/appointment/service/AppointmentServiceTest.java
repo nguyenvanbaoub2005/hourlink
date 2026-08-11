@@ -12,6 +12,7 @@ import com.hourlink.appointment.enums.VerificationMethod;
 import com.hourlink.appointment.repository.AppointmentCompletionRepository;
 import com.hourlink.appointment.repository.AppointmentRepository;
 import com.hourlink.appointment.repository.AppointmentVerificationRepository;
+import com.hourlink.chat.repository.UserBlockRepository;
 import com.hourlink.chat.service.ChatService;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
@@ -66,6 +67,7 @@ class AppointmentServiceTest {
     @Mock AppointmentVerificationRepository verificationRepository;
     @Mock AppointmentCompletionRepository completionRepository;
     @Mock UserRepository userRepository;
+    @Mock UserBlockRepository userBlockRepository;
     @Mock InvitationRepository invitationRepository;
     @Mock SkillRepository skillRepository;
     @Mock NotificationService notificationService;
@@ -80,7 +82,7 @@ class AppointmentServiceTest {
     @BeforeEach
     void setUp() {
         service = new AppointmentService(appointmentRepository, verificationRepository,
-                completionRepository, userRepository, invitationRepository, skillRepository,
+                completionRepository, userRepository, userBlockRepository, invitationRepository, skillRepository,
                 notificationService, chatService, walletService, ratingService);
         provider = user("provider@hourlink.vn", "Người hỗ trợ");
         receiver = user("receiver@hourlink.vn", "Người nhận");
@@ -162,6 +164,24 @@ class AppointmentServiceTest {
 
         assertEquals(ErrorCode.INVALID_REQUEST, error.getErrorCode());
         verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void createAppointment_whenEitherUserBlocksTheOther_isRejected() {
+        authenticate(receiver);
+        Invitation invitation = acceptedInvitation();
+        when(userRepository.findById(provider.getId())).thenReturn(Optional.of(provider));
+        when(userRepository.findById(receiver.getId())).thenReturn(Optional.of(receiver));
+        when(userBlockRepository.existsBlockBetween(provider.getId(), receiver.getId()))
+                .thenReturn(true);
+
+        AppException error = assertThrows(AppException.class,
+                () -> service.createAppointment(createRequest(invitation)));
+
+        assertEquals(ErrorCode.USER_BLOCKED, error.getErrorCode());
+        verify(invitationRepository, never()).findByIdForUpdate(any());
+        verify(appointmentRepository, never()).save(any());
+        verify(notificationService, never()).createNotification(any(), any(), any(), any(), any(), any());
     }
 
     @Test
