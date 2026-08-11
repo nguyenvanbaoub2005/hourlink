@@ -59,7 +59,8 @@ public class HelpRequestService {
 
     public List<HelpRequestResponse> getMyHelpRequests() {
         String email = SecurityUtil.getCurrentUserEmail();
-        List<HelpRequest> requests = helpRequestRepository.findAllByRequester_Email(email);
+        List<HelpRequest> requests = helpRequestRepository
+                .findAllByRequester_EmailAndStatusNotOrderByCreatedAtDesc(email, RequestStatus.DELETED);
         return requests.stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
@@ -71,6 +72,9 @@ public class HelpRequestService {
 
         if (!helpRequest.getRequester().getEmail().equals(email)) {
             throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+        if (helpRequest.getStatus() == RequestStatus.DELETED) {
+            throw new AppException(ErrorCode.REQUEST_NOT_FOUND);
         }
 
         SkillCategory category = categoryRepository.findById(request.getCategoryId())
@@ -101,7 +105,15 @@ public class HelpRequestService {
             throw new AppException(ErrorCode.ACCESS_DENIED);
         }
 
-        helpRequestRepository.delete(helpRequest);
+        // Keep invitation/appointment history intact. A physical delete is rejected by
+        // the invitation.help_request_id foreign key as soon as the request has responses.
+        if (helpRequest.getStatus() == RequestStatus.DELETED) {
+            return;
+        }
+
+        helpRequest.setStatus(RequestStatus.DELETED);
+        helpRequestRepository.save(helpRequest);
+        log.info("User {} soft-deleted help request {}", email, id);
     }
 
     @Transactional
@@ -112,6 +124,9 @@ public class HelpRequestService {
 
         if (!helpRequest.getRequester().getEmail().equals(email)) {
             throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+        if (helpRequest.getStatus() == RequestStatus.DELETED) {
+            throw new AppException(ErrorCode.REQUEST_NOT_FOUND);
         }
 
         helpRequest.setStatus(RequestStatus.COMPLETED);

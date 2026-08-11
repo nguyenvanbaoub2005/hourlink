@@ -6,6 +6,7 @@ import com.hourlink.appointment.entity.*;
 import com.hourlink.appointment.enums.AppointmentStatus;
 import com.hourlink.appointment.enums.VerificationMethod;
 import com.hourlink.appointment.repository.*;
+import com.hourlink.chat.repository.UserBlockRepository;
 import com.hourlink.chat.service.ChatService;
 import com.hourlink.wallet.service.WalletService;
 import com.hourlink.common.exception.AppException;
@@ -74,6 +75,7 @@ public class AppointmentService {
     private final AppointmentVerificationRepository verificationRepository;
     private final AppointmentCompletionRepository completionRepository;
     private final UserRepository userRepository;
+    private final UserBlockRepository userBlockRepository;
     private final InvitationRepository invitationRepository;
     private final SkillRepository skillRepository;
     private final NotificationService notificationService;
@@ -98,6 +100,16 @@ public class AppointmentService {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Người hỗ trợ và người nhận phải là hai người khác nhau.");
         }
 
+        // Chỉ hai người tham gia mới được kiểm tra và tạo lịch hẹn cho cặp này.
+        boolean isProvider = currentUser.getId().equals(provider.getId());
+        boolean isReceiver = currentUser.getId().equals(receiver.getId());
+        if (!isProvider && !isReceiver) {
+            throw new AppException(ErrorCode.ACCESS_DENIED, "Bạn không phải người tham gia lịch hẹn này.");
+        }
+        if (userBlockRepository.existsBlockBetween(provider.getId(), receiver.getId())) {
+            throw new AppException(ErrorCode.USER_BLOCKED,
+                    "Không thể tạo lịch hẹn mới vì một trong hai tài khoản đã chặn người kia.");
+        }
         Invitation invitation = null;
         if (req.getInvitationId() != null) {
             invitation = invitationRepository.findByIdForUpdate(req.getInvitationId())
@@ -134,13 +146,6 @@ public class AppointmentService {
         if (req.getTimeCreditAmount() != null
                 && (req.getTimeCreditAmount() < 0.5 || req.getTimeCreditAmount() > 24.0)) {
             throw new AppException(ErrorCode.INVALID_REQUEST, "Time Credit phải nằm trong khoảng 0.5 đến 24 TC.");
-        }
-
-        // Validate: người tạo phải là 1 trong 2 bên
-        boolean isProvider = currentUser.getId().equals(provider.getId());
-        boolean isReceiver = currentUser.getId().equals(receiver.getId());
-        if (!isProvider && !isReceiver) {
-            throw new AppException(ErrorCode.ACCESS_DENIED, "Bạn không phải người tham gia lịch hẹn này.");
         }
 
         Appointment appointment = Appointment.builder()

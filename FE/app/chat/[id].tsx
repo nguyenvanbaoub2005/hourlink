@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -30,7 +31,6 @@ import Avatar from '@components/Avatar';
 import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import UserProfileSheet from '@components/UserProfileSheet';
 import DateTimePickerModal from '@components/DateTimePickerModal';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import MapPickerModal from '@components/MapPickerModal';
 import { useChatStore } from '@store/chatStore';
 import { useAuthStore } from '@store/authStore';
@@ -168,6 +168,7 @@ export default function ChatRoomScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [blockActionBusy, setBlockActionBusy] = useState(false);
   const [pickerBusy, setPickerBusy] = useState(false);
   const [input, setInput] = useState('');
   const [realtime, setRealtime] = useState(false);
@@ -213,9 +214,16 @@ export default function ChatRoomScreen() {
   const [aptLocation, setAptLocation] = useState('');
   const [creatingApt, setCreatingApt] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+  const appointmentFormScrollRef = useRef<ScrollView>(null);
+  const appointmentLocationFocusedRef = useRef(false);
 
   // Lấy thông tin invitation từ conversation để xác định provider/receiver
   const invitationId = conversation?.invitationId;
+  const isBlockedByMe = Boolean(conversation?.isBlockedByMe);
+  const hasBlockedMe = Boolean(conversation?.hasBlockedMe);
+  const interactionBlocked = isBlockedByMe || hasBlockedMe;
+  const canInteract = Boolean(conversation) && !interactionBlocked;
+  const canOpenAppointment = Boolean(conversation?.activeAppointmentId) || canInteract;
 
   const updateEndTime = (start: string, creditStr: string) => {
     try {
@@ -456,7 +464,7 @@ export default function ChatRoomScreen() {
 
   const sendText = async () => {
     const content = input.trim();
-    if (!content || !id || sending) return;
+    if (!content || !id || sending || !canInteract) return;
 
     setSending(true);
     try {
@@ -470,7 +478,7 @@ export default function ChatRoomScreen() {
   };
 
   const sendImage = async () => {
-    if (attachmentPickerInProgress || sending || loading || !conversation) return;
+    if (attachmentPickerInProgress || sending || loading || !canInteract) return;
     attachmentPickerInProgress = true;
     setPickerBusy(true);
     try {
@@ -509,7 +517,7 @@ export default function ChatRoomScreen() {
   };
 
   const sendDocument = async () => {
-    if (attachmentPickerInProgress || sending || loading || !conversation) return;
+    if (attachmentPickerInProgress || sending || loading || !canInteract) return;
     attachmentPickerInProgress = true;
     setPickerBusy(true);
     try {
@@ -551,7 +559,7 @@ export default function ChatRoomScreen() {
     size?: number,
     pickedFile?: Blob | null
   ) => {
-    if (!id) return;
+    if (!id || !canInteract) return;
     let stagingDirectory: Directory | null = null;
     setSending(true);
     try {
@@ -628,7 +636,7 @@ export default function ChatRoomScreen() {
   };
 
   const sendLocation = async () => {
-    if (!id) return;
+    if (!id || !canInteract) return;
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Cần quyền vị trí', 'Vui lòng cho phép HourLink truy cập vị trí để chia sẻ.');
@@ -667,7 +675,7 @@ export default function ChatRoomScreen() {
 
   const sendMeetingLink = async () => {
     const link = meetingLink.trim();
-    if (!link || !id) return;
+    if (!link || !id || !canInteract) return;
 
     setSending(true);
     try {
@@ -685,7 +693,7 @@ export default function ChatRoomScreen() {
   const submitReschedule = async () => {
     if (isCommunityChat) return;
     const time = rescheduleTime.trim();
-    if (!time || !id) return;
+    if (!time || !id || !canInteract) return;
 
     setSending(true);
     try {
@@ -707,6 +715,7 @@ export default function ChatRoomScreen() {
       router.push(`/appointment/${conversation.activeAppointmentId}` as any);
       return;
     }
+    if (!canInteract) return;
 
     const nextSlot = getNextAppointmentSlot();
     setAptDate(nextSlot.date);
@@ -724,9 +733,30 @@ export default function ChatRoomScreen() {
     }
 
     setAptModalVisible(true);
+    requestAnimationFrame(() => {
+      appointmentFormScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+  };
+
+  const closeCreateAppointmentModal = () => {
+    appointmentLocationFocusedRef.current = false;
+    Keyboard.dismiss();
+    setPickerMode(null);
+    setMapPickerVisible(false);
+    setAptModalVisible(false);
+  };
+
+  const revealAppointmentLocation = () => {
+    requestAnimationFrame(() => {
+      appointmentFormScrollRef.current?.scrollToEnd({ animated: true });
+    });
   };
 
   const submitCreateAppointment = async () => {
+    if (!canInteract) {
+      closeCreateAppointmentModal();
+      return;
+    }
     if (!user?.id || !peerId) {
       Alert.alert('Lỗi', 'Không thể xác định thông tin người dùng.');
       return;
@@ -787,7 +817,7 @@ export default function ChatRoomScreen() {
           canCreateAppointment: false,
         } : prev);
       }
-      setAptModalVisible(false);
+      closeCreateAppointmentModal();
       setAptLocation('');
       Alert.alert('Đã gửi đề xuất', 'Buổi học tiếp theo đã được gửi. Hãy đợi người kia xác nhận!', [
         { text: 'OK', style: 'default' }
@@ -802,7 +832,7 @@ export default function ChatRoomScreen() {
 
   // ─── Menu đính kèm ──────────────────────────────────────────────────────
   const openAttachMenu = () => {
-    if (attachmentPickerInProgress || sending || loading || !conversation) return;
+    if (attachmentPickerInProgress || sending || loading || !canInteract) return;
     setAttachSheetVisible(true);
   };
 
@@ -851,7 +881,7 @@ export default function ChatRoomScreen() {
 
   const confirmBlock = () => {
     setMenuVisible(false);
-    if (!peerId) return;
+    if (!conversation || !peerId || isBlockedByMe || blockActionBusy) return;
 
     Alert.alert(
       'Chặn người dùng',
@@ -863,12 +893,58 @@ export default function ChatRoomScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              setBlockActionBusy(true);
               await ChatApi.blockUser({ userId: peerId });
-              Alert.alert('Đã chặn', 'Bạn sẽ không nhận tin nhắn mới từ người này.', [
-                { text: 'OK', onPress: () => router.back() },
-              ]);
+              setConversation((current) => current ? { ...current, isBlockedByMe: true } : current);
+              setInput('');
+              setAttachSheetVisible(false);
+              setMeetingVisible(false);
+              setRescheduleVisible(false);
+              setAptModalVisible(false);
+              Alert.alert(
+                'Đã chặn',
+                'Tin nhắn, tệp và đề xuất mới giữa hai bạn đã được khóa. Bạn có thể bỏ chặn ngay tại màn hình này.'
+              );
             } catch (e: any) {
               handleError(e, 'Không chặn được người dùng. Vui lòng thử lại.');
+            } finally {
+              setBlockActionBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const confirmUnblock = () => {
+    setMenuVisible(false);
+    if (!conversation || !peerId || !isBlockedByMe || blockActionBusy) return;
+
+    const stillBlockedByOther = hasBlockedMe;
+    Alert.alert(
+      'Bỏ chặn người dùng',
+      stillBlockedByOther
+        ? `Bạn sẽ bỏ chặn ${peerName ?? 'người này'}, nhưng chỉ có thể tương tác lại khi họ cũng bỏ chặn bạn.`
+        : `Bỏ chặn để khôi phục quyền nhắn tin, gửi tệp và đề xuất với ${peerName ?? 'người này'}?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Bỏ chặn',
+          onPress: async () => {
+            try {
+              setBlockActionBusy(true);
+              await ChatApi.unblockUser(peerId);
+              setConversation((current) => current ? { ...current, isBlockedByMe: false } : current);
+              Alert.alert(
+                'Đã bỏ chặn',
+                stillBlockedByOther
+                  ? 'Bạn đã bỏ chặn phía mình. Các quyền tương tác vẫn tạm khóa vì người kia đang chặn bạn.'
+                  : 'Bạn có thể nhắn tin, gửi tệp và đề xuất với người này trở lại.'
+              );
+            } catch (e: any) {
+              handleError(e, 'Không bỏ chặn được người dùng. Vui lòng thử lại.');
+            } finally {
+              setBlockActionBusy(false);
             }
           },
         },
@@ -1264,8 +1340,9 @@ export default function ChatRoomScreen() {
 
         {!isCommunityChat && (
           <TouchableOpacity
-            style={styles.headerBtn}
+            style={[styles.headerBtn, !canOpenAppointment && styles.controlDisabled]}
             onPress={openCreateAppointmentModal}
+            disabled={!canOpenAppointment}
           >
             <Ionicons
               name={conversation?.activeAppointmentId ? 'calendar' : 'calendar-outline'}
@@ -1274,7 +1351,11 @@ export default function ChatRoomScreen() {
             />
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={styles.headerBtn} onPress={() => setMeetingVisible(true)}>
+        <TouchableOpacity
+          style={[styles.headerBtn, !canInteract && styles.controlDisabled]}
+          onPress={() => setMeetingVisible(true)}
+          disabled={!canInteract}
+        >
           <Ionicons name="videocam-outline" size={23} color={Colors.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.headerBtn} onPress={() => setMenuVisible(true)}>
@@ -1310,42 +1391,76 @@ export default function ChatRoomScreen() {
           />
         )}
 
-        {/* ── Ô soạn tin ───────────────────────────────────────── */}
-        <View style={styles.composer}>
-          <TouchableOpacity
-            onPress={openAttachMenu}
-            style={styles.attachBtn}
-            disabled={sending || pickerBusy || loading || !conversation}
-          >
-            <Ionicons name="attach" size={24} color={Colors.textMuted} />
-          </TouchableOpacity>
-
-          <TextInput
-            style={styles.composerInput}
-            placeholder="Nhập tin nhắn..."
-            placeholderTextColor={Colors.textMuted}
-            value={input}
-            onChangeText={setInput}
-            multiline
-            maxLength={2000}
-          />
-
-          <TouchableOpacity
-            onPress={sendText}
-            style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
-            disabled={!input.trim() || sending}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
-            ) : (
-              <Ionicons
-                name="send"
-                size={20}
-                color={input.trim() ? Colors.primary : Colors.textMuted}
-              />
+        {/* ── Ô soạn tin / trạng thái chặn ─────────────────────── */}
+        {interactionBlocked ? (
+          <View style={styles.blockedNotice}>
+            <View style={styles.blockedNoticeIcon}>
+              <Ionicons name="shield-outline" size={20} color={Colors.danger} />
+            </View>
+            <View style={styles.blockedNoticeBody}>
+              <Text style={styles.blockedNoticeTitle}>
+                {isBlockedByMe
+                  ? (hasBlockedMe ? 'Hai bạn đang chặn nhau' : 'Bạn đã chặn người dùng này')
+                  : 'Bạn không thể tương tác với người này'}
+              </Text>
+              <Text style={styles.blockedNoticeText}>
+                {isBlockedByMe
+                  ? (hasBlockedMe
+                      ? 'Bỏ chặn phía bạn trước. Tin nhắn chỉ mở lại khi người kia cũng bỏ chặn.'
+                      : 'Bỏ chặn để nhắn tin, gửi tệp và đề xuất trở lại.')
+                  : 'Người này đang chặn bạn nên tin nhắn và đề xuất mới tạm thời bị khóa.'}
+              </Text>
+            </View>
+            {isBlockedByMe && (
+              <TouchableOpacity
+                style={[styles.noticeUnblockButton, blockActionBusy && styles.controlDisabled]}
+                onPress={confirmUnblock}
+                disabled={blockActionBusy}
+              >
+                {blockActionBusy ? (
+                  <ActivityIndicator size="small" color={Colors.secondary} />
+                ) : (
+                  <Text style={styles.noticeUnblockText}>Bỏ chặn</Text>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-        </View>
+          </View>
+        ) : (
+          <View style={styles.composer}>
+            <TouchableOpacity
+              onPress={openAttachMenu}
+              style={styles.attachBtn}
+              disabled={sending || pickerBusy || loading || !canInteract}
+            >
+              <Ionicons name="attach" size={24} color={Colors.textMuted} />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.composerInput}
+              placeholder="Nhập tin nhắn..."
+              placeholderTextColor={Colors.textMuted}
+              value={input}
+              onChangeText={setInput}
+              editable={canInteract}
+              multiline
+              maxLength={2000}
+            />
+            <TouchableOpacity
+              onPress={sendText}
+              style={[styles.sendBtn, (!input.trim() || !canInteract) && styles.sendBtnDisabled]}
+              disabled={!input.trim() || sending || !canInteract}
+            >
+              {sending ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={input.trim() && canInteract ? Colors.primary : Colors.textMuted}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* ── Modal Chi tiết lịch hẹn ────────────────────────────────────── */}
@@ -1457,7 +1572,8 @@ export default function ChatRoomScreen() {
             {!isCommunityChat && (
               <>
                 <TouchableOpacity
-                  style={styles.menuItem}
+                  style={[styles.menuItem, !canOpenAppointment && styles.controlDisabled]}
+                  disabled={!canOpenAppointment}
                   onPress={() => {
                     setMenuVisible(false);
                     openCreateAppointmentModal();
@@ -1469,7 +1585,8 @@ export default function ChatRoomScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.menuItem}
+                  style={[styles.menuItem, !canInteract && styles.controlDisabled]}
+                  disabled={!canInteract}
                   onPress={() => {
                     setMenuVisible(false);
                     setRescheduleVisible(true);
@@ -1480,10 +1597,25 @@ export default function ChatRoomScreen() {
                 </TouchableOpacity>
               </>
             )}
-            <TouchableOpacity style={styles.menuItem} onPress={confirmBlock}>
-              <Ionicons name="ban-outline" size={22} color={Colors.danger} />
-              <Text style={[styles.menuText, { color: Colors.danger }]}>Chặn người dùng</Text>
-            </TouchableOpacity>
+            {isBlockedByMe ? (
+              <TouchableOpacity
+                style={[styles.menuItem, (!conversation || blockActionBusy) && styles.controlDisabled]}
+                onPress={confirmUnblock}
+                disabled={!conversation || blockActionBusy}
+              >
+                <Ionicons name="lock-open-outline" size={22} color={Colors.secondary} />
+                <Text style={[styles.menuText, { color: Colors.secondary }]}>Bỏ chặn người dùng</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.menuItem, (!conversation || blockActionBusy) && styles.controlDisabled]}
+                onPress={confirmBlock}
+                disabled={!conversation || blockActionBusy}
+              >
+                <Ionicons name="ban-outline" size={22} color={Colors.danger} />
+                <Text style={[styles.menuText, { color: Colors.danger }]}>Chặn người dùng</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               style={styles.menuItem} 
               onPress={() => {
@@ -1805,29 +1937,50 @@ export default function ChatRoomScreen() {
       </Modal>
 
       {/* ── Bottom sheet: Tạo Lịch Hẹn Nhanh ─────────────────────── */}
-      <Modal visible={aptModalVisible} transparent animationType="fade">
+      <Modal
+        visible={aptModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCreateAppointmentModal}
+      >
         <KeyboardAvoidingView
           style={styles.overlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={[styles.sheet, { maxHeight: '90%', paddingBottom: 24 }]}>
+          <View style={[styles.sheet, styles.appointmentSheet]}>
             <View style={styles.modalHandle} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <View style={styles.appointmentHeader}>
               <Text style={styles.sheetTitle}>Đề xuất lịch hẹn</Text>
-              <TouchableOpacity onPress={() => setAptModalVisible(false)} style={{ padding: 4 }}>
+              <TouchableOpacity
+                onPress={closeCreateAppointmentModal}
+                style={styles.appointmentCloseButton}
+                accessibilityRole="button"
+                accessibilityLabel="Đóng đề xuất lịch hẹn"
+              >
                 <Ionicons name="close" size={22} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
             <Text style={styles.sheetDesc}>Điền thông tin bên dưới, người kia sẽ thấy và có thể phản hồi trong chat</Text>
 
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 }}>Tiêu đề *</Text>
-            <TextInput
-              style={[styles.sheetInput, { marginBottom: 12 }]}
-              placeholder="VD: Học lập trình Java buổi 1..."
-              placeholderTextColor={Colors.textMuted}
-              value={aptTitle}
-              onChangeText={setAptTitle}
-            />
+            <ScrollView
+              ref={appointmentFormScrollRef}
+              style={styles.appointmentFormScroll}
+              contentContainerStyle={styles.appointmentFormContent}
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              onLayout={() => {
+                if (appointmentLocationFocusedRef.current) revealAppointmentLocation();
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 }}>Tiêu đề *</Text>
+              <TextInput
+                style={[styles.sheetInput, { marginBottom: 12 }]}
+                placeholder="VD: Học lập trình Java buổi 1..."
+                placeholderTextColor={Colors.textMuted}
+                value={aptTitle}
+                onChangeText={setAptTitle}
+              />
 
             {/* Chọn Ngày */}
             <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 6 }}>Ngày hẹn *</Text>
@@ -1935,6 +2088,15 @@ export default function ChatRoomScreen() {
               onChangeText={setAptLocation}
               autoCapitalize="none"
               keyboardType={aptFormat === 'ONLINE' ? 'url' : 'default'}
+              returnKeyType="done"
+              onFocus={() => {
+                appointmentLocationFocusedRef.current = true;
+                revealAppointmentLocation();
+              }}
+              onBlur={() => {
+                appointmentLocationFocusedRef.current = false;
+              }}
+              onSubmitEditing={Keyboard.dismiss}
             />
             {aptFormat === 'OFFLINE' && (
               <TouchableOpacity 
@@ -1945,12 +2107,12 @@ export default function ChatRoomScreen() {
                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#0D9488' }}>Chọn trên bản đồ</Text>
               </TouchableOpacity>
             )}
+            </ScrollView>
 
-
-            <View style={styles.sheetActions}>
+            <View style={[styles.sheetActions, styles.appointmentSheetActions]}>
               <TouchableOpacity
                 style={[styles.sheetBtn, styles.sheetBtnGhost]}
-                onPress={() => setAptModalVisible(false)}
+                onPress={closeCreateAppointmentModal}
               >
                 <Text style={styles.sheetBtnGhostText}>Hủy</Text>
               </TouchableOpacity>
@@ -2016,6 +2178,7 @@ const styles = StyleSheet.create({
   headerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   headerName: { fontSize: 15, fontWeight: '700', color: '#0F172A', flexShrink: 1 },
   headerSub: { fontSize: 12, color: Colors.primary },
+  controlDisabled: { opacity: 0.45 },
 
   // Dải ngày
   dateWrap: { alignItems: 'center', marginVertical: 10 },
@@ -2096,6 +2259,39 @@ const styles = StyleSheet.create({
   },
   sendBtn: { width: 38, height: 38, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.6 },
+  blockedNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: '#FFF7ED',
+    borderTopWidth: 1,
+    borderTopColor: '#FED7AA',
+  },
+  blockedNoticeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEE2E2',
+  },
+  blockedNoticeBody: { flex: 1 },
+  blockedNoticeTitle: { color: '#9A3412', fontSize: 13, fontWeight: '700' },
+  blockedNoticeText: { color: '#7C2D12', fontSize: 11, lineHeight: 16, marginTop: 2 },
+  noticeUnblockButton: {
+    minWidth: 72,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  noticeUnblockText: { color: Colors.secondary, fontSize: 12, fontWeight: '700' },
 
   // Modal chung
   overlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
@@ -2125,6 +2321,32 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 44 : 28,
     paddingHorizontal: 20,
+  },
+  appointmentSheet: {
+    height: '90%',
+    paddingBottom: 24,
+    overflow: 'hidden',
+  },
+  appointmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  appointmentCloseButton: {
+    width: 40,
+    height: 40,
+    marginRight: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appointmentFormScroll: { flex: 1 },
+  appointmentFormContent: { paddingBottom: 4 },
+  appointmentSheetActions: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   sheetTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
   sheetDesc: { fontSize: 13, color: Colors.textMuted, marginTop: 4, marginBottom: 14, lineHeight: 18 },

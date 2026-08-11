@@ -3,6 +3,7 @@ package com.hourlink.chat.service;
 import com.hourlink.appointment.repository.AppointmentRepository;
 import com.hourlink.chat.entity.ChatMessage;
 import com.hourlink.chat.entity.Conversation;
+import com.hourlink.chat.entity.UserBlock;
 import com.hourlink.chat.enums.ConversationSourceType;
 import com.hourlink.chat.enums.MessageType;
 import com.hourlink.chat.repository.ChatMessageRepository;
@@ -366,6 +367,52 @@ class ChatServicePersonalConversationTest {
         verify(chatMessageRepository).save(savedMessage.capture());
         assertSame(canonical, savedMessage.getValue().getConversation());
         assertEquals(appointmentId, savedMessage.getValue().getAppointmentId());
+    }
+
+    @Test
+    void unblockRestoresConversationWhenNoBlockRemainsBetweenUsers() {
+        User blocker = user("blocker@hourlink.vn", "Người chặn");
+        User blocked = user("blocked@hourlink.vn", "Người bị chặn");
+        Conversation conversation = conversation(blocker, blocked, null,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-09T00:00:00Z"), "Tin nhắn");
+        UserBlock block = UserBlock.builder().blocker(blocker).blocked(blocked).build();
+        block.setId(UUID.randomUUID());
+        authenticate(blocker);
+
+        when(userRepository.findByEmail(blocker.getEmail())).thenReturn(Optional.of(blocker));
+        when(userBlockRepository.findByBlocker_IdAndBlocked_Id(blocker.getId(), blocked.getId()))
+                .thenReturn(Optional.of(block));
+        when(userBlockRepository.existsBlockBetween(blocker.getId(), blocked.getId()))
+                .thenReturn(false);
+        when(firebaseService.isEnabled()).thenReturn(true);
+        when(conversationRepository.findAllByParticipantEmail(blocker.getEmail()))
+                .thenReturn(List.of(conversation));
+
+        service.unblockUser(blocked.getId());
+
+        verify(userBlockRepository).delete(block);
+        verify(firebaseService).setBlocked(conversation.getId().toString(), false);
+    }
+
+    @Test
+    void unblockKeepsConversationLockedWhenOtherUserStillBlocksMe() {
+        User blocker = user("blocker@hourlink.vn", "Người chặn");
+        User blocked = user("blocked@hourlink.vn", "Người bị chặn");
+        UserBlock block = UserBlock.builder().blocker(blocker).blocked(blocked).build();
+        block.setId(UUID.randomUUID());
+        authenticate(blocker);
+
+        when(userRepository.findByEmail(blocker.getEmail())).thenReturn(Optional.of(blocker));
+        when(userBlockRepository.findByBlocker_IdAndBlocked_Id(blocker.getId(), blocked.getId()))
+                .thenReturn(Optional.of(block));
+        when(userBlockRepository.existsBlockBetween(blocker.getId(), blocked.getId()))
+                .thenReturn(true);
+
+        service.unblockUser(blocked.getId());
+
+        verify(userBlockRepository).delete(block);
+        verify(firebaseService, never()).setBlocked(any(), eq(false));
     }
 
     private void authenticate(User user) {

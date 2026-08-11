@@ -1,35 +1,51 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import HelpRequestApi from '@api/helprequest';
+import { useFocusEffect, useRouter } from 'expo-router';
+import HelpRequestApi, { type HelpRequestResponse } from '@api/helprequest';
+
+type RequestAction = 'close' | 'delete';
+
+const getRequestErrorMessage = (error: any, fallback: string) => {
+  const status = error?.response?.status;
+  const serverMessage = error?.response?.data?.message;
+
+  if (!error?.response) return 'Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.';
+  if (status === 403) return 'Bạn không có quyền thay đổi yêu cầu này.';
+  if (status === 404) return 'Yêu cầu này không còn tồn tại.';
+  if (status >= 500) return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.';
+  return serverMessage || fallback;
+};
 
 export default function HelpRequestsScreen() {
   const router = useRouter();
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<HelpRequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'COMPLETED'>('ACTIVE');
+  const [processing, setProcessing] = useState<{ id: string; action: RequestAction } | null>(null);
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await HelpRequestApi.getMyRequests();
-      if (res.data?.data) {
-        setRequests(res.data.data);
-      }
+      setRequests((res.data?.data ?? []).filter(item => item.status !== 'DELETED'));
     } catch (error) {
       console.error('Lỗi khi tải yêu cầu:', error);
+      Alert.alert('Không thể tải yêu cầu', getRequestErrorMessage(error, 'Vui lòng thử lại.'));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchRequests();
   }, []);
 
-  const handleEdit = (item: any) => {
+  useFocusEffect(
+    useCallback(() => {
+      void fetchRequests();
+    }, [fetchRequests]),
+  );
+
+  const handleEdit = (item: HelpRequestResponse) => {
     router.push({
       pathname: '/(tabs)/post' as any,
       params: {
@@ -40,62 +56,78 @@ export default function HelpRequestsScreen() {
     });
   };
 
-  const handleDeleteOrClose = (item: any) => {
-    const isCompleted = item.status === 'COMPLETED' || item.status === 'CANCELLED';
-    if (isCompleted) {
-      Alert.alert('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa vĩnh viễn yêu cầu này?', [
+  const deleteRequest = async (item: HelpRequestResponse) => {
+    setProcessing({ id: item.id, action: 'delete' });
+    try {
+      await HelpRequestApi.deleteRequest(item.id);
+      setRequests(previous => previous.filter(request => request.id !== item.id));
+      Alert.alert('Đã xóa yêu cầu', 'Yêu cầu đã được gỡ khỏi danh sách của bạn.');
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        setRequests(previous => previous.filter(request => request.id !== item.id));
+        Alert.alert('Danh sách đã được cập nhật', 'Yêu cầu này không còn tồn tại.');
+      } else {
+        Alert.alert('Không thể xóa yêu cầu', getRequestErrorMessage(error, 'Vui lòng thử lại.'));
+      }
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const closeRequest = async (item: HelpRequestResponse) => {
+    setProcessing({ id: item.id, action: 'close' });
+    try {
+      const response = await HelpRequestApi.closeRequest(item.id);
+      const updatedRequest = response.data?.data ?? { ...item, status: 'COMPLETED' as const };
+      setRequests(previous => previous.map(request => request.id === item.id ? updatedRequest : request));
+      Alert.alert('Đã đóng yêu cầu', 'Yêu cầu được lưu trong mục đã kết thúc.');
+    } catch (error) {
+      Alert.alert('Không thể đóng yêu cầu', getRequestErrorMessage(error, 'Vui lòng thử lại.'));
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const confirmDelete = (item: HelpRequestResponse) => {
+    Alert.alert(
+      'Xóa yêu cầu',
+      'Yêu cầu sẽ không còn hiển thị trong danh sách của bạn. Lịch sử lời mời và lịch hẹn liên quan vẫn được giữ để đối soát.',
+      [
         { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Xóa',
+          text: 'Xóa yêu cầu',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await HelpRequestApi.deleteRequest(item.id);
-              setRequests(prev => prev.filter(r => r.id !== item.id));
-              Alert.alert('Thành công', 'Đã xóa yêu cầu');
-            } catch (e) {
-              Alert.alert('Lỗi', 'Không thể xóa yêu cầu');
-            }
-          }
-        }
-      ]);
+          onPress: () => void deleteRequest(item),
+        },
+      ],
+    );
+  };
+
+  const handleDeleteOrClose = (item: HelpRequestResponse) => {
+    const isCompleted = item.status === 'COMPLETED' || item.status === 'CANCELLED';
+    if (isCompleted) {
+      confirmDelete(item);
     } else {
-      Alert.alert('Tùy chọn yêu cầu', 'Bạn muốn Đóng (hoàn thành) hay Xóa vĩnh viễn yêu cầu này?', [
+      Alert.alert('Quản lý yêu cầu', 'Đóng để lưu yêu cầu trong lịch sử, hoặc xóa để gỡ khỏi danh sách của bạn. Lịch sử liên quan vẫn được giữ.', [
         { text: 'Hủy', style: 'cancel' },
         {
           text: 'Đóng yêu cầu',
-          onPress: async () => {
-            try {
-              await HelpRequestApi.closeRequest(item.id);
-              setRequests(prev => prev.map(r => r.id === item.id ? { ...r, status: 'COMPLETED' } : r));
-              Alert.alert('Thành công', 'Đã đóng yêu cầu');
-            } catch (e) {
-              Alert.alert('Lỗi', 'Không thể đóng yêu cầu');
-            }
-          }
+          onPress: () => void closeRequest(item),
         },
         {
-          text: 'Xóa vĩnh viễn',
+          text: 'Xóa yêu cầu',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await HelpRequestApi.deleteRequest(item.id);
-              setRequests(prev => prev.filter(r => r.id !== item.id));
-              Alert.alert('Thành công', 'Đã xóa yêu cầu');
-            } catch (e) {
-              Alert.alert('Lỗi', 'Không thể xóa yêu cầu');
-            }
-          }
-        }
+          onPress: () => void deleteRequest(item),
+        },
       ]);
     }
   };
 
-  const activeList = requests.filter(r => r.status !== 'COMPLETED' && r.status !== 'CANCELLED');
+  const activeList = requests.filter(r => r.status !== 'COMPLETED' && r.status !== 'CANCELLED' && r.status !== 'DELETED');
   const completedList = requests.filter(r => r.status === 'COMPLETED' || r.status === 'CANCELLED');
   const displayList = activeTab === 'ACTIVE' ? activeList : completedList;
 
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item }: { item: HelpRequestResponse }) => {
     const isCompleted = item.status === 'COMPLETED';
     const isCancelled = item.status === 'CANCELLED';
     const durMin = item.duration || (item.timeCreditAmount > 10 ? item.timeCreditAmount : Number(item.timeCreditAmount || 1) * 60);
@@ -104,6 +136,7 @@ export default function HelpRequestsScreen() {
       : (item.timeCreditAmount > 10
           ? Number((item.timeCreditAmount / 60).toFixed(1))
           : Number(Number(item.timeCreditAmount || 1).toFixed(1)));
+    const isProcessing = processing?.id === item.id;
 
     return (
       <View style={styles.card}>
@@ -146,15 +179,34 @@ export default function HelpRequestsScreen() {
           <TouchableOpacity
             style={styles.aiButton}
             onPress={() => router.push({ pathname: '/profile/ai-suggest', params: { helpRequestId: item.id } })}
+            disabled={isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel={`Xem AI gợi ý cho yêu cầu ${item.title}`}
           >
             <Ionicons name="sparkles-outline" size={17} color="#059669" />
             <Text style={styles.aiButtonText}>Xem AI gợi ý</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => handleEdit(item)}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => handleEdit(item)}
+            disabled={isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel={`Chỉnh sửa yêu cầu ${item.title}`}
+          >
             <Ionicons name="pencil-outline" size={18} color="#64748b" />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, { backgroundColor: '#fef2f2' }]} onPress={() => handleDeleteOrClose(item)}>
-            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: '#fef2f2' }, isProcessing && styles.actionDisabled]}
+            onPress={() => handleDeleteOrClose(item)}
+            disabled={isProcessing}
+            accessibilityRole="button"
+            accessibilityLabel={`Quản lý hoặc xóa yêu cầu ${item.title}`}
+          >
+            {isProcessing ? (
+              <ActivityIndicator size="small" color="#EF4444" />
+            ) : (
+              <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -275,5 +327,6 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 40, height: 40, borderRadius: 10, backgroundColor: '#F1F5F9',
     alignItems: 'center', justifyContent: 'center'
-  }
+  },
+  actionDisabled: { opacity: 0.65 },
 });
