@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usersApi } from '@/api/users';
 import toast from 'react-hot-toast';
 import { X, Upload, Loader2, User } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 import RegionPicker from '@/pages/skills/components/RegionPicker';
 
 interface UserFormModalProps {
@@ -131,7 +132,16 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
 
     try {
       setIsUploading(true);
-      const url = await usersApi.uploadAvatar(file);
+
+      // Nén ảnh tại trình duyệt trước khi upload (Giải pháp 1)
+      const compressionOptions = {
+        maxSizeMB: 0.5,          // Giới hạn dung lượng tối đa 500KB
+        maxWidthOrHeight: 1920,  // Giới hạn chiều dài/rộng tối đa 1920px
+        useWebWorker: true,      // Chạy ngầm, không làm đơ giao diện
+      };
+      const compressedFile = await imageCompression(file, compressionOptions);
+
+      const url = await usersApi.uploadAvatar(compressedFile);
       setFormData(prev => ({ ...prev, avatarUrl: url }));
       toast.success('Đã tải ảnh đại diện lên thành công!');
     } catch (error: any) {
@@ -191,7 +201,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, mode, initia
                       {isUploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
                       {isUploading ? 'Đang tải lên...' : 'Chọn ảnh'}
                     </button>
-                    <p className="text-[12px] text-slate-500 mt-1">Hỗ trợ JPG, PNG, WEBP. Tối đa 10MB.</p>
+                     <p className="text-[12px] text-slate-500 mt-1">Hỗ trợ JPG, PNG, WEBP. Tối đa 10MB (ảnh sẽ được nén tự động).</p>
                   </div>
                 </div>
               </div>
