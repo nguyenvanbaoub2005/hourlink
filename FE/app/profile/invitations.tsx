@@ -12,6 +12,7 @@ import AppointmentApi from '@api/appointment';
 import { openChatFromInvitation } from '@utils/chatNav';
 import { formatDateTimeVi, formatLocalDateInput, getNextAppointmentSlot } from '@utils/dateTime';
 import DateTimePickerModal from '@components/DateTimePickerModal';
+import UserProfileSheet from '@components/UserProfileSheet';
 
 type TabType = 'RECEIVED' | 'SENT';
 
@@ -65,6 +66,7 @@ export default function InvitationsScreen() {
   const [sent, setSent] = useState<InvitationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   // Modal nhập lý do từ chối
   const [rejectModal, setRejectModal] = useState(false);
@@ -382,6 +384,7 @@ export default function InvitationsScreen() {
   // ── Render Item ─────────────────────────────────────────────────────────────
   const renderItem = ({ item }: { item: InvitationType }) => {
     const isSentTab = activeTab === 'SENT';
+    const otherUserId = isSentTab ? item.receiverId : item.senderId;
     const otherName = isSentTab ? item.receiverName : item.senderName;
     const otherAvatar = isSentTab ? item.receiverAvatarUrl : item.senderAvatarUrl;
     const otherLetter = otherName ? otherName.charAt(0).toUpperCase() : '?';
@@ -393,13 +396,22 @@ export default function InvitationsScreen() {
       <View style={styles.card}>
         {/* Header: Avatar + Name + Status */}
         <View style={styles.cardHeader}>
-          {otherAvatar ? (
-            <Image source={{ uri: otherAvatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-          ) : (
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarLetter}>{otherLetter}</Text>
-            </View>
-          )}
+          <TouchableOpacity
+            style={styles.avatarButton}
+            onPress={() => setProfileUserId(otherUserId)}
+            activeOpacity={0.75}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Xem trang cá nhân của ${otherName || 'người dùng'}`}
+          >
+            {otherAvatar ? (
+              <Image source={{ uri: otherAvatar }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarLetter}>{otherLetter}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.otherName}>{otherName}</Text>
@@ -674,6 +686,12 @@ export default function InvitationsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <UserProfileSheet
+        visible={Boolean(profileUserId)}
+        userId={profileUserId ?? undefined}
+        onClose={() => setProfileUserId(null)}
+      />
 
       {/* ── Modal nhập lý do từ chối ──────────────────────────────────── */}
       <Modal
@@ -1019,6 +1037,8 @@ const styles = StyleSheet.create({
   },
 
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  avatarButton: { width: 44, height: 44, borderRadius: 22 },
+  avatarImage: { width: 44, height: 44, borderRadius: 22 },
   avatarCircle: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center',

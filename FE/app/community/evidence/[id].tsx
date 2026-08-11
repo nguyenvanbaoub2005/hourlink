@@ -34,6 +34,33 @@ export default function ActivityEvidenceScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
 
+  const hasEnded = Boolean(
+    participant && new Date(participant.activityEndTime) <= new Date()
+  );
+  const canSubmit = Boolean(
+    participant &&
+    ['REGISTERED', 'CONFIRMED'].includes(participant.status) &&
+    hasEnded
+  );
+
+  const showUnavailableMessage = () => {
+    if (!participant) return;
+
+    if (participant.status === 'CANCELLED') {
+      Alert.alert('Không thể gửi minh chứng', 'Đăng ký này đã bị hủy.');
+      return;
+    }
+    if (participant.status === 'ABSENT') {
+      Alert.alert('Không thể gửi minh chứng', 'Tổ chức đã ghi nhận bạn vắng mặt.');
+      return;
+    }
+
+    Alert.alert(
+      'Hoạt động chưa kết thúc',
+      `Bạn có thể gửi minh chứng sau ${new Date(participant.activityEndTime).toLocaleString('vi-VN')}.`
+    );
+  };
+
   const load = async () => {
     try {
       const [participationResponse, activityResponse] = await Promise.all([
@@ -57,6 +84,11 @@ export default function ActivityEvidenceScreen() {
   }, [id]);
 
   const pickImages = async () => {
+    if (!canSubmit) {
+      showUnavailableMessage();
+      return;
+    }
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Cần quyền truy cập', 'Vui lòng cho phép HourLink truy cập thư viện ảnh.');
@@ -81,6 +113,11 @@ export default function ActivityEvidenceScreen() {
   };
 
   const submit = async () => {
+    if (!canSubmit) {
+      showUnavailableMessage();
+      return;
+    }
+
     if (selected.length === 0 && !participant?.evidence?.length) {
       Alert.alert('Thiếu ảnh', 'Vui lòng chọn ít nhất một ảnh minh chứng.');
       return;
@@ -120,8 +157,6 @@ export default function ActivityEvidenceScreen() {
     return <SafeAreaView style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></SafeAreaView>;
   }
 
-  const hasEnded = new Date(participant.activityEndTime) <= new Date();
-  const canSubmit = ['REGISTERED', 'CONFIRMED'].includes(participant.status) && hasEnded;
   const images = selected.length > 0
     ? selected.map((asset, index) => ({ id: `${asset.uri}-${index}`, url: asset.uri }))
     : (participant.evidence ?? []).map(item => ({ id: item.id, url: item.fileUrl }));
@@ -197,7 +232,7 @@ export default function ActivityEvidenceScreen() {
             ))}
           </View>
         ) : (
-          <TouchableOpacity style={styles.emptyPicker} onPress={pickImages} disabled={!canSubmit}>
+          <TouchableOpacity style={styles.emptyPicker} onPress={pickImages}>
             <Ionicons name="images-outline" size={42} color={Colors.primary} />
             <Text style={styles.emptyTitle}>Chọn ảnh tham gia hoạt động</Text>
             <Text style={styles.helper}>Ảnh check-in, ảnh hoạt động hoặc giấy xác nhận</Text>
@@ -224,7 +259,7 @@ export default function ActivityEvidenceScreen() {
         <TouchableOpacity
           style={[styles.submitButton, (!canSubmit || submitting) && styles.disabledButton]}
           onPress={submit}
-          disabled={!canSubmit || submitting}
+          disabled={submitting}
         >
           {submitting
             ? <ActivityIndicator color="#FFFFFF" />

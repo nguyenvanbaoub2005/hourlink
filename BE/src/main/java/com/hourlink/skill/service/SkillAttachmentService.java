@@ -10,6 +10,7 @@ import com.hourlink.common.util.SecurityUtil;
 import com.hourlink.skill.dto.response.SkillAttachmentResponse;
 import com.hourlink.skill.entity.Skill;
 import com.hourlink.skill.entity.SkillAttachment;
+import com.hourlink.skill.enums.SkillStatus;
 import com.hourlink.skill.repository.SkillAttachmentRepository;
 import com.hourlink.skill.repository.SkillRepository;
 import com.hourlink.user.entity.User;
@@ -109,11 +110,26 @@ public class SkillAttachmentService {
 
     /**
      * Lấy danh sách file minh chứng của một kỹ năng (chỉ lấy file chưa xóa).
+     *
+     * <p>Chủ sở hữu và admin có thể xem cả kỹ năng đang ẩn để quản lý. Người
+     * dùng khác chỉ được xem minh chứng của kỹ năng đang công khai và thuộc
+     * một tài khoản còn hoạt động. Public ID của Cloudinary chỉ phục vụ thao
+     * tác quản trị/xóa nên không trả cho người xem công khai.</p>
      */
     public List<SkillAttachmentResponse> getAttachments(UUID skillId) {
+        Skill skill = skillRepository.findById(skillId)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+        String email = SecurityUtil.getCurrentUserEmail();
+        User currentUser = userRepository.findByEmail(email).orElse(null);
+        boolean canManage = canManageSkill(skill, currentUser, email);
+
+        if (!canManage && !isPubliclyVisible(skill)) {
+            throw new AppException(ErrorCode.ACCESS_DENIED);
+        }
+
         return attachmentRepository.findAllBySkill_IdAndIsDeletedFalse(skillId)
                 .stream()
-                .map(this::mapToResponse)
+                .map(attachment -> mapToResponse(attachment, canManage))
                 .collect(Collectors.toList());
     }
 
@@ -173,11 +189,39 @@ public class SkillAttachmentService {
         }
     }
 
+    private boolean canManageSkill(Skill skill, User currentUser, String currentEmail) {
+        boolean isOwner = skill.getUser() != null
+                && skill.getUser().getEmail().equals(currentEmail);
+        boolean isAdmin = currentUser != null
+                && currentUser.getUserRoles() != null
+                && currentUser.getUserRoles().stream()
+                .anyMatch(userRole -> userRole.getRole() != null
+                        && ("ROLE_ADMIN".equals(userRole.getRole().getRoleCode())
+                        || "ADMIN".equals(userRole.getRole().getRoleName())));
+        return isOwner || isAdmin;
+    }
+
+    private boolean isPubliclyVisible(Skill skill) {
+        if (skill.getStatus() != SkillStatus.VISIBLE || skill.getUser() == null) {
+            return false;
+        }
+        if (skill.getUser().isLocked() || skill.getUser().isDeleted()) {
+            return false;
+        }
+        return skill.getCategory() == null || !skill.getCategory().isDeleted();
+    }
+
     private SkillAttachmentResponse mapToResponse(SkillAttachment attachment) {
+        return mapToResponse(attachment, true);
+    }
+
+    private SkillAttachmentResponse mapToResponse(
+            SkillAttachment attachment,
+            boolean includeManagementFields) {
         return SkillAttachmentResponse.builder()
                 .id(attachment.getId())
                 .fileUrl(attachment.getFileUrl())
-                .publicId(attachment.getPublicId())
+                .publicId(includeManagementFields ? attachment.getPublicId() : null)
                 .originalName(attachment.getOriginalName())
                 .fileType(attachment.getFileType())
                 .fileSize(attachment.getFileSize())
