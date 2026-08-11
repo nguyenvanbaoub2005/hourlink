@@ -231,6 +231,24 @@ export default function ExploreScreen() {
     fetchSkills();
   };
 
+  const openTutorProfile = (skill: SkillItem) => {
+    setSelectedSkill(skill);
+    setModalTab('intro');
+    setModalVisible(true);
+  };
+
+  const openSkillEvidence = (skill: SkillItem) => {
+    setModalVisible(false);
+    router.push({
+      pathname: '/profile/skill-evidence/[id]' as any,
+      params: {
+        id: skill.id,
+        skillName: skill.name,
+        ownerName: skill.userFullName ?? 'Người hỗ trợ',
+      },
+    });
+  };
+
   const formatLabel = (fmt: string) => {
     switch (fmt) {
       case 'ONLINE': return 'Trực tuyến';
@@ -465,7 +483,15 @@ export default function ExploreScreen() {
             <View key={item.id} style={styles.card}>
               {/* Top row: Avatar & Tutor Info */}
               <View style={styles.cardHeader}>
-                {renderAvatar(item)}
+                <TouchableOpacity
+                  onPress={() => openTutorProfile(item)}
+                  activeOpacity={0.75}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xem trang cá nhân của ${item.userFullName || 'người hỗ trợ'}`}
+                >
+                  {renderAvatar(item)}
+                </TouchableOpacity>
                 <View style={styles.tutorInfo}>
                   <View style={styles.tutorNameRow}>
                     <Text style={styles.tutorName}>{item.userFullName || 'Thành viên HourLink'}</Text>
@@ -517,11 +543,7 @@ export default function ExploreScreen() {
                 </View>
                 <TouchableOpacity
                   style={styles.connectBtn}
-                  onPress={() => {
-                    setSelectedSkill(item);
-                    setModalTab('intro');
-                    setModalVisible(true);
-                  }}
+                  onPress={() => openTutorProfile(item)}
                 >
                   <Text style={styles.connectBtnText}>Kết nối</Text>
                   <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 4 }} />
@@ -746,6 +768,23 @@ export default function ExploreScreen() {
                           </View>
                         ) : null}
                       </View>
+
+                      <TouchableOpacity
+                        style={styles.evidenceButton}
+                        activeOpacity={0.82}
+                        onPress={() => openSkillEvidence(selectedSkill)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Xem minh chứng kỹ năng ${selectedSkill.name}`}
+                      >
+                        <View style={styles.evidenceButtonIcon}>
+                          <Ionicons name="shield-checkmark-outline" size={21} color="#047857" />
+                        </View>
+                        <View style={styles.evidenceButtonTextWrap}>
+                          <Text style={styles.evidenceButtonTitle}>Xem minh chứng kỹ năng</Text>
+                          <Text style={styles.evidenceButtonSubtitle}>Ảnh, chứng chỉ và tài liệu người hỗ trợ đã đăng</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#0D9488" />
+                      </TouchableOpacity>
                     </View>
                   )}
 
@@ -1028,6 +1067,18 @@ const styles = StyleSheet.create({
   skillDetailDesc: { fontSize: 14, color: '#475569', lineHeight: 22, marginTop: 4 },
   skillFreeTimeBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E0F2FE', padding: 10, borderRadius: Radius.md, marginTop: 12 },
   skillFreeTimeText: { fontSize: 13, color: '#0369A1', fontWeight: '500' },
+  evidenceButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 12,
+    backgroundColor: '#ECFDF5', borderRadius: Radius.lg, padding: 13,
+    borderWidth: 1, borderColor: '#A7F3D0',
+  },
+  evidenceButtonIcon: {
+    width: 42, height: 42, borderRadius: 14, backgroundColor: '#D1FAE5',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  evidenceButtonTextWrap: { flex: 1 },
+  evidenceButtonTitle: { fontSize: 13, fontWeight: '800', color: '#065F46' },
+  evidenceButtonSubtitle: { fontSize: 11, lineHeight: 16, color: '#047857', marginTop: 2 },
 
   reviewSummaryBox: { backgroundColor: '#fff', borderRadius: Radius.lg, padding: 16, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: '#F1F5F9' },
   reviewSummaryScore: { fontSize: 24, fontWeight: 'bold', color: '#0F172A' },

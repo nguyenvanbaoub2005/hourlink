@@ -16,7 +16,7 @@ import SkillApi from '@api/skill';
 type Attachment = {
   id: string;
   fileUrl: string;
-  publicId: string;
+  publicId?: string | null;
   originalName: string;
   fileType: 'IMAGE' | 'DOCUMENT';
   fileSize: number;

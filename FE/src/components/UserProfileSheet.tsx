@@ -9,6 +9,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import UserApi from '@api/user';
 import Avatar from '@components/Avatar';
 import { Colors, Radius } from '@constants/Colors';
@@ -41,6 +42,7 @@ interface Props {
  * thông tin backend cho phép công khai (không có email / số điện thoại).
  */
 export default function UserProfileSheet({ visible, userId, onClose }: Props) {
+  const router = useRouter();
   const [profile, setProfile] = useState<PublicUserProfileResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +78,20 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
     if (isNaN(d.getTime())) return null;
     return `Tham gia từ ${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
   })();
+
+  const openSkillEvidence = (skillId: string, skillName: string) => {
+    onClose();
+    requestAnimationFrame(() => {
+      router.push({
+        pathname: '/profile/skill-evidence/[id]' as any,
+        params: {
+          id: skillId,
+          skillName,
+          ownerName: profile?.fullName ?? 'Người hỗ trợ',
+        },
+      });
+    });
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -190,7 +206,14 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
                 </Text>
                 {profile.skills && profile.skills.length > 0 ? (
                   profile.skills.map((s) => (
-                    <View key={s.id} style={styles.skillCard}>
+                    <TouchableOpacity
+                      key={s.id}
+                      style={styles.skillCard}
+                      activeOpacity={0.82}
+                      onPress={() => openSkillEvidence(s.id, s.name)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xem minh chứng kỹ năng ${s.name}`}
+                    >
                       <View style={styles.skillIcon}>
                         <Ionicons name="school-outline" size={18} color={Colors.secondary} />
                       </View>
@@ -208,8 +231,13 @@ export default function UserProfileSheet({ visible, userId, onClose }: Props) {
                             .filter(Boolean)
                             .join(' · ')}
                         </Text>
+                        <View style={styles.evidenceHintRow}>
+                          <Ionicons name="shield-checkmark-outline" size={13} color="#047857" />
+                          <Text style={styles.evidenceHintText}>Xem minh chứng</Text>
+                        </View>
                       </View>
-                    </View>
+                      <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+                    </TouchableOpacity>
                   ))
                 ) : (
                   <Text style={styles.emptyText}>Người này chưa đăng kỹ năng nào.</Text>
@@ -315,6 +343,8 @@ const styles = StyleSheet.create({
   },
   skillName: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
   skillMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  evidenceHintRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
+  evidenceHintText: { fontSize: 11, color: '#047857', fontWeight: '700' },
 
   joined: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: 18 },
 

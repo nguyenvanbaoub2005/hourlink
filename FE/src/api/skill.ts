@@ -2,6 +2,16 @@ import api from './axiosInstance';
 import type { ApiResponse, PagedResponse } from '@types';
 // TODO: import request/response types as they are implemented
 
+export interface SkillAttachmentResponse {
+  id: string;
+  fileUrl: string;
+  publicId?: string | null;
+  originalName: string;
+  fileType: 'IMAGE' | 'DOCUMENT';
+  fileSize: number;
+  createdAt: string;
+}
+
 /**
  * SkillApi — API calls cho module skill.
  * Base URL: /skills
@@ -23,7 +33,8 @@ const SkillApi = {
     api.post(`/skill/${skillId}/attachments`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
-  getAttachments: (skillId: string) => api.get(`/skill/${skillId}/attachments`),
+  getAttachments: (skillId: string) =>
+    api.get<ApiResponse<SkillAttachmentResponse[]>>(`/skill/${skillId}/attachments`),
   deleteAttachment: (attachmentId: string) => api.delete(`/skill/attachments/${attachmentId}`),
 };
 
