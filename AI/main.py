@@ -1,14 +1,28 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-import math
 
-# Try importing the AI libraries, if missing we will just crash gracefully
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
 from sentence_transformers import SentenceTransformer, util
+
+try:
+    from .hybrid_classifier import (
+        SEMANTIC_MODEL_NAME,
+        SEMANTIC_WEIGHT,
+        TEXT_WEIGHT,
+        blend_probabilities,
+        build_semantic_classifier,
+        build_text_classifier,
+    )
+except ImportError:  # Chạy `uvicorn main:app` trực tiếp trong thư mục AI
+    from hybrid_classifier import (
+        SEMANTIC_MODEL_NAME,
+        SEMANTIC_WEIGHT,
+        TEXT_WEIGHT,
+        blend_probabilities,
+        build_semantic_classifier,
+        build_text_classifier,
+    )
 
 app = FastAPI(title="HourLink AI Matching API")
 
@@ -53,34 +67,46 @@ class RecommendResponse(BaseModel):
 # -----------------
 # 2. ML MODELS STATE
 # -----------------
-model_category: Pipeline = None
+model_category = None
 model_semantic: SentenceTransformer = None
+model_semantic_classifier = None
+model_text_weight = TEXT_WEIGHT
+model_semantic_weight = SEMANTIC_WEIGHT
 dataset_df = None
 dataset_embeddings = None
 
+import joblib
 import pandas as pd
-import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+DATASET_PATH = BASE_DIR / "docs" / "hourlink_skill_dataset_v3.csv"
+MODEL_PATH = BASE_DIR / "model_category.pkl"
 
 # Danh mục kỹ năng giả định (Mock Data vì chưa có CSDL thật)
 CATEGORY_MAPPING = {
-    0: (1, "Lập trình phần mềm"),
-    1: (2, "Ngoại ngữ"),
-    2: (3, "Sửa chữa điện máy"),
-    3: (4, "Âm nhạc & Nghệ thuật"),
-    4: (5, "Tư vấn tuyển dụng")
+    1: (1, "Lập trình"),
+    2: (2, "Ngôn ngữ"),
+    3: (3, "Thiết kế"),
+    4: (4, "Kinh doanh"),
+    5: (5, "Giáo dục"),
+    6: (6, "Sức khỏe"),
+    7: (7, "Nghệ thuật"),
+    8: (8, "Khác"),
 }
 
 @app.on_event("startup")
 def load_models():
-    global model_category, model_semantic, CATEGORY_MAPPING, dataset_df, dataset_embeddings
+    global model_category, model_semantic, model_semantic_classifier
+    global model_text_weight, model_semantic_weight
+    global CATEGORY_MAPPING, dataset_df, dataset_embeddings
     
     print("Loading AI Models...")
     
     # --- A. Khởi tạo TF-IDF + Logistic Regression cho Phân loại Danh mục (Task 14) ---
-    dataset_path = "docs/hourlink_skill_dataset_v2.csv"
-    if os.path.exists(dataset_path):
-        print(f"Loading real dataset from {dataset_path}...")
-        dataset_df = pd.read_csv(dataset_path)
+    if DATASET_PATH.exists():
+        print(f"Loading real dataset from {DATASET_PATH}...")
+        dataset_df = pd.read_csv(DATASET_PATH)
         train_texts = dataset_df['description'].fillna("").tolist()
         train_labels = dataset_df['category_id'].tolist()
         
@@ -88,41 +114,86 @@ def load_models():
         unique_categories = dataset_df[['category_id', 'category_name']].drop_duplicates()
         CATEGORY_MAPPING = {row['category_id']: (row['category_id'], row['category_name']) for _, row in unique_categories.iterrows()}
     else:
-        print("Dataset not found, using dummy data...")
+        print(f"Dataset not found at {DATASET_PATH}, using dummy data...")
         train_texts = [
             "Cần người hướng dẫn Java Spring Boot", "Dạy ReactJS cơ bản", "Lập trình website với NodeJS",
             "Muốn luyện thi IELTS", "Dạy giao tiếp tiếng Anh", "Học tiếng Nhật N3",
-            "Sửa ống nước bị rò rỉ", "Máy lạnh không mát cần sửa", "Bảo trì tủ lạnh",
-            "Dạy đàn guitar", "Học vẽ cơ bản", "Hướng dẫn chơi piano",
-            "Sửa CV xin việc", "Tư vấn phỏng vấn IT", "Cần người review hồ sơ xin việc"
+            "Học thiết kế giao diện Figma", "Cần sửa poster Canva", "Hướng dẫn Photoshop cơ bản",
+            "Học chạy quảng cáo Facebook", "Lập kế hoạch kinh doanh", "Quản lý tài chính cá nhân",
+            "Cần gia sư Toán lớp 12", "Ôn thi Vật lý", "Hướng dẫn làm slide thuyết trình",
+            "Tập Yoga cho người mới", "Học bơi cơ bản", "Lập lịch chạy bộ 5 km",
+            "Dạy đàn guitar", "Học vẽ màu nước", "Hướng dẫn chơi piano",
+            "Học nấu ăn gia đình", "Sửa máy giặt", "Hướng dẫn trồng rau ban công",
         ]
         train_labels = [
             1, 1, 1,
             2, 2, 2,
             3, 3, 3,
             4, 4, 4,
-            5, 5, 5
+            5, 5, 5,
+            6, 6, 6,
+            7, 7, 7,
+            8, 8, 8,
         ]
     
-    model_category = Pipeline([
-        ('tfidf', TfidfVectorizer(ngram_range=(1,2))),
-        ('clf', LogisticRegression(random_state=42, C=1.0))
-    ])
-    model_category.fit(train_texts, train_labels)
-    print("✅ Model Category Classification (TF-IDF + LR) trained!")
+    # Ưu tiên bundle đã được đánh giá/huấn luyện offline. Nếu artifact chưa có
+    # hoặc không hợp lệ, API vẫn tự train nhánh text để không bị ngừng phục vụ.
+    if MODEL_PATH.exists():
+        try:
+            model_bundle = joblib.load(MODEL_PATH)
+            if not isinstance(model_bundle, dict) or model_bundle.get('version') != 3:
+                raise ValueError("Unsupported model bundle")
+            model_category = model_bundle['text_classifier']
+            model_semantic_classifier = model_bundle['semantic_classifier']
+            model_text_weight = float(model_bundle.get('text_weight', TEXT_WEIGHT))
+            model_semantic_weight = float(
+                model_bundle.get('semantic_weight', SEMANTIC_WEIGHT)
+            )
+            bundled_embeddings = model_bundle.get('dataset_embeddings')
+            if (
+                bundled_embeddings is not None
+                and dataset_df is not None
+                and len(bundled_embeddings) == len(dataset_df)
+            ):
+                dataset_embeddings = np.asarray(
+                    bundled_embeddings, dtype=np.float32
+                )
+            print("✅ Hybrid Logistic Regression bundle loaded!")
+        except Exception as error:
+            print(f"⚠️ Không thể đọc model bundle, sẽ train fallback: {error}")
+
+    if model_category is None:
+        model_category = build_text_classifier()
+        model_category.fit(train_texts, train_labels)
+        print("✅ Text classifier fallback trained!")
 
     # --- B. Load SentenceTransformer cho Semantic Matching (Task 15) ---
     # Dùng mô hình đa ngôn ngữ cực nhẹ, phù hợp tiếng Việt
-    print("Downloading/Loading Sentence Transformer (paraphrase-multilingual-MiniLM-L12-v2)...")
+    print(f"Downloading/Loading Sentence Transformer ({SEMANTIC_MODEL_NAME})...")
     try:
-        model_semantic = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        model_semantic = SentenceTransformer(SEMANTIC_MODEL_NAME)
         print("✅ Model Semantic Matching loaded!")
         
         # Tiền tính toán embedding cho toàn bộ dataset để suggest nhanh hơn
-        if dataset_df is not None:
+        if dataset_df is not None and dataset_embeddings is None:
             print("Pre-computing embeddings for dataset...")
-            dataset_embeddings = model_semantic.encode(dataset_df['description'].fillna("").tolist(), convert_to_tensor=True)
-            print("✅ Dataset embeddings computed!")
+            dataset_embeddings = model_semantic.encode(
+                dataset_df['description'].fillna("").tolist(),
+                convert_to_tensor=True,
+                normalize_embeddings=True,
+            )
+        if dataset_df is not None:
+            if model_semantic_classifier is None:
+                model_semantic_classifier = build_semantic_classifier()
+                embedding_matrix = (
+                    dataset_embeddings.cpu().numpy()
+                    if hasattr(dataset_embeddings, 'cpu')
+                    else np.asarray(dataset_embeddings)
+                )
+                model_semantic_classifier.fit(
+                    embedding_matrix, train_labels
+                )
+                print("✅ Semantic Logistic Regression fallback trained!")
             
     except Exception as e:
         print(f"❌ Failed to load SentenceTransformer: {e}")
@@ -141,10 +212,33 @@ def predict_category(req: PredictCategoryRequest):
         # Fallback category
         return PredictCategoryResponse(category_id=0, category_name="Khác", confidence=0.0)
 
-    # Dự đoán
-    pred_class = model_category.predict([text])[0]
-    proba = model_category.predict_proba([text])[0]
-    confidence = float(np.max(proba))
+    # Nhánh 1: TF-IDF theo từ/ký tự + Logistic Regression.
+    text_probabilities = model_category.predict_proba([text])
+    category_classes = model_category.classes_
+    combined_probabilities = text_probabilities
+    query_embedding = None
+
+    # Nhánh 2: SentenceTransformer embedding + Logistic Regression.
+    # Khi model semantic chưa tải được, API vẫn hoạt động bằng nhánh TF-IDF.
+    if model_semantic is not None and model_semantic_classifier is not None:
+        query_embedding = model_semantic.encode(
+            [text], convert_to_tensor=True, normalize_embeddings=True
+        )
+        semantic_probabilities = model_semantic_classifier.predict_proba(
+            query_embedding.cpu().numpy()
+        )
+        category_classes, combined_probabilities = blend_probabilities(
+            model_category.classes_,
+            text_probabilities,
+            model_semantic_classifier.classes_,
+            semantic_probabilities,
+            text_weight=model_text_weight,
+            semantic_weight=model_semantic_weight,
+        )
+
+    best_category_index = int(np.argmax(combined_probabilities[0]))
+    pred_class = category_classes[best_category_index]
+    confidence = float(combined_probabilities[0][best_category_index])
     
     cat_id, cat_name = CATEGORY_MAPPING.get(int(pred_class), (0, "Khác"))
     
@@ -156,8 +250,11 @@ def predict_category(req: PredictCategoryRequest):
     # 1. Trích xuất Semantic: Tìm câu giống nhất trong CSDL để lấy title và level
     if model_semantic is not None and dataset_embeddings is not None and dataset_df is not None:
         try:
-            query_emb = model_semantic.encode(text, convert_to_tensor=True)
-            cos_scores = util.cos_sim(query_emb, dataset_embeddings)[0]
+            if query_embedding is None:
+                query_embedding = model_semantic.encode(
+                    [text], convert_to_tensor=True, normalize_embeddings=True
+                )
+            cos_scores = util.cos_sim(query_embedding, dataset_embeddings)[0]
             best_idx = int(np.argmax(cos_scores.cpu().numpy()))
             best_score = float(cos_scores[best_idx])
             
@@ -272,3 +369,7 @@ def recommend_helpers(req: RecommendRequest):
     recommendations.sort(key=lambda x: x.match_percentage, reverse=True)
     
     return RecommendResponse(recommendations=recommendations)
+
+
+# source venv/bin/activate
+# uvicorn main:app --reload --port 8000
