@@ -34,6 +34,22 @@ const TABS: { id: AppointmentTab; label: string }[] = [
   { id: 'HISTORY', label: 'Lịch sử' },
 ];
 
+function filterAppointmentsByTab(items: any[], tab: AppointmentTab) {
+  return items.filter((apt) => {
+    const s = (apt.status || '').toUpperCase();
+    if (tab === 'UPCOMING') {
+      return ['PENDING', 'CONFIRMED', 'UPCOMING', 'RESCHEDULED'].includes(s);
+    }
+    if (tab === 'IN_PROGRESS') {
+      return s === 'IN_PROGRESS';
+    }
+    if (tab === 'HISTORY') {
+      return ['COMPLETED', 'CANCELLED', 'DISPUTED'].includes(s);
+    }
+    return false;
+  });
+}
+
 export default function AppointmentsScreen() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
@@ -59,11 +75,25 @@ export default function AppointmentsScreen() {
           ? pageData.length
           : pageData?.totalElements ?? pageData?.content?.length ?? 0;
         return [tabId, count] as const;
-      } catch (error) {
-        console.error(`Failed to fetch ${tabId} appointment count:`, error);
+      } catch {
+        // Ngoại tuyến: Không log console.error để tránh hiện thanh lỗi LogBox đỏ trên máy
         return null;
       }
     }));
+
+    // Nếu không kết nối được mạng (offline) -> tính toán số lượng badge từ SQLite
+    const hasNetworkSuccess = countEntries.some((e) => e !== null);
+    if (!hasNetworkSuccess) {
+      try {
+        const allCached = await getLocalAppointments();
+        setTabCounts({
+          UPCOMING: filterAppointmentsByTab(allCached, 'UPCOMING').length,
+          IN_PROGRESS: filterAppointmentsByTab(allCached, 'IN_PROGRESS').length,
+          HISTORY: filterAppointmentsByTab(allCached, 'HISTORY').length,
+        });
+      } catch {}
+      return;
+    }
 
     setTabCounts((current) => {
       const next = { ...current };
@@ -93,14 +123,14 @@ export default function AppointmentsScreen() {
         saveAppointmentsToLocal(list).catch(() => {});
       }
       await countsPromise;
-    } catch (error: any) {
-      console.warn('[AppointmentsScreen] Lỗi mạng khi nạp lịch hẹn, đọc từ SQLite cục bộ:', error?.message);
-      // Fallback nạp từ SQLite cục bộ
-      const cached = await getLocalAppointments();
-      if (cached.length > 0) {
-        setAppointments(cached);
-      } else {
-        Alert.alert('Ngoại tuyến', 'Chưa có dữ liệu lịch hẹn nào được lưu trong bộ nhớ cục bộ.');
+    } catch {
+      // Ngoại tuyến: nạp từ SQLite cục bộ và lọc đúng theo tab đang chọn (không hiện Alert popup gây phiền)
+      try {
+        const cached = await getLocalAppointments();
+        const filtered = filterAppointmentsByTab(cached, activeTab);
+        setAppointments(filtered);
+      } catch {
+        setAppointments([]);
       }
     } finally {
       setLoading(false);
