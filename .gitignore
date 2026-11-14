@@ -7,12 +7,27 @@
 *.iml
 
 # Node / Expo (Frontend)
+FE/node_modules/
 fe/node_modules/
+FE/.expo/
 fe/.expo/
+FE/dist/
 fe/dist/
+dist/
+FE/android/
+FE/ios/
+FE/npm-debug.*
 fe/npm-debug.*
 fe/yarn-error.log
 fe/yarn-debug.log
+
+# Mobile Signing & Credentials (Security)
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*service-account*.json
 
 # Java / Spring Boot (Backend)
 BE/target/

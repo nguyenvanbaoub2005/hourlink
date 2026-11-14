@@ -1,0 +1,182 @@
+# frozen_string_literal: true
+
+default_platform(:android)
+
+platform :android do
+  desc "Chạy kiểm tra TypeScript và Lint trước khi đóng gói"
+  lane :check do
+    UI.header("🔍 Kiểm tra mã nguồn HourLink...")
+    Dir.chdir("..") do
+      sh("npm run typecheck")
+    end
+    UI.success("✅ Kiểm tra kiểu dữ liệu TypeScript thành công!")
+  end
+
+  desc "Chuẩn bị native project (Expo CNG Prebuild) và cấu hình Keystore ký số"
+  lane :prepare_native do
+    UI.header("🛠️ Khởi tạo dự án Android từ Expo Config (CNG)...")
+    
+    # 1. Chạy prebuild nếu chưa có thư mục android
+    unless File.directory?("../android")
+      UI.message("Chưa tìm thấy thư mục native android/, tiến hành chạy expo prebuild...")
+      Dir.chdir("..") do
+        sh("npx expo prebuild --platform android --no-install")
+      end
+    else
+      UI.message("Thư mục native android/ đã tồn tại.")
+    end
+
+    # 2. Đảm bảo thư mục dist/ tồn tại
+    FileUtils.mkdir_p("../dist")
+
+    # 3. Xác định Keystore ký số
+    keystore_path = ENV["ANDROID_KEYSTORE_PATH"] || ENV["KEYSTORE_PATH"] || File.expand_path("release.keystore")
+    keystore_password = ENV["ANDROID_KEYSTORE_PASSWORD"] || ENV["KEYSTORE_PASSWORD"] || "hourlink123"
+    key_alias = ENV["ANDROID_KEY_ALIAS"] || ENV["KEY_ALIAS"] || "hourlink"
+    key_password = ENV["ANDROID_KEY_PASSWORD"] || ENV["KEY_PASSWORD"] || "hourlink123"
+
+    unless File.exist?(keystore_path)
+      UI.important("⚠️ Không tìm thấy keystore tại: #{keystore_path}")
+      UI.message("Tự động tạo Release Keystore mới để ký số tự động...")
+      sh("keytool -genkey -v -keystore \"#{keystore_path}\" -alias \"#{key_alias}\" -keyalg RSA -keysize 2048 -validity 10000 -storepass \"#{keystore_password}\" -keypass \"#{key_password}\" -dname \"CN=HourLink, OU=Mobile, O=HourLink Team, L=Hanoi, ST=Hanoi, C=VN\" -noprompt")
+      UI.success("Đã khởi tạo Keystore ký số thành công: #{keystore_path}")
+    end
+
+    # Lưu thông tin signing vào context lane
+    Actions.lane_context[:keystore_path] = File.expand_path(keystore_path)
+    Actions.lane_context[:keystore_password] = keystore_password
+    Actions.lane_context[:key_alias] = key_alias
+    Actions.lane_context[:key_password] = key_password
+  end
+
+  desc "Tự động đóng gói và ký số APK Release (Phát hành thử nghiệm / Cài trực tiếp)"
+  lane :build_apk do
+    UI.header("📦 Bắt đầu quy trình đóng gói Release APK (Ký số tự động)...")
+    
+    # Chuẩn bị native & keystore
+    prepare_native
+
+    keystore_path = Actions.lane_context[:keystore_path]
+    keystore_password = Actions.lane_context[:keystore_password]
+    key_alias = Actions.lane_context[:key_alias]
+    key_password = Actions.lane_context[:key_password]
+
+    UI.message("Ký số bản build với Keystore: #{keystore_path} (Alias: #{key_alias})")
+
+    # Biên dịch qua Gradle với thông số ký số được inject tự động
+    gradle(
+      task: "assembleRelease",
+      project_dir: "../android/",
+      print_command: true,
+      properties: {
+        "android.injected.signing.store.file" => keystore_path,
+        "android.injected.signing.store.password" => keystore_password,
+        "android.injected.signing.key.alias" => key_alias,
+        "android.injected.signing.key.password" => key_password,
+      }
+    )
+
+    # Tìm file APK đầu ra
+    apk_candidates = Dir.glob("../android/app/build/outputs/apk/release/*.apk").reject { |f| f.include?("unaligned") }
+    if apk_candidates.empty?
+      UI.user_error!("❌ Không tìm thấy file APK sau khi biên dịch!")
+    end
+
+    source_apk = apk_candidates.first
+    target_apk = File.expand_path("../dist/hourlink-release.apk")
+    FileUtils.cp(source_apk, target_apk)
+
+    # Tính toán SHA256 để nghiệm thu chất lượng
+    require "digest"
+    sha256 = Digest::SHA256.file(target_apk).hexdigest
+    file_size_mb = (File.size(target_apk).to_f / (1024 * 1024)).round(2)
+
+    UI.success("🎉 ĐÓNG GÓI RELEASE APK THÀNH CÔNG!")
+    UI.message("📍 Vị trí APK: #{target_apk}")
+    UI.message("📏 Kích thước: #{file_size_mb} MB")
+    UI.message("🔑 SHA-256 Checksum: #{sha256}")
+
+    # Set output path for GitHub Actions
+    ENV["HOURLINK_APK_PATH"] = target_apk
+  end
+
+  desc "Tự động đóng gói và ký số Android App Bundle (AAB Release cho Google Play Store)"
+  lane :build_aab do
+    UI.header("📦 Bắt đầu quy trình đóng gói Release AAB (Google Play Store)...")
+    
+    # Chuẩn bị native & keystore
+    prepare_native
+
+    keystore_path = Actions.lane_context[:keystore_path]
+    keystore_password = Actions.lane_context[:keystore_password]
+    key_alias = Actions.lane_context[:key_alias]
+    key_password = Actions.lane_context[:key_password]
+
+    UI.message("Ký số bản build với Keystore: #{keystore_path} (Alias: #{key_alias})")
+
+    # Biên dịch qua Gradle với thông số ký số được inject tự động
+    gradle(
+      task: "bundleRelease",
+      project_dir: "../android/",
+      print_command: true,
+      properties: {
+        "android.injected.signing.store.file" => keystore_path,
+        "android.injected.signing.store.password" => keystore_password,
+        "android.injected.signing.key.alias" => key_alias,
+        "android.injected.signing.key.password" => key_password,
+      }
+    )
+
+    # Tìm file AAB đầu ra
+    aab_candidates = Dir.glob("../android/app/build/outputs/bundle/release/*.aab")
+    if aab_candidates.empty?
+      UI.user_error!("❌ Không tìm thấy file AAB sau khi biên dịch!")
+    end
+
+    source_aab = aab_candidates.first
+    target_aab = File.expand_path("../dist/hourlink-release.aab")
+    FileUtils.cp(source_aab, target_aab)
+
+    # Tính toán SHA256
+    require "digest"
+    sha256 = Digest::SHA256.file(target_aab).hexdigest
+    file_size_mb = (File.size(target_aab).to_f / (1024 * 1024)).round(2)
+
+    UI.success("🎉 ĐÓNG GÓI RELEASE AAB THÀNH CÔNG!")
+    UI.message("📍 Vị trí AAB: #{target_aab}")
+    UI.message("📏 Kích thước: #{file_size_mb} MB")
+    UI.message("🔑 SHA-256 Checksum: #{sha256}")
+
+    ENV["HOURLINK_AAB_PATH"] = target_aab
+  end
+
+  desc "Dọn dẹp các thư mục build tạm"
+  lane :clean do
+    UI.message("🧹 Dọn dẹp thư mục build tạm...")
+    if File.directory?("../android")
+      gradle(task: "clean", project_dir: "../android/")
+    end
+    FileUtils.rm_rf("../dist")
+    UI.success("Dọn dẹp hoàn tất!")
+  end
+end
+
+platform :ios do
+  desc "Đóng gói iOS IPA (chạy trên macOS Runner với Xcode)"
+  lane :build_ipa do
+    UI.header("🍏 Đóng gói iOS IPA Release...")
+    unless HostInfo.mac?
+      UI.important("Chức năng đóng gói iOS yêu cầu macOS runner và môi trường Xcode.")
+      next
+    end
+
+    unless File.directory?("../ios")
+      Dir.chdir("..") do
+        sh("npx expo prebuild --platform ios --no-install")
+      end
+    end
+
+    # Có thể sử dụng gym(scheme: "HourLink", export_method: "ad-hoc") khi có certificate
+    UI.message("Cấu hình iOS đã sẵn sàng cho Fastlane gym.")
+  end
+end
