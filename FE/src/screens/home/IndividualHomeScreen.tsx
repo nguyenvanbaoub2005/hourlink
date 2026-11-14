@@ -18,6 +18,12 @@ import Logo from '@components/Logo';
 import InvitationApi, { type InvitationResponse } from '@api/invitation';
 import Avatar from '@components/Avatar';
 import { formatDateTimeVi } from '@utils/dateTime';
+import {
+  saveHelpRequestsToLocal,
+  getLocalHelpRequests,
+  saveAppointmentsToLocal,
+  getLocalAppointments,
+} from '../../offline';
 import type { AppointmentItem } from '@types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -65,15 +71,27 @@ export default function IndividualHomeScreen() {
     ]);
 
     if (requestResult.status === 'fulfilled') {
-      setMyRequests(requestResult.value.data.data ?? []);
+      const list = requestResult.value.data.data ?? [];
+      setMyRequests(list);
+      if (list.length > 0) {
+        saveHelpRequestsToLocal(list).catch(() => {});
+      }
     } else {
-      setMyRequests([]);
+      // Fallback nạp từ bộ nhớ SQLite cục bộ khi offline
+      const cached = await getLocalHelpRequests();
+      setMyRequests(cached);
     }
 
     if (appointmentResult.status === 'fulfilled') {
-      setUpcomingAppointments(appointmentResult.value.data.data?.content ?? []);
+      const list = appointmentResult.value.data.data?.content ?? [];
+      setUpcomingAppointments(list);
+      if (list.length > 0) {
+        saveAppointmentsToLocal(list).catch(() => {});
+      }
     } else {
-      setUpcomingAppointments([]);
+      // Fallback nạp lịch hẹn từ bộ nhớ SQLite cục bộ khi offline
+      const cached = await getLocalAppointments();
+      setUpcomingAppointments(cached);
     }
 
     if (profileResult.status === 'fulfilled' && profileResult.value.data.data?.fullName) {

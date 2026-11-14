@@ -12,6 +12,7 @@ import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
 import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import { useAuthStore } from '@store/authStore';
+import { saveAppointmentsToLocal, getLocalAppointments } from '../../src/offline';
 import type { AppointmentItem } from '@types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -80,17 +81,27 @@ export default function AppointmentsScreen() {
     try {
       const countsPromise = fetchTabCounts();
       const res = await AppointmentApi.getMyAppointments(activeTab, 0, 50);
+      let list: AppointmentItem[] = [];
       if (res.data?.data?.content) {
-        setAppointments(res.data.data.content);
+        list = res.data.data.content;
       } else if (Array.isArray(res.data?.data)) {
-        setAppointments(res.data.data as any);
-      } else {
-        setAppointments([]);
+        list = res.data.data as any;
+      }
+      setAppointments(list);
+      // Lưu đệm vào SQLite cục bộ (Offline-First)
+      if (list.length > 0) {
+        saveAppointmentsToLocal(list).catch(() => {});
       }
       await countsPromise;
     } catch (error: any) {
-      console.error('Failed to fetch appointments:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách lịch hẹn. Vui lòng thử lại.');
+      console.warn('[AppointmentsScreen] Lỗi mạng khi nạp lịch hẹn, đọc từ SQLite cục bộ:', error?.message);
+      // Fallback nạp từ SQLite cục bộ
+      const cached = await getLocalAppointments();
+      if (cached.length > 0) {
+        setAppointments(cached);
+      } else {
+        Alert.alert('Ngoại tuyến', 'Chưa có dữ liệu lịch hẹn nào được lưu trong bộ nhớ cục bộ.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

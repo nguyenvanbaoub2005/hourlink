@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@store/authStore';
 import NotificationToast from '@components/NotificationToast';
 import { AppThemeProvider, useTheme } from '@theme';
+import { NetworkProvider } from '../src/offline/NetworkContext';
+import { OfflineBanner } from '../src/components/OfflineBanner';
 import { setUnauthorizedHandler } from '@api/axiosInstance';
 
 const queryClient = new QueryClient({
@@ -20,8 +23,10 @@ function RootNavigationContent() {
   const { colors, isDark } = useTheme();
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      {/* Thanh thông báo ngoại tuyến Offline Banner */}
+      <OfflineBanner />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
@@ -31,7 +36,7 @@ function RootNavigationContent() {
       </Stack>
       {/* Toast thông báo nổi — hoạt động trên tất cả màn hình */}
       <NotificationToast />
-    </>
+    </View>
   );
 }
 
@@ -47,9 +52,11 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppThemeProvider>
-        <RootNavigationContent />
-      </AppThemeProvider>
+      <NetworkProvider>
+        <AppThemeProvider>
+          <RootNavigationContent />
+        </AppThemeProvider>
+      </NetworkProvider>
     </QueryClientProvider>
   );
 }
