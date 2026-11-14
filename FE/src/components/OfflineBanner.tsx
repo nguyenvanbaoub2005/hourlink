@@ -15,18 +15,21 @@ export const OfflineBanner: React.FC = () => {
     return null;
   }
 
-  // Chế độ đang đồng bộ dữ liệu khi vừa có mạng lại
+  // Vị trí nổi thông minh phía trên thanh Tab Bar đáy màn hình (tránh 100% va chạm với tiêu đề/tai thỏ ở trên đỉnh)
+  const bottomPosition = Math.max(insets.bottom, 16) + 62;
+
+  // 1. Chế độ đang đồng bộ dữ liệu khi vừa có mạng lại
   if (isSyncing) {
     return (
       <View
         pointerEvents="box-none"
-        style={[styles.floatingWrapper, { top: Math.max(insets.top, 8) + 2 }]}
+        style={[styles.floatingWrapper, { bottom: bottomPosition }]}
       >
         <View
           style={[
             styles.pill,
             {
-              backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(239, 246, 255, 0.96)',
+              backgroundColor: isDark ? 'rgba(30, 41, 59, 0.96)' : 'rgba(239, 246, 255, 0.98)',
               borderColor: colors.primary,
             },
           ]}
@@ -40,23 +43,23 @@ export const OfflineBanner: React.FC = () => {
     );
   }
 
-  // Chế độ ngoại tuyến (Offline)
+  // 2. Chế độ ngoại tuyến (Offline)
   if (isOffline) {
     return (
       <View
         pointerEvents="box-none"
-        style={[styles.floatingWrapper, { top: Math.max(insets.top, 8) + 2 }]}
+        style={[styles.floatingWrapper, { bottom: bottomPosition }]}
       >
         <View
           style={[
             styles.pill,
             {
-              backgroundColor: isDark ? 'rgba(69, 26, 3, 0.94)' : 'rgba(254, 243, 199, 0.96)',
+              backgroundColor: isDark ? 'rgba(69, 26, 3, 0.95)' : 'rgba(254, 243, 199, 0.98)',
               borderColor: isDark ? '#B45309' : '#F59E0B',
             },
           ]}
         >
-          <Ionicons name="cloud-offline" size={14} color="#D97706" style={styles.icon} />
+          <Ionicons name="cloud-offline" size={15} color="#D97706" style={styles.icon} />
           <Text style={[styles.text, { color: isDark ? '#FDE68A' : '#92400E' }]}>
             Đang ngoại tuyến • Dữ liệu trong máy
           </Text>
@@ -70,12 +73,12 @@ export const OfflineBanner: React.FC = () => {
     );
   }
 
-  // Có mạng nhưng còn thao tác ngoại tuyến đang chờ gửi
+  // 3. Có mạng nhưng còn thao tác ngoại tuyến đang chờ gửi
   if (pendingSyncCount > 0) {
     return (
       <View
         pointerEvents="box-none"
-        style={[styles.floatingWrapper, { top: Math.max(insets.top, 8) + 2 }]}
+        style={[styles.floatingWrapper, { bottom: bottomPosition }]}
       >
         <TouchableOpacity
           onPress={syncNow}
@@ -83,12 +86,12 @@ export const OfflineBanner: React.FC = () => {
           style={[
             styles.pill,
             {
-              backgroundColor: isDark ? 'rgba(20, 83, 45, 0.94)' : 'rgba(220, 252, 231, 0.96)',
+              backgroundColor: isDark ? 'rgba(20, 83, 45, 0.95)' : 'rgba(220, 252, 231, 0.98)',
               borderColor: '#16A34A',
             },
           ]}
         >
-          <Ionicons name="cloud-upload-outline" size={14} color="#16A34A" style={styles.icon} />
+          <Ionicons name="cloud-upload-outline" size={15} color="#16A34A" style={styles.icon} />
           <Text style={[styles.text, { color: isDark ? '#86EFAC' : '#15803D' }]}>
             Có mạng lại • Bấm để đồng bộ {pendingSyncCount} tác vụ
           </Text>
@@ -111,35 +114,35 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    borderWidth: 1.5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
     maxWidth: '90%',
   },
   icon: {
-    marginRight: 6,
+    marginRight: 7,
   },
   text: {
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 0.2,
   },
   badge: {
-    marginLeft: 6,
+    marginLeft: 8,
     backgroundColor: '#D97706',
     borderRadius: 10,
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1,
   },
   badgeText: {
     color: '#FFF',
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 10.5,
+    fontWeight: '800',
   },
 });

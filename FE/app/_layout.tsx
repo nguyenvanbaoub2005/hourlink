@@ -26,8 +26,6 @@ function RootNavigationContent() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      {/* Thanh thông báo ngoại tuyến Offline Banner */}
-      <OfflineBanner />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
@@ -39,6 +37,8 @@ function RootNavigationContent() {
       <NotificationToast />
       {/* Modal thông báo tùy chỉnh hiện đại toàn app */}
       <AppAlertModal />
+      {/* Thanh thông báo ngoại tuyến Offline Banner (nổi phía trên thanh tab đáy) */}
+      <OfflineBanner />
     </View>
   );
 }
