@@ -2,20 +2,19 @@ import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
-import { Colors } from '@constants/Colors';
+import { useTheme } from '@theme';
 import { View, Text } from 'react-native';
 
 export default function TabsLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
   const { unreadCount } = useNotificationStore();
-
-
+  const { colors, isDark } = useTheme();
 
   // Đang đọc token từ SecureStore → hiển thị màn hình chờ
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <Text style={{ color: '#64748B', fontSize: 16 }}>Đang tải...</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 16 }}>Đang tải...</Text>
       </View>
     );
   }
@@ -30,14 +29,14 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.bgCard,
-          borderTopColor: Colors.border,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.outlineVariant,
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
         },
-        tabBarActiveTintColor:   Colors.primary,
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarActiveTintColor:   colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
       }}
     >
@@ -69,12 +68,12 @@ export default function TabsLayout() {
               width: 50,
               height: 50,
               borderRadius: 25,
-              backgroundColor: '#38bdf8', // Light blue background
+              backgroundColor: colors.primary,
               justifyContent: 'center',
               alignItems: 'center',
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
+              shadowOpacity: isDark ? 0.4 : 0.2,
               shadowRadius: 4,
               elevation: 4
             }}>
@@ -111,5 +110,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-
-

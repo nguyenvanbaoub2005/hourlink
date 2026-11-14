@@ -19,9 +19,11 @@ module.exports = function (api) {
             '@types': './src/types',
             '@utils': './src/utils',
             '@constants': './src/constants',
+            '@theme': './src/theme',
           },
         },
       ],
+      'react-native-reanimated/plugin',
     ],
   };
 };

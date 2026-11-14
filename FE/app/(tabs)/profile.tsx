@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius } from '@constants/Colors';
+import { useTheme } from '@theme';
+import { ThemeSelectorModal } from '@components/ThemeSelectorModal';
 import UserApi from '@api/user';
 import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
@@ -32,8 +34,14 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { wallet, fetchWallet } = useWalletStore();
+  const { colors, isDark } = useTheme();
+  const [showThemeModal, setShowThemeModal] = useState(false);
 
   const handleMenuPress = (label: string, isLogout?: boolean) => {
+    if (label === 'Giao diện & Dark Mode') {
+      setShowThemeModal(true);
+      return;
+    }
     if (isLogout) {
       Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi HourLink?', [
         { text: 'Hủy', style: 'cancel' },
@@ -145,8 +153,8 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <SafeAreaView style={styles.center}>
-        <Text style={{ color: Colors.textMuted }}>Không thể tải hồ sơ</Text>
+      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.textMuted }}>Không thể tải hồ sơ</Text>
       </SafeAreaView>
     );
   }
@@ -157,17 +165,17 @@ export default function ProfileScreen() {
   const activeRequests = requests.filter(r => r.status === 'SEARCHING' || r.status === 'ASSIGNED');
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cá nhân</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.outline }]}>
+        <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Cá nhân</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {/* Bell icon với badge thông báo thực */}
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => router.push('/notifications' as any)}
           >
-            <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+            <Ionicons name="notifications-outline" size={24} color={colors.onSurface} />
             {unreadCount > 0 && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>
@@ -182,7 +190,7 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Mở cài đặt"
           >
-            <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
+            <Ionicons name="settings-outline" size={24} color={colors.onSurface} />
           </TouchableOpacity>
         </View>
       </View>
@@ -190,7 +198,7 @@ export default function ProfileScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {/* Avatar + Info */}
         <View style={styles.infoRow}>
@@ -210,8 +218,8 @@ export default function ProfileScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{profile.fullName}</Text>
-            <Text style={styles.subtext}>
+            <Text style={[styles.name, { color: colors.onSurface }]}>{profile.fullName}</Text>
+            <Text style={[styles.subtext, { color: colors.onSurfaceVariant }]}>
               {profile.region ? `${profile.region} · ` : ''}Tham gia từ {joinMonthYear}
             </Text>
             <View style={styles.ratingRow}>
@@ -223,15 +231,15 @@ export default function ProfileScreen() {
                   color="#F59E0B"
                 />
               ))}
-              <Text style={styles.ratingText}>{profile.reputationScore?.toFixed(1) ?? '0.0'}</Text>
+              <Text style={[styles.ratingText, { color: colors.onSurface }]}>{profile.reputationScore?.toFixed(1) ?? '0.0'}</Text>
             </View>
           </View>
         </View>
 
         {/* Stats Row */}
-        <View style={styles.statsRow}>
+        <View style={[styles.statsRow, { borderColor: colors.outline }]}>
           {[
-            { label: 'Số dư',   value: wallet?.balance?.toFixed(1) ?? '-', color: Colors.primary },
+            { label: 'Số dư',   value: wallet?.balance?.toFixed(1) ?? '-', color: colors.primary },
             { label: 'Đã cho',  value: wallet?.totalUsed?.toFixed(1) ?? '-', color: '#3B82F6' },
             { label: 'Đã nhận', value: wallet?.totalEarned?.toFixed(1) ?? '-', color: '#F59E0B' },
             { label: 'Buổi học', value: String(profile.completedSessions ?? 0), color: '#8B5CF6' },
@@ -239,9 +247,9 @@ export default function ProfileScreen() {
             <React.Fragment key={stat.label}>
               <View style={styles.statCell}>
                 <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
+                <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>{stat.label}</Text>
               </View>
-              {i < arr.length - 1 && <View style={styles.divider} />}
+              {i < arr.length - 1 && <View style={[styles.divider, { backgroundColor: colors.outline }]} />}
             </React.Fragment>
           ))}
         </View>
@@ -250,7 +258,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           {/* Kỹ năng chia sẻ */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Kỹ năng chia sẻ</Text>
+            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Kỹ năng chia sẻ</Text>
             <TouchableOpacity onPress={() => router.push('/profile/skills' as any)}>
               <Text style={styles.actionLink}>Quản lý</Text>
             </TouchableOpacity>
@@ -274,7 +282,7 @@ export default function ProfileScreen() {
 
           {/* Muốn học */}
           <View style={[styles.sectionHeaderRow, { marginTop: Spacing.lg }]}>
-            <Text style={styles.sectionTitle}>Muốn học</Text>
+            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Muốn học</Text>
             <TouchableOpacity onPress={() => router.push('/profile/help-requests' as any)}>
               <Text style={styles.actionLink}>Quản lý</Text>
             </TouchableOpacity>
@@ -293,12 +301,12 @@ export default function ProfileScreen() {
 
           {/* Huy hiệu */}
           <View style={[styles.sectionHeaderRow, { marginTop: Spacing.lg }]}>
-            <Text style={styles.sectionTitle}>Huy hiệu</Text>
+            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Huy hiệu</Text>
             <TouchableOpacity
               style={styles.badgeActionButton}
               onPress={() => router.push({ pathname: '/profile/reputation', params: { tab: 'BADGES' } } as any)}
             >
-              <Ionicons name="ribbon-outline" size={15} color={Colors.secondary} />
+              <Ionicons name="ribbon-outline" size={15} color={colors.secondary} />
               <Text style={styles.actionLink}>Xem tất cả</Text>
             </TouchableOpacity>
           </View>
@@ -307,11 +315,11 @@ export default function ProfileScreen() {
               badges.slice(0, 3).map(b => {
                 const visual = getBadgeVisual(b.code);
                 return (
-                  <View key={b.id} style={styles.badgeCard}>
+                  <View key={b.id} style={[styles.badgeCard, { backgroundColor: colors.surface, borderColor: colors.outline }]}>
                     <View style={[styles.badgeIcon, { backgroundColor: visual.background }]}>
                       <Ionicons name={visual.icon} size={24} color={visual.color} />
                     </View>
-                    <Text style={styles.badgeLabel} numberOfLines={2}>{b.name}</Text>
+                    <Text style={[styles.badgeLabel, { color: colors.onSurfaceVariant }]} numberOfLines={2}>{b.name}</Text>
                   </View>
                 );
               })
@@ -326,7 +334,7 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             {profile.occupation && (
               <>
-                <Text style={styles.sectionTitle}>Nghề nghiệp</Text>
+                <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Nghề nghiệp</Text>
                 <View style={styles.chipWrap}>
                   <View style={styles.chipBlue}>
                     <Text style={styles.chipBlueText}>{profile.occupation}</Text>
@@ -336,7 +344,7 @@ export default function ProfileScreen() {
             )}
             {profile.languages && (
               <>
-                <Text style={[styles.sectionTitle, { marginTop: Spacing.md }]}>Ngôn ngữ</Text>
+                <Text style={[styles.sectionTitle, { color: colors.onSurface, marginTop: Spacing.md }]}>Ngôn ngữ</Text>
                 <View style={styles.chipWrap}>
                   <View style={styles.chipOrange}>
                     <Text style={styles.chipOrangeText}>{profile.languages}</Text>
@@ -349,7 +357,7 @@ export default function ProfileScreen() {
 
         {/* Menu Items (Theo ảnh 3) */}
         <View style={styles.menuSection}>
-          <Text style={[styles.sectionTitle, { marginBottom: Spacing.md, marginTop: Spacing.sm }]}>Cài đặt & Tiện ích</Text>
+          <Text style={[styles.sectionTitle, { color: colors.onSurface, marginBottom: Spacing.md, marginTop: Spacing.sm }]}>Cài đặt & Tiện ích</Text>
 
           {/* Nhóm 1: Hoạt động & Uy tín */}
           {[
@@ -359,33 +367,34 @@ export default function ProfileScreen() {
             { icon: 'ribbon-outline', color: '#7C3AED', bg: '#EDE9FE', label: 'Huy hiệu của tôi' },
             { icon: 'people-outline', color: '#9333EA', bg: '#F3E8FF', label: 'Lời mời' },
           ].map(item => (
-            <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
+            <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outline }]} onPress={() => handleMenuPress(item.label)}>
               <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
                 <Ionicons name={item.icon as any} size={20} color={item.color} />
               </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+              <Text style={[styles.menuLabel, { color: colors.onSurface }]}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           ))}
 
-          <View style={styles.menuDivider} />
+          <View style={[styles.menuDivider, { backgroundColor: colors.outline }]} />
 
-          {/* Nhóm 2: Cài đặt tài khoản */}
+          {/* Nhóm 2: Cài đặt tài khoản & Giao diện */}
           {[
+            { icon: 'moon-outline', color: '#8B5CF6', bg: isDark ? '#312E81' : '#EDE9FE', label: 'Giao diện & Dark Mode' },
             { icon: 'notifications-outline', color: '#EA580C', bg: '#FFEDD5', label: 'Thông báo' },
             { icon: 'lock-closed-outline', color: '#2563EB', bg: '#E0F2FE', label: 'Bảo mật' },
             { icon: 'eye-off-outline', color: '#64748B', bg: '#F1F5F9', label: 'Quyền riêng tư' },
           ].map(item => (
-            <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
+            <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outline }]} onPress={() => handleMenuPress(item.label)}>
               <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
                 <Ionicons name={item.icon as any} size={20} color={item.color} />
               </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+              <Text style={[styles.menuLabel, { color: colors.onSurface }]}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           ))}
 
-          <View style={styles.menuDivider} />
+          <View style={[styles.menuDivider, { backgroundColor: colors.outline }]} />
 
           {/* Nhóm 3: Hỗ trợ & Khác */}
           {[
@@ -393,19 +402,19 @@ export default function ProfileScreen() {
             { icon: 'document-text-outline', color: '#64748B', bg: '#F1F5F9', label: 'Điều khoản dịch vụ' },
             { icon: 'alert-circle-outline', color: '#DC2626', bg: '#FEE2E2', label: 'Báo cáo của tôi' },
           ].map(item => (
-            <TouchableOpacity key={item.label} style={styles.menuItem} onPress={() => handleMenuPress(item.label)}>
+            <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outline }]} onPress={() => handleMenuPress(item.label)}>
               <View style={[styles.menuIconWrap, { backgroundColor: item.bg }]}>
                 <Ionicons name={item.icon as any} size={20} color={item.color} />
               </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+              <Text style={[styles.menuLabel, { color: colors.onSurface }]}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           ))}
 
-          <View style={styles.menuDivider} />
+          <View style={[styles.menuDivider, { backgroundColor: colors.outline }]} />
 
           {/* Đăng xuất */}
-          <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuPress('Đăng xuất', true)}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: isDark ? '#451A1A' : '#FEF2F2', borderColor: isDark ? '#7F1D1D' : '#FEE2E2' }]} onPress={() => handleMenuPress('Đăng xuất', true)}>
             <View style={[styles.menuIconWrap, { backgroundColor: '#FEE2E2' }]}>
               <Ionicons name="log-out-outline" size={20} color="#DC2626" />
             </View>
@@ -414,6 +423,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <ThemeSelectorModal visible={showThemeModal} onClose={() => setShowThemeModal(false)} />
     </SafeAreaView>
   );
 }

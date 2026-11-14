@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
+import { useTheme } from '@theme';
 import AppointmentApi from '@api/appointment';
 import Avatar from '@components/Avatar';
 import CancelAppointmentModal from '@components/CancelAppointmentModal';
@@ -33,6 +34,7 @@ const TABS: { id: AppointmentTab; label: string }[] = [
 ];
 
 export default function AppointmentsScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
   const [activeTab, setActiveTab] = useState<AppointmentTab>('UPCOMING');
@@ -187,15 +189,15 @@ export default function AppointmentsScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.card}
+        style={[styles.card, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}
         activeOpacity={0.8}
         onPress={() => router.push(`/appointment/${item.id}` as any)}
       >
         {/* Top Row: Date & Status Badge */}
         <View style={styles.cardHeader}>
           <View style={styles.dateBadge}>
-            <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.dateText}>
+            <Ionicons name="calendar-outline" size={14} color={colors.onSurfaceVariant} />
+            <Text style={[styles.dateText, { color: colors.onSurfaceVariant }]}>
               {item.appointmentDate} • {item.startTime?.slice(0, 5)} - {item.endTime?.slice(0, 5)}
             </Text>
           </View>
@@ -206,7 +208,7 @@ export default function AppointmentsScreen() {
         </View>
 
         {/* Title and Skill */}
-        <Text style={styles.title} numberOfLines={2}>{titleStr}</Text>
+        <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={2}>{titleStr}</Text>
         {!!item.skillName && (
           <View style={styles.skillTag}>
             <Ionicons name="ribbon-outline" size={13} color="#0284C7" />
@@ -220,7 +222,7 @@ export default function AppointmentsScreen() {
             <Text style={styles.userRole}>Người hỗ trợ</Text>
             <View style={styles.userRow}>
               <Avatar uri={item.providerAvatarUrl || (item as any).helper?.avatarUrl} name={item.providerName || (item as any).helper?.fullName} size={28} />
-              <Text style={styles.userName} numberOfLines={1}>
+              <Text style={[styles.userName, { color: colors.onSurface }]} numberOfLines={1}>
                 {item.providerName || (item as any).helper?.fullName || 'Người hỗ trợ'}
               </Text>
             </View>
@@ -232,7 +234,7 @@ export default function AppointmentsScreen() {
             <Text style={styles.userRole}>Người nhận</Text>
             <View style={styles.userRow}>
               <Avatar uri={item.receiverAvatarUrl || (item as any).receiver?.avatarUrl} name={item.receiverName || (item as any).receiver?.fullName} size={28} />
-              <Text style={styles.userName} numberOfLines={1}>
+              <Text style={[styles.userName, { color: colors.onSurface }]} numberOfLines={1}>
                 {item.receiverName || (item as any).receiver?.fullName || 'Người nhận'}
               </Text>
             </View>
@@ -333,28 +335,37 @@ export default function AppointmentsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Lịch Hẹn</Text>
+        <Text style={[styles.headerTitle, { color: colors.onBackground }]}>Lịch Hẹn</Text>
         <TouchableOpacity style={styles.refreshIcon} onPress={() => fetchAppointments(true)}>
-          <Ionicons name="refresh-outline" size={22} color={Colors.textPrimary} />
+          <Ionicons name="refresh-outline" size={22} color={colors.onSurface} />
         </TouchableOpacity>
       </View>
 
       {/* Filter Tabs */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { backgroundColor: isDark ? colors.surfaceVariant : '#EEF2F6' }]}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           const count = tabCounts[tab.id];
           return (
             <TouchableOpacity
               key={tab.id}
-              style={[styles.tabItem, isActive && styles.tabItemActive]}
+              style={[
+                styles.tabItem,
+                isActive && [styles.tabItemActive, { backgroundColor: colors.surfaceCard }]
+              ]}
               onPress={() => setActiveTab(tab.id)}
             >
               <View style={styles.tabLabelRow}>
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
+                <Text style={[
+                  styles.tabText,
+                  { color: colors.onSurfaceVariant },
+                  isActive && [styles.tabTextActive, { color: colors.primary }]
+                ]}>
+                  {tab.label}
+                </Text>
                 {count > 0 && (
                   <View style={[styles.tabCountBadge, isActive && styles.tabCountBadgeActive]}>
                     <Text style={[styles.tabCountText, isActive && styles.tabCountTextActive]}>

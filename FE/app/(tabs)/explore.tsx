@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '@constants/Colors';
+import { useTheme } from '@theme';
 import SkillApi from '@api/skill';
 import RatingApi from '@api/rating';
 import { openChatWithUser } from '@utils/chatNav';
@@ -104,6 +105,7 @@ const normalizeCategory = (value: unknown): CategoryItem | null => {
 };
 
 export default function ExploreScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [keyword, setKeyword] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -285,21 +287,21 @@ export default function ExploreScreen() {
   const visibleSupportCount = new Set(skills.map((skill) => skill.userId || skill.id)).size;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Khám phá</Text>
-        <Text style={styles.headerSub}>Tìm kiếm & lọc người hỗ trợ theo kỹ năng</Text>
+        <Text style={[styles.headerTitle, { color: colors.onBackground }]}>Khám phá</Text>
+        <Text style={[styles.headerSub, { color: colors.onSurfaceVariant }]}>Tìm kiếm & lọc người hỗ trợ theo kỹ năng</Text>
       </View>
 
       {/* ── Search Bar ──────────────────────────────────────────────────── */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={20} color={Colors.textMuted} style={{ marginRight: 8 }} />
+        <View style={[styles.searchBar, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}>
+          <Ionicons name="search-outline" size={20} color={colors.onSurfaceVariant} style={{ marginRight: 8 }} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.onSurface }]}
             placeholder="Tìm theo kỹ năng, tên người hỗ trợ..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={colors.onSurfaceVariant}
             value={keyword}
             onChangeText={setKeyword}
             onSubmitEditing={handleSearchSubmit}
@@ -307,7 +309,7 @@ export default function ExploreScreen() {
           />
           {keyword.length > 0 && (
             <TouchableOpacity onPress={() => { setKeyword(''); }} style={{ padding: 4 }}>
-              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+              <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           )}
         </View>
@@ -480,7 +482,7 @@ export default function ExploreScreen() {
           </View>
         ) : (
           skills.map((item, index) => (
-            <View key={item.id} style={styles.card}>
+            <View key={item.id} style={[styles.card, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}>
               {/* Top row: Avatar & Tutor Info */}
               <View style={styles.cardHeader}>
                 <TouchableOpacity
@@ -494,13 +496,13 @@ export default function ExploreScreen() {
                 </TouchableOpacity>
                 <View style={styles.tutorInfo}>
                   <View style={styles.tutorNameRow}>
-                    <Text style={styles.tutorName}>{item.userFullName || 'Thành viên HourLink'}</Text>
-                    <Ionicons name="checkmark-circle" size={16} color={Colors.primary} style={{ marginLeft: 4 }} />
+                    <Text style={[styles.tutorName, { color: colors.onSurface }]}>{item.userFullName || 'Thành viên HourLink'}</Text>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginLeft: 4 }} />
                   </View>
-                  <Text style={styles.tutorSub}>{item.userOccupation || 'Người hỗ trợ'}</Text>
+                  <Text style={[styles.tutorSub, { color: colors.onSurfaceVariant }]}>{item.userOccupation || 'Người hỗ trợ'}</Text>
                   <View style={styles.tutorLocationRow}>
-                    <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
-                    <Text style={styles.tutorLocationText}>{item.userRegion || item.region || 'Toàn quốc'}</Text>
+                    <Ionicons name="location-outline" size={12} color={colors.onSurfaceVariant} />
+                    <Text style={[styles.tutorLocationText, { color: colors.onSurfaceVariant }]}>{item.userRegion || item.region || 'Toàn quốc'}</Text>
                   </View>
                 </View>
                 <View style={styles.badgeIndex}>
@@ -509,16 +511,16 @@ export default function ExploreScreen() {
               </View>
 
               {/* Middle row: Skill Info */}
-              <View style={styles.skillBox}>
+              <View style={[styles.skillBox, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC' }]}>
                 <View style={styles.skillTitleRow}>
-                  <Text style={styles.skillName}>{item.name}</Text>
+                  <Text style={[styles.skillName, { color: colors.onSurface }]}>{item.name}</Text>
                   <View style={styles.levelTag}>
                     <Text style={styles.levelTagText}>{levelLabel(item.level)}</Text>
                   </View>
                 </View>
 
                 {item.description ? (
-                  <Text style={styles.skillDesc} numberOfLines={2}>{item.description}</Text>
+                  <Text style={[styles.skillDesc, { color: colors.onSurfaceVariant }]} numberOfLines={2}>{item.description}</Text>
                 ) : null}
 
                 <View style={styles.tagRow}>

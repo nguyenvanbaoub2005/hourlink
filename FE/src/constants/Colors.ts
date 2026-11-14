@@ -1,39 +1,12 @@
 /**
  * Colors — Bảng màu chính của HourLink.
- * Dark-first, hỗ trợ light/dark mode.
+ * Hỗ trợ Light & Dark Mode theo chuẩn Google Material 3.
+ * Khuyến khích sử dụng hook: `const { colors, isDark } = useTheme()` từ `@theme`
  */
-export const Colors = {
-  primary:    '#10B981',  // Teal/Emerald (Main button color)
-  secondary:  '#0D9488',  // Darker Teal (Text links)
-  accent:     '#F97316',  // Orange (Accent)
-  success:    '#10B981',  // Emerald
-  warning:    '#F59E0B',  // Amber
-  danger:     '#EF4444',  // Red
+import { lightColorScheme, darkColorScheme, type ColorScheme } from '../theme/colors';
 
-  // Backgrounds
-  bgLight:    '#FFFFFF',  // White
-  bgCard:     '#F1F5F9',  // Slate-100 (Light gray)
-  bgInput:    '#FFFFFF',  // White inputs
-  bgScreen:   '#F8FAFC',  // Very light screen bg
-  bgDark:     '#F8FAFC',  // Alias for old screens to avoid errors
-  surface:    '#FFFFFF',  // Alias for legacy card/input screens
-
-  // Text
-  text:          '#1E293B',  // Alias for old screens
-  textPrimary:   '#1E293B',  // Slate-800
-  textSecondary: '#64748B',  // Slate-500
-  textMuted:     '#94A3B8',  // Slate-400
-
-  // Border
-  border:     '#E2E8F0',  // Slate-200
-
-  // Gradient stops
-  gradientStart: '#047857',  // Deep emerald
-  gradientEnd:   '#10B981',  // Emerald
-
-  // Time Credit gold
-  credit:     '#F59E0B',
-};
+export const Colors = lightColorScheme;
+export { lightColorScheme, darkColorScheme, type ColorScheme };
 
 export const Fonts = {
   regular: 'System',

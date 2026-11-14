@@ -36,6 +36,12 @@
       ],
       "@constants/*": [
         "src/constants/*"
+      ],
+      "@theme/*": [
+        "src/theme/*"
+      ],
+      "@theme": [
+        "src/theme/index"
       ]
     }
   },
