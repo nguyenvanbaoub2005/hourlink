@@ -218,7 +218,7 @@ export default function DateTimePickerModal({
   if (!visible) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, styles.overlay, { zIndex: 99999, elevation: 99999 }]}>
+    <View style={[StyleSheet.absoluteFill, styles.overlay, { zIndex: 99999, elevation: 99999 }]}>
       <View style={styles.modalCard}>
         {/* Header */}
         <View style={styles.modalHeader}>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { InteractionManager, Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -33,10 +33,8 @@ export const M3Spring = {
  * Chạy tác vụ sau khi animation chuyển màn hình hoàn tất (giữ 60fps tuyệt đối)
  */
 export function runAfterTransition(task: () => void) {
-  const handle = InteractionManager.runAfterInteractions(() => {
-    task();
-  });
-  return () => handle.cancel();
+  const handle = setTimeout(task, 100);
+  return () => clearTimeout(handle);
 }
 
 /**

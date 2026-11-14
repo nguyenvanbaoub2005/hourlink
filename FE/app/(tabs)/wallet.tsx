@@ -194,7 +194,7 @@ export default function WalletScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <TransactionItem item={item} />}
         ListHeaderComponent={ListHeader}
-        ListEmptyComponent={!isLoading ? ListEmpty : null}
+        ListEmptyComponent={!isLoading ? ListEmpty : undefined}
         ListFooterComponent={ListFooter}
         contentContainerStyle={styles.listContent}
         onEndReached={loadMoreTransactions}

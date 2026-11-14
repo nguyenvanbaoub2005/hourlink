@@ -121,7 +121,7 @@ export default function OrganizationHomeScreen() {
       ListEmptyComponent={
         !loading
           ? <Text style={styles.empty}>Chưa có hoạt động nào. Hãy tạo hoạt động đầu tiên.</Text>
-          : null
+          : undefined
       }
       renderItem={({ item }) => (
         <TouchableOpacity

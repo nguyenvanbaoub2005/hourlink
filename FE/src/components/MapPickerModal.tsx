@@ -129,7 +129,7 @@ export default function MapPickerModal({ visible, onClose, onSelect }: MapPicker
   if (!visible) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { zIndex: 99999, backgroundColor: '#fff' }]}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 99999, backgroundColor: '#fff' }]}>
       <View style={styles.container}>
         <MapView
           style={styles.map}
