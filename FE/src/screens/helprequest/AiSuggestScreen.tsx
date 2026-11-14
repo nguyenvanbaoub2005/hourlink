@@ -10,7 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import AiMatchingApi, { type AiRecommendationResponse } from '@api/aimatching';
+import { container } from '../../di/container';
+import type { AiRecommendationEntity } from '../../domain/entities/AiRecommendation';
 import Avatar from '@components/Avatar';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 
@@ -20,7 +21,7 @@ export default function AiSuggestScreen() {
     ? params.helpRequestId[0]
     : params.helpRequestId;
   const router = useRouter();
-  const [recommendations, setRecommendations] = useState<AiRecommendationResponse[]>([]);
+  const [recommendations, setRecommendations] = useState<AiRecommendationEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,8 +37,9 @@ export default function AiSuggestScreen() {
     setError(null);
 
     try {
-      const response = await AiMatchingApi.getRecommendations(helpRequestId);
-      setRecommendations(response.data?.data ?? []);
+      // Gọi qua UseCase của lớp Domain (Clean Architecture 3 lớp)
+      const data = await container.getAiSuggestionsUseCase.execute(helpRequestId);
+      setRecommendations(data as any);
     } catch (fetchError: any) {
       const status = fetchError?.response?.status;
       const serverMessage = fetchError?.response?.data?.message;
@@ -59,7 +61,7 @@ export default function AiSuggestScreen() {
     fetchSuggestions();
   }, [fetchSuggestions]);
 
-  const renderItem = ({ item, index }: { item: AiRecommendationResponse; index: number }) => {
+  const renderItem = ({ item, index }: { item: AiRecommendationEntity; index: number }) => {
     const helperId = item.helper?.id;
     const helperName = item.helper?.fullName || 'Người hỗ trợ chưa cập nhật tên';
     const skillId = item.skill?.id;
@@ -100,7 +102,7 @@ export default function AiSuggestScreen() {
             <Ionicons name="bulb-outline" size={17} color="#0F766E" />
             <Text style={styles.reasonsTitle}>Vì sao phù hợp?</Text>
           </View>
-          {reasons.length > 0 ? reasons.map((reason, reasonIndex) => (
+          {reasons.length > 0 ? reasons.map((reason: string, reasonIndex: number) => (
             <View key={`${reason}-${reasonIndex}`} style={styles.reasonRow}>
               <View style={styles.reasonCheck}>
                 <Ionicons name="checkmark" size={11} color="#047857" />

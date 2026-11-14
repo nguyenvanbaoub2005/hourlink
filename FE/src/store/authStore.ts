@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { TOKEN_KEY, REFRESH_KEY } from '@api/axiosInstance';
 import AuthApi from '@api/auth';
 import { signOutFirebase } from '@lib/firebase';
+import { container } from '../di/container';
 import type { UserResponse } from '@types';
 
 interface AuthState {
@@ -91,7 +92,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (token && !isTokenExpired(token)) {
         // Token còn hạn → khôi phục phiên đăng nhập
         const role = decodeJwtRole(token);
-        set({ accessToken: token, role, isAuthenticated: true });
+        // Tải hồ sơ người dùng qua UseCase Domain (Clean Architecture)
+        const profile = await container.getProfileUseCase.execute();
+        set({ accessToken: token, role, user: (profile as any) || null, isAuthenticated: true });
       } else if (token) {
         // Token đã hết hạn → xóa sạch, buộc đăng nhập lại
         await SecureStore.deleteItemAsync(TOKEN_KEY);
