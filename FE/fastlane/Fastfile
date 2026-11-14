@@ -15,12 +15,12 @@ platform :android do
   desc "Chuẩn bị native project (Expo CNG Prebuild) và cấu hình Keystore ký số"
   lane :prepare_native do
     UI.header("🛠️ Khởi tạo dự án Android từ Expo Config (CNG)...")
-    
+
     # 1. Chạy prebuild nếu chưa có thư mục android
     unless File.directory?("../android")
       UI.message("Chưa tìm thấy thư mục native android/, tiến hành chạy expo prebuild...")
       Dir.chdir("..") do
-        sh("npx expo prebuild --platform android --no-install")
+        sh("npx expo prebuild --platform android --clean --no-install")
       end
     else
       UI.message("Thư mục native android/ đã tồn tại.")
@@ -36,9 +36,9 @@ platform :android do
     FileUtils.mkdir_p(File.expand_path("../dist", __dir__))
 
     # 3. Xác định Keystore ký số
-    keystore_dir = File.expand_path("../android/app", __dir__)
-    FileUtils.mkdir_p(keystore_dir)
-    keystore_path = File.join(keystore_dir, "release.keystore")
+    app_dir = File.expand_path("../android/app", __dir__)
+    FileUtils.mkdir_p(app_dir)
+    keystore_path = File.join(app_dir, "release.keystore")
 
     get_env = lambda do |key, default|
       val = ENV[key]
@@ -49,11 +49,11 @@ platform :android do
     key_alias = get_env.call("ANDROID_KEY_ALIAS", get_env.call("KEY_ALIAS", "hourlink"))
     key_password = get_env.call("ANDROID_KEY_PASSWORD", get_env.call("KEY_PASSWORD", "hourlink123"))
 
-    # Kiểm tra nếu có Base64 trong ENV thì giải mã
-    if ENV["ANDROID_KEYSTORE_BASE64"] && !ENV["ANDROID_KEYSTORE_BASE64"].empty?
+    # Giải mã Keystore từ biến môi trường nếu có
+    if ENV["ANDROID_KEYSTORE_BASE64"] && !ENV["ANDROID_KEYSTORE_BASE64"].strip.empty?
       UI.message("🔓 Giải mã Keystore từ biến môi trường ANDROID_KEYSTORE_BASE64...")
       require "base64"
-      File.binwrite(keystore_path, Base64.decode64(ENV["ANDROID_KEYSTORE_BASE64"]))
+      File.binwrite(keystore_path, Base64.decode64(ENV["ANDROID_KEYSTORE_BASE64"].strip))
       UI.success("Đã ghi Keystore thành công vào: #{keystore_path}")
     elsif !File.exist?(keystore_path)
       # Tự động tạo Release Keystore RSA 2048-bit nếu chưa có
@@ -62,17 +62,42 @@ platform :android do
       UI.success("Đã khởi tạo Keystore ký số thành công: #{keystore_path}")
     end
 
-    # 4. Patch build.gradle để đảm bảo release buildType trỏ tới release signing
-    build_gradle_path = File.join(keystore_dir, "build.gradle")
+    # 4. Ghi thông số ký số vào gradle.properties theo chuẩn React Native
+    gradle_props_path = File.expand_path("../android/gradle.properties", __dir__)
+    if File.exist?(gradle_props_path)
+      props_content = File.read(gradle_props_path)
+      unless props_content.include?("HOURLINK_RELEASE_STORE_FILE")
+        release_props = <<~PROPS
+
+          # --- HourLink Release Signing Config ---
+          HOURLINK_RELEASE_STORE_FILE=release.keystore
+          HOURLINK_RELEASE_KEY_ALIAS=#{key_alias}
+          HOURLINK_RELEASE_STORE_PASSWORD=#{keystore_password}
+          HOURLINK_RELEASE_KEY_PASSWORD=#{key_password}
+        PROPS
+        File.open(gradle_props_path, "a") { |f| f.write(release_props) }
+        UI.success("Đã cập nhật gradle.properties với thông tin ký số release!")
+      end
+    end
+
+    # 5. Cấu hình signingConfig release trong android/app/build.gradle
+    build_gradle_path = File.join(app_dir, "build.gradle")
     if File.exist?(build_gradle_path)
       gradle_content = File.read(build_gradle_path).gsub(/\r\n/, "\n")
       unless gradle_content.include?("signingConfigs.release")
         release_signing_block = <<~GRADLE
               release {
-                  storeFile file('release.keystore')
-                  storePassword '#{keystore_password}'
-                  keyAlias '#{key_alias}'
-                  keyPassword '#{key_password}'
+                  if (project.hasProperty('HOURLINK_RELEASE_STORE_FILE')) {
+                      storeFile file(HOURLINK_RELEASE_STORE_FILE)
+                      storePassword HOURLINK_RELEASE_STORE_PASSWORD
+                      keyAlias HOURLINK_RELEASE_KEY_ALIAS
+                      keyPassword HOURLINK_RELEASE_KEY_PASSWORD
+                  } else {
+                      storeFile file('release.keystore')
+                      storePassword '#{keystore_password}'
+                      keyAlias '#{key_alias}'
+                      keyPassword '#{key_password}'
+                  }
               }
         GRADLE
 
@@ -82,12 +107,10 @@ platform :android do
         end
 
         # Chuyển release buildType từ signingConfigs.debug sang signingConfigs.release
-        # Khối release có comment: "// Caution! In production, you need to generate your own keystore file."
         debug_sign_target = "// Caution! In production, you need to generate your own keystore file.\n            // see https://reactnative.dev/docs/signed-apk-android.\n            signingConfig signingConfigs.debug"
         if gradle_content.include?(debug_sign_target)
           gradle_content = gradle_content.sub(debug_sign_target, "signingConfig signingConfigs.release")
         else
-          # Fallback: thay thế signingConfig debug thứ hai (của block release)
           parts = gradle_content.split("signingConfig signingConfigs.debug", 3)
           if parts.length >= 3
             gradle_content = "#{parts[0]}signingConfig signingConfigs.debug#{parts[1]}signingConfig signingConfigs.release#{parts[2]}"
@@ -99,38 +122,23 @@ platform :android do
       end
     end
 
-    # Lưu thông tin signing vào context lane
+    # Lưu context cho các bước sau
     Actions.lane_context[:keystore_path] = keystore_path
-    Actions.lane_context[:keystore_password] = keystore_password
-    Actions.lane_context[:key_alias] = key_alias
-    Actions.lane_context[:key_password] = key_password
   end
 
   desc "Tự động đóng gói và ký số APK Release (Phát hành thử nghiệm / Cài trực tiếp)"
   lane :build_apk do
     UI.header("📦 Bắt đầu quy trình đóng gói Release APK (Ký số tự động qua Fastlane)...")
-    
+
     # Chuẩn bị native & keystore
     prepare_native
 
-    keystore_path = Actions.lane_context[:keystore_path]
-    keystore_password = Actions.lane_context[:keystore_password]
-    key_alias = Actions.lane_context[:key_alias]
-    key_password = Actions.lane_context[:key_password]
-
-    UI.message("Ký số bản build với Keystore: #{keystore_path} (Alias: #{key_alias})")
-
-    # Biên dịch qua Gradle với thông số ký số được inject tự động
+    # Biên dịch qua Gradle
     gradle(
       task: "assembleRelease",
       project_dir: "../android/",
       print_command: true,
-      properties: {
-        "android.injected.signing.store.file" => keystore_path,
-        "android.injected.signing.store.password" => keystore_password,
-        "android.injected.signing.key.alias" => key_alias,
-        "android.injected.signing.key.password" => key_password,
-      }
+      flags: "--no-daemon --stacktrace"
     )
 
     # Tìm file APK đầu ra
@@ -157,28 +165,16 @@ platform :android do
   desc "Tự động đóng gói và ký số Android App Bundle (AAB Release cho Google Play Store)"
   lane :build_aab do
     UI.header("📦 Bắt đầu quy trình đóng gói Release AAB (Google Play Store qua Fastlane)...")
-    
+
     # Chuẩn bị native & keystore
     prepare_native
 
-    keystore_path = Actions.lane_context[:keystore_path]
-    keystore_password = Actions.lane_context[:keystore_password]
-    key_alias = Actions.lane_context[:key_alias]
-    key_password = Actions.lane_context[:key_password]
-
-    UI.message("Ký số bản build với Keystore: #{keystore_path} (Alias: #{key_alias})")
-
-    # Biên dịch qua Gradle với thông số ký số được inject tự động
+    # Biên dịch qua Gradle
     gradle(
       task: "bundleRelease",
       project_dir: "../android/",
       print_command: true,
-      properties: {
-        "android.injected.signing.store.file" => keystore_path,
-        "android.injected.signing.store.password" => keystore_password,
-        "android.injected.signing.key.alias" => key_alias,
-        "android.injected.signing.key.password" => key_password,
-      }
+      flags: "--no-daemon --stacktrace"
     )
 
     # Tìm file AAB đầu ra

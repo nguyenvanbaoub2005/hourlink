@@ -45,10 +45,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🟢 Setup Node.js (v20)
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: FE/package-lock.json
 
@@ -73,6 +73,9 @@ jobs:
       - name: 🔍 TypeScript Static Type Check
         run: npm run typecheck
 
+      - name: 🛠️ Expo Prebuild (Generate native Android project)
+        run: npx expo prebuild --platform android --clean --no-install
+
       - name: 🚀 Run Fastlane Build & Sign Release APK
         if: ${{ github.event.inputs.build_type == 'apk' || github.event.inputs.build_type == 'both' || github.event_name == 'push' }}
         env:
@@ -90,6 +93,15 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: bundle exec fastlane android build_aab
+
+      - name: 📋 Diagnostics on Failure
+        if: failure()
+        run: |
+          echo "=== PWD AND DIST ==="
+          pwd
+          ls -la dist/ 2>/dev/null || true
+          echo "=== GRADLE LOGS ==="
+          find android -name "*.log" -exec cat {} + 2>/dev/null || true
 
       - name: 📊 Display Build Artifacts Summary
         run: |
