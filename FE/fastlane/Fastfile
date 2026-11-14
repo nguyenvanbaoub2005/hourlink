@@ -137,8 +137,7 @@ platform :android do
     gradle(
       task: "assembleRelease",
       project_dir: "../android/",
-      print_command: true,
-      flags: "--no-daemon --stacktrace"
+      print_command: true
     )
 
     # Tìm file APK đầu ra
@@ -173,8 +172,7 @@ platform :android do
     gradle(
       task: "bundleRelease",
       project_dir: "../android/",
-      print_command: true,
-      flags: "--no-daemon --stacktrace"
+      print_command: true
     )
 
     # Tìm file AAB đầu ra
