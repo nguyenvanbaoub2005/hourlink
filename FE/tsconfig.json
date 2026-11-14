@@ -49,6 +49,15 @@
       ],
       "@offline": [
         "src/offline/index"
+      ],
+      "@domain/*": [
+        "src/domain/*"
+      ],
+      "@data/*": [
+        "src/data/*"
+      ],
+      "@di/*": [
+        "src/di/*"
       ]
     }
   },
