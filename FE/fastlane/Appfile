@@ -1,0 +1,9 @@
+# Appfile configuration for HourLink
+# More information: https://docs.fastlane.tools/advanced/#appfile
+
+# Android Configuration
+package_name("vn.hourlink.app")
+
+# Google Play Service Account (for future automated Play Store upload)
+# json_key_file("fastlane/google-play-service-account.json")
+

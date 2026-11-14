@@ -8,7 +8,7 @@ const PROVINCES = [
 ];
 
 interface RegionPickerModalProps {
-  value: string;
+  value?: string;
   onSelect: (region: string) => void;
   placeholder?: string;
   style?: any;
