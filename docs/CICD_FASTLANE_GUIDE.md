@@ -145,3 +145,4 @@ File kết quả sẽ xuất hiện tại thư mục `FE/dist/`:
 | Kiểm tra chất lượng trước build | Bước `npm run typecheck` trong pipeline và lane `check` | ✅ **ĐẠT** |
 | Xuất artifact và GitHub Release | Tự động sinh Release Notes và đính kèm APK có mã băm SHA-256 | ✅ **ĐẠT** |
 | Hỗ trợ song song Cloud EAS Build | `FE/eas.json` hoàn chỉnh | ✅ **ĐẠT** |
+

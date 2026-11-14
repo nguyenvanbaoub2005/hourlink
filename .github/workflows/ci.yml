@@ -59,3 +59,4 @@ jobs:
 
       - name: 🔨 Compile & Package (Skip heavy DB tests on standard CI)
         run: mvn clean compile test -Dtest=*Test -DfailIfNoTests=false
+

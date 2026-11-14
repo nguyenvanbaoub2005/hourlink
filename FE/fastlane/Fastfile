@@ -180,3 +180,4 @@ platform :ios do
     UI.message("Cấu hình iOS đã sẵn sàng cho Fastlane gym.")
   end
 end
+
