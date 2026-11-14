@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
+import { useTheme } from '@theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import SkillApi from '@api/skill';
@@ -38,6 +39,7 @@ const FORMAT_MAP = {
 
 // ─── Component ─────────────────────────────────────────────
 export default function PostScreen() {
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{ editId?: string; editType?: 'needHelp' | 'shareSkill'; initialData?: string }>();
   const { editId, editType, initialData } = params;
@@ -301,34 +303,41 @@ export default function PostScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
         {editId ? (
           <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 12 }}>
-            <Ionicons name="chevron-back" size={26} color={Colors.textPrimary} />
+            <Ionicons name="chevron-back" size={26} color={colors.onSurface} />
           </TouchableOpacity>
         ) : null}
-        <Text style={styles.headerTitle}>
+        <Text style={[styles.headerTitle, { color: colors.onBackground }]}>
           {editId ? (activeTab === 'needHelp' ? 'Chỉnh sửa yêu cầu' : 'Chỉnh sửa kỹ năng') : 'Đăng bài'}
         </Text>
       </View>
 
       {/* Tab Switch */}
       {!editId && (
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { backgroundColor: isDark ? colors.surfaceVariant : '#F1F5F9' }]}>
           {(['needHelp', 'shareSkill'] as const).map(tab => (
             <TouchableOpacity
               key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              style={[
+                styles.tab,
+                activeTab === tab && [styles.tabActive, { backgroundColor: colors.surfaceCard }]
+              ]}
               onPress={() => setActiveTab(tab)}
             >
               <Ionicons
                 name={tab === 'needHelp' ? 'help-buoy-outline' : 'school-outline'}
                 size={17}
-                color={activeTab === tab ? Colors.primary : Colors.textMuted}
+                color={activeTab === tab ? colors.primary : colors.onSurfaceVariant}
               />
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              <Text style={[
+                styles.tabText,
+                { color: colors.onSurfaceVariant },
+                activeTab === tab && [styles.tabTextActive, { color: colors.primary }]
+              ]}>
                 {tab === 'needHelp' ? 'Cần hỗ trợ' : 'Chia sẻ kỹ năng'}
               </Text>
             </TouchableOpacity>

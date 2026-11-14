@@ -200,7 +200,7 @@ export default function QrScanScreen() {
               ) : (
                 <View style={styles.cameraWrapper}>
                   <CameraView
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                     onBarcodeScanned={scanned ? undefined : onBarcodeScanned}
                   />

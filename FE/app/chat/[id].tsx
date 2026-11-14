@@ -214,7 +214,7 @@ export default function ChatRoomScreen() {
   const [aptLocation, setAptLocation] = useState('');
   const [creatingApt, setCreatingApt] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
-  const appointmentFormScrollRef = useRef<ScrollView>(null);
+  const appointmentFormScrollRef = useRef<any>(null);
   const appointmentLocationFocusedRef = useRef(false);
 
   // Lấy thông tin invitation từ conversation để xác định provider/receiver
@@ -1805,7 +1805,7 @@ export default function ChatRoomScreen() {
               style={styles.menuItem}
               onPress={() => {
                 if (messageActionMsg?.content) {
-                  Clipboard.setString(messageActionMsg.content);
+                  Clipboard.setStringAsync(messageActionMsg.content);
                   Alert.alert('Đã sao chép');
                 }
                 setMessageActionMsg(null);

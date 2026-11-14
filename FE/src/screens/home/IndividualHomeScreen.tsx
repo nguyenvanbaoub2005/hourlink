@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Pressable } from 'react-native';
 import { Colors, Spacing, Radius } from '@constants/Colors';
+import { useTheme, PressableScale, FadeInView } from '@theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@store/authStore';
 import { useNotificationStore } from '@store/notificationStore';
@@ -42,6 +43,7 @@ function getGreeting(): string {
 
 // ─── Main Component ────────────────────────────────────────────────────────
 export default function IndividualHomeScreen() {
+  const { colors, isDark } = useTheme();
   const { user } = useAuthStore();
   const router = useRouter();
   const { unreadCount } = useNotificationStore();
@@ -133,24 +135,24 @@ export default function IndividualHomeScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.container}
+      contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
     >
       {/* ── Top Bar ─────────────────────────────────────────────────────── */}
       <View style={styles.topBar}>
         <View style={styles.logo}>
           <Logo size={32} style={{ marginRight: 8 }} />
-          <Text style={styles.brandName}>HourLink</Text>
+          <Text style={[styles.brandName, { color: colors.onBackground }]}>HourLink</Text>
         </View>
         <View style={styles.topRight}>
           <TouchableOpacity
             style={[styles.iconBtn, { position: 'relative' }]}
             onPress={() => router.push('/chat' as any)}
           >
-            <Ionicons name="chatbubble-outline" size={24} color={Colors.textPrimary} />
+            <Ionicons name="chatbubble-outline" size={24} color={colors.onSurface} />
             {chatUnread > 0 && (
-              <View style={styles.notifBadge}>
+              <View style={[styles.notifBadge, { borderColor: colors.background }]}>
                 <Text style={styles.notifBadgeText}>
                   {chatUnread > 9 ? '9+' : String(chatUnread)}
                 </Text>
@@ -165,10 +167,10 @@ export default function IndividualHomeScreen() {
             <Ionicons
               name={pendingInvitations.length > 0 ? 'mail-unread-outline' : 'mail-outline'}
               size={24}
-              color={Colors.textPrimary}
+              color={colors.onSurface}
             />
             {pendingInvitations.length > 0 && (
-              <View style={styles.notifBadge}>
+              <View style={[styles.notifBadge, { borderColor: colors.background }]}>
                 <Text style={styles.notifBadgeText}>
                   {pendingInvitations.length > 9 ? '9+' : String(pendingInvitations.length)}
                 </Text>
@@ -179,9 +181,9 @@ export default function IndividualHomeScreen() {
             style={[styles.iconBtn, { position: 'relative' }]}
             onPress={() => router.push('/notifications' as any)}
           >
-            <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+            <Ionicons name="notifications-outline" size={24} color={colors.onSurface} />
             {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
+              <View style={[styles.notifBadge, { borderColor: colors.background }]}>
                 <Text style={styles.notifBadgeText}>
                   {unreadCount > 9 ? '9+' : String(unreadCount)}
                 </Text>
@@ -191,72 +193,74 @@ export default function IndividualHomeScreen() {
         </View>
       </View>
 
-      {/* ── Wallet Card ──────────────────────────────────────────────────── */}
-      <LinearGradient
-        colors={['#0D9488', '#1D4ED8']}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.card}
-      >
-        <Text style={styles.greeting}>{getGreeting()}</Text>
-        <Text style={styles.greetingName}>{firstName} ơi, có gì mới?</Text>
+      <FadeInView delay={60}>
+        {/* ── Wallet Card ──────────────────────────────────────────────────── */}
+        <LinearGradient
+          colors={isDark ? ['#0F766E', '#1E3A8A'] : ['#0D9488', '#1D4ED8']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={styles.card}
+        >
+          <Text style={styles.greeting}>{getGreeting()}</Text>
+          <Text style={styles.greetingName}>{firstName} ơi, có gì mới?</Text>
 
-        <View style={styles.balanceRow}>
-          <View>
-            <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
-            <Text style={styles.balanceValue}>
-              {wallet?.balance?.toFixed(1) ?? '0.0'} <Text style={styles.balanceUnit}>Time Credit</Text>
-            </Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.walletBtn}
-            onPress={() => router.push('/(tabs)/wallet' as any)}
-          >
-            <Text style={styles.walletBtnText}>Ví tiền</Text>
-            <Ionicons name="chevron-forward" size={16} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.stats}>
-          {[
-            { label: 'Đã cho', icon: 'arrow-up-outline', val: `${wallet?.totalUsed?.toFixed(1) ?? '0.0'}h` },
-            { label: 'Đã nhận', icon: 'arrow-down-outline', val: `${wallet?.totalEarned?.toFixed(1) ?? '0.0'}h` },
-            { label: 'Đang giữ', icon: 'hourglass-outline', val: `${wallet?.heldAmount?.toFixed(1) ?? '0.0'}h` },
-          ].map(s => (
-            <View key={s.label} style={styles.statBox}>
-              <Text style={styles.statLabel}>{s.label}</Text>
-              <View style={styles.statVal}>
-                <Ionicons name={s.icon as any} size={14} color="#fff" />
-                <Text style={styles.statText}>{s.val}</Text>
-              </View>
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
+              <Text style={styles.balanceValue}>
+                {wallet?.balance?.toFixed(1) ?? '0.0'} <Text style={styles.balanceUnit}>Time Credit</Text>
+              </Text>
             </View>
-          ))}
+            <TouchableOpacity 
+              style={styles.walletBtn}
+              onPress={() => router.push('/(tabs)/wallet' as any)}
+            >
+              <Text style={styles.walletBtnText}>Ví tiền</Text>
+              <Ionicons name="chevron-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.stats}>
+            {[
+              { label: 'Đã cho', icon: 'arrow-up-outline', val: `${wallet?.totalUsed?.toFixed(1) ?? '0.0'}h` },
+              { label: 'Đã nhận', icon: 'arrow-down-outline', val: `${wallet?.totalEarned?.toFixed(1) ?? '0.0'}h` },
+              { label: 'Đang giữ', icon: 'hourglass-outline', val: `${wallet?.heldAmount?.toFixed(1) ?? '0.0'}h` },
+            ].map(s => (
+              <View key={s.label} style={styles.statBox}>
+                <Text style={styles.statLabel}>{s.label}</Text>
+                <View style={styles.statVal}>
+                  <Ionicons name={s.icon as any} size={14} color="#fff" />
+                  <Text style={styles.statText}>{s.val}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </LinearGradient>
+
+        {/* ── Action Buttons ───────────────────────────────────────────────── */}
+        <View style={styles.actions}>
+          <PressableScale
+            style={[styles.actionCard, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}
+            onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'shareSkill' } } as any)}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: isDark ? 'rgba(13,148,136,0.2)' : '#CCFBF1' }]}>
+              <Ionicons name="school-outline" size={26} color={colors.primary} />
+            </View>
+            <Text style={[styles.actionTitle, { color: colors.onSurface }]}>Đăng kỹ năng</Text>
+            <Text style={[styles.actionSub, { color: colors.onSurfaceVariant }]}>Chia sẻ với cộng đồng</Text>
+          </PressableScale>
+
+          <PressableScale
+            style={[styles.actionCard, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}
+            onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'needHelp' } } as any)}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: isDark ? 'rgba(245,158,11,0.2)' : '#FEF3C7' }]}>
+              <Ionicons name="help-buoy-outline" size={26} color={colors.tertiary} />
+            </View>
+            <Text style={[styles.actionTitle, { color: colors.onSurface }]}>Cần hỗ trợ</Text>
+            <Text style={[styles.actionSub, { color: colors.onSurfaceVariant }]}>Đặt yêu cầu giúp đỡ</Text>
+          </PressableScale>
         </View>
-      </LinearGradient>
-
-      {/* ── Action Buttons ───────────────────────────────────────────────── */}
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'shareSkill' } } as any)}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#CCFBF1' }]}>
-            <Ionicons name="school-outline" size={26} color="#0F766E" />
-          </View>
-          <Text style={styles.actionTitle}>Đăng kỹ năng</Text>
-          <Text style={styles.actionSub}>Chia sẻ với cộng đồng</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionCard}
-          onPress={() => router.push({ pathname: '/(tabs)/post', params: { tab: 'needHelp' } } as any)}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="help-buoy-outline" size={26} color="#B45309" />
-          </View>
-          <Text style={styles.actionTitle}>Cần hỗ trợ</Text>
-          <Text style={styles.actionSub}>Đặt yêu cầu giúp đỡ</Text>
-        </TouchableOpacity>
-      </View>
+      </FadeInView>
 
       {/* ── Lời mời mới ────────────────────────────────────────────────── */}
       {pendingInvitations.length > 0 && (
@@ -315,43 +319,43 @@ export default function IndividualHomeScreen() {
 
       {/* ── Lịch hẹn ─────────────────────────────────────────────────────── */}
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Lịch hẹn sắp tới</Text>
+        <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Lịch hẹn sắp tới</Text>
         <TouchableOpacity onPress={() => router.push('/(tabs)/appointments' as any)}>
-          <Text style={styles.seeAll}>Xem tất cả</Text>
+          <Text style={[styles.seeAll, { color: colors.secondary }]}>Xem tất cả</Text>
         </TouchableOpacity>
       </View>
 
       {upcomingAppointments.length === 0 ? (
-        <View style={styles.emptyBox}>
-          <Ionicons name="calendar-outline" size={32} color={Colors.textMuted} />
-          <Text style={styles.emptyText}>Chưa có lịch hẹn nào</Text>
+        <View style={[styles.emptyBox, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}>
+          <Ionicons name="calendar-outline" size={32} color={colors.onSurfaceVariant} />
+          <Text style={[styles.emptyText, { color: colors.onSurfaceVariant }]}>Chưa có lịch hẹn nào</Text>
         </View>
       ) : (
         upcomingAppointments.map(apt => (
           <TouchableOpacity 
             key={apt.id} 
-            style={styles.requestCard}
+            style={[styles.requestCard, { backgroundColor: colors.surfaceCard, borderColor: colors.outlineVariant }]}
             onPress={() => openAppointment(apt.id)}
           >
             <View style={styles.requestTopRow}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={[styles.badge, { backgroundColor: '#DBEAFE' }]}>
-                  <Ionicons name="calendar-outline" size={14} color="#1D4ED8" style={{ marginRight: 4 }} />
-                  <Text style={[styles.badgeText, { color: '#1D4ED8' }]}>
+                <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(59,130,246,0.2)' : '#DBEAFE' }]}>
+                  <Ionicons name="calendar-outline" size={14} color={isDark ? '#60A5FA' : '#1D4ED8'} style={{ marginRight: 4 }} />
+                  <Text style={[styles.badgeText, { color: isDark ? '#60A5FA' : '#1D4ED8' }]}>
                     {apt.appointmentDate} • {apt.startTime?.slice(0, 5)}
                   </Text>
                 </View>
               </View>
             </View>
-            <Text style={styles.requestTitle}>{apt.title || 'Lịch hẹn'}</Text>
+            <Text style={[styles.requestTitle, { color: colors.onSurface }]}>{apt.title || 'Lịch hẹn'}</Text>
             {apt.skillName ? (
-              <Text style={styles.requestDesc} numberOfLines={1}>
+              <Text style={[styles.requestDesc, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
                 Kỹ năng: {apt.skillName}
               </Text>
             ) : null}
-            <View style={styles.cardDivider} />
+            <View style={[styles.cardDivider, { backgroundColor: colors.outlineVariant }]} />
             <View style={styles.requestBottomRow}>
-              <Text style={styles.requestBottomText}>
+              <Text style={[styles.requestBottomText, { color: colors.onSurfaceVariant }]}>
                 {apt.providerName && apt.receiverName ? 
                   `Giữa ${apt.providerName} & ${apt.receiverName}` : 
                   'Với người dùng khác'}
@@ -362,7 +366,7 @@ export default function IndividualHomeScreen() {
       )}
 
       {/* ── Yêu cầu đang hoạt động ───────────────────────────────────────── */}
-      <View style={styles.activeRequestSection}>
+      <View style={[styles.activeRequestSection, { backgroundColor: isDark ? colors.surfaceCard : '#F0FDFA', borderColor: isDark ? colors.outlineVariant : '#CCFBF1' }]}>
         <TouchableOpacity
           style={styles.activeRequestHeader}
           activeOpacity={0.7}
@@ -371,34 +375,34 @@ export default function IndividualHomeScreen() {
           accessibilityLabel={`Xem tất cả ${activeRequests.length} yêu cầu đang hoạt động`}
         >
           <View style={styles.activeRequestHeading}>
-            <View style={styles.activeRequestHeadingIcon}>
-              <Ionicons name="pulse-outline" size={20} color="#047857" />
+            <View style={[styles.activeRequestHeadingIcon, { backgroundColor: isDark ? 'rgba(13,148,136,0.2)' : '#CCFBF1' }]}>
+              <Ionicons name="pulse-outline" size={20} color={isDark ? '#2DD4BF' : '#047857'} />
             </View>
             <View style={styles.activeRequestHeadingText}>
               <View style={styles.activeRequestTitleRow}>
-                <Text style={styles.activeRequestSectionTitle} numberOfLines={1}>Yêu cầu đang hoạt động</Text>
+                <Text style={[styles.activeRequestSectionTitle, { color: colors.onSurface }]} numberOfLines={1}>Yêu cầu đang hoạt động</Text>
                 {activeRequests.length > 0 && (
                   <View style={styles.activeRequestCount}>
                     <Text style={styles.activeRequestCountText}>{activeRequests.length}</Text>
                   </View>
                 )}
               </View>
-              <Text style={styles.activeRequestSubtitle}>Theo dõi phản hồi và tìm người hỗ trợ phù hợp</Text>
+              <Text style={[styles.activeRequestSubtitle, { color: colors.onSurfaceVariant }]}>Theo dõi phản hồi và tìm người hỗ trợ phù hợp</Text>
             </View>
           </View>
-          <View style={styles.activeRequestSeeAll}>
-            <Text style={styles.activeRequestSeeAllText}>Tất cả</Text>
-            <Ionicons name="chevron-forward" size={16} color="#047857" />
+          <View style={[styles.activeRequestSeeAll, { backgroundColor: isDark ? colors.surfaceVariant : '#FFFFFF', borderColor: isDark ? colors.outlineVariant : '#A7F3D0' }]}>
+            <Text style={[styles.activeRequestSeeAllText, { color: isDark ? '#2DD4BF' : '#047857' }]}>Tất cả</Text>
+            <Ionicons name="chevron-forward" size={16} color={isDark ? '#2DD4BF' : '#047857'} />
           </View>
         </TouchableOpacity>
 
         {activeRequests.length === 0 ? (
-          <View style={styles.activeRequestEmpty}>
-            <View style={styles.activeRequestEmptyIcon}>
-              <Ionicons name="document-text-outline" size={28} color="#0D9488" />
+          <View style={[styles.activeRequestEmpty, { backgroundColor: isDark ? colors.surfaceVariant : '#FFFFFF', borderColor: isDark ? colors.outlineVariant : '#CCFBF1' }]}>
+            <View style={[styles.activeRequestEmptyIcon, { backgroundColor: isDark ? 'rgba(13,148,136,0.2)' : '#CCFBF1' }]}>
+              <Ionicons name="document-text-outline" size={28} color={isDark ? '#2DD4BF' : '#0D9488'} />
             </View>
-            <Text style={styles.activeRequestEmptyTitle}>Bạn chưa có yêu cầu đang mở</Text>
-            <Text style={styles.activeRequestEmptyText}>Đăng nhu cầu để cộng đồng có thể tìm thấy và hỗ trợ bạn.</Text>
+            <Text style={[styles.activeRequestEmptyTitle, { color: colors.onSurface }]}>Bạn chưa có yêu cầu đang mở</Text>
+            <Text style={[styles.activeRequestEmptyText, { color: colors.onSurfaceVariant }]}>Đăng nhu cầu để cộng đồng có thể tìm thấy và hỗ trợ bạn.</Text>
             <TouchableOpacity
               style={styles.activeRequestCreateButton}
               activeOpacity={0.8}
@@ -423,6 +427,7 @@ export default function IndividualHomeScreen() {
                   key={req.id}
                   style={({ pressed }) => [
                     styles.activeRequestCard,
+                    { backgroundColor: colors.surfaceCard },
                     isSearching ? styles.activeRequestCardSearching : styles.activeRequestCardMatched,
                     pressed && styles.activeRequestCardPressed,
                   ]}
@@ -453,33 +458,33 @@ export default function IndividualHomeScreen() {
                         </View>
                       ) : null}
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+                    <Ionicons name="chevron-forward" size={20} color={colors.onSurfaceVariant} />
                   </View>
 
-                  <Text style={styles.activeRequestCardTitle} numberOfLines={2}>{req.title}</Text>
+                  <Text style={[styles.activeRequestCardTitle, { color: colors.onSurface }]} numberOfLines={2}>{req.title}</Text>
                   {req.description ? (
-                    <Text style={styles.activeRequestCardDescription} numberOfLines={2}>{req.description}</Text>
+                    <Text style={[styles.activeRequestCardDescription, { color: colors.onSurfaceVariant }]} numberOfLines={2}>{req.description}</Text>
                   ) : null}
 
                   <View style={styles.activeRequestMetaRow}>
-                    <View style={styles.activeRequestMetaPill}>
-                      <Ionicons name="time-outline" size={14} color="#475569" />
-                      <Text style={styles.activeRequestMetaText}>{req.duration || 60} phút</Text>
+                    <View style={[styles.activeRequestMetaPill, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outlineVariant }]}>
+                      <Ionicons name="time-outline" size={14} color={colors.onSurfaceVariant} />
+                      <Text style={[styles.activeRequestMetaText, { color: colors.onSurfaceVariant }]}>{req.duration || 60} phút</Text>
                     </View>
-                    <View style={styles.activeRequestMetaPill}>
-                      <Ionicons name={req.format === 'OFFLINE' ? 'people-outline' : 'videocam-outline'} size={14} color="#475569" />
-                      <Text style={styles.activeRequestMetaText}>{formatLabel}</Text>
+                    <View style={[styles.activeRequestMetaPill, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outlineVariant }]}>
+                      <Ionicons name={req.format === 'OFFLINE' ? 'people-outline' : 'videocam-outline'} size={14} color={colors.onSurfaceVariant} />
+                      <Text style={[styles.activeRequestMetaText, { color: colors.onSurfaceVariant }]}>{formatLabel}</Text>
                     </View>
-                    <View style={styles.activeRequestMetaPill}>
-                      <Ionicons name="chatbubble-ellipses-outline" size={14} color="#475569" />
-                      <Text style={styles.activeRequestMetaText}>{req.responseCount ?? 0}</Text>
+                    <View style={[styles.activeRequestMetaPill, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outlineVariant }]}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.onSurfaceVariant} />
+                      <Text style={[styles.activeRequestMetaText, { color: colors.onSurfaceVariant }]}>{req.responseCount ?? 0}</Text>
                     </View>
                   </View>
 
-                  <View style={styles.activeRequestCardFooter}>
+                  <View style={[styles.activeRequestCardFooter, { borderTopColor: colors.outlineVariant }]}>
                     <View style={styles.activeRequestDetailHint}>
-                      <Ionicons name="eye-outline" size={16} color="#475569" />
-                      <Text style={styles.activeRequestDetailHintText}>Xem chi tiết</Text>
+                      <Ionicons name="eye-outline" size={16} color={colors.onSurfaceVariant} />
+                      <Text style={[styles.activeRequestDetailHintText, { color: colors.onSurfaceVariant }]}>Xem chi tiết</Text>
                     </View>
                     <Pressable
                       style={({ pressed }) => [styles.activeRequestAiButton, pressed && styles.activeRequestAiButtonPressed]}

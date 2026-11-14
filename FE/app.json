@@ -3,16 +3,10 @@
     "name": "HourLink",
     "slug": "hourlink",
     "version": "1.0.0",
-    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "hourlink",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "vn.hourlink.app"
@@ -55,6 +49,16 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "HourLink cần truy cập vị trí để bạn chia sẻ địa điểm gặp mặt trong cuộc trò chuyện."
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0F172A"
         }
       ]
     ],

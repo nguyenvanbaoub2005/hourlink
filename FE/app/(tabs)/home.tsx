@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@constants/Colors';
 import { useAuthStore } from '@store/authStore';
+import { useTheme } from '@theme';
 
 import IndividualHomeScreen from '../../src/screens/home/IndividualHomeScreen';
 import OrganizationHomeScreen from '../../src/screens/home/OrganizationHomeScreen';
@@ -11,6 +12,7 @@ import CommunityHomeScreen from '../../src/screens/home/CommunityHomeScreen';
 
 export default function HomeScreen() {
   const { role, user } = useAuthStore();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'individual' | 'community'>('individual');
   const isOrganization = role?.includes('ROLE_ORGANIZATION') || user?.userType === 'organization';
 
@@ -30,20 +32,26 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.tabContainer}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.tabContainer, { backgroundColor: colors.surface, borderBottomColor: colors.outline }]}>
         <TouchableOpacity 
-          style={[styles.tabBtn, activeTab === 'individual' && styles.tabBtnActive]}
+          style={[styles.tabBtn, activeTab === 'individual' && { borderBottomColor: colors.primary }]}
           onPress={() => setActiveTab('individual')}
         >
-          <Text style={[styles.tabText, activeTab === 'individual' && styles.tabTextActive]}>{isOrganization ? 'Cộng đồng' : 'Cá nhân'}</Text>
+          <Text style={[styles.tabText, { color: activeTab === 'individual' ? colors.primary : colors.textSecondary }]}>
+            {isOrganization ? 'Cộng đồng' : 'Cá nhân'}
+          </Text>
         </TouchableOpacity>
-        {!isOrganization && <TouchableOpacity
-          style={[styles.tabBtn, activeTab === 'community' && styles.tabBtnActive]}
-          onPress={() => setActiveTab('community')}
-        >
-          <Text style={[styles.tabText, activeTab === 'community' && styles.tabTextActive]}>Cộng đồng</Text>
-        </TouchableOpacity>}
+        {!isOrganization && (
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'community' && { borderBottomColor: colors.primary }]}
+            onPress={() => setActiveTab('community')}
+          >
+            <Text style={[styles.tabText, { color: activeTab === 'community' ? colors.primary : colors.textSecondary }]}>
+              Cộng đồng
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
       {renderHomeContent()}
     </SafeAreaView>
@@ -51,14 +59,12 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bgLight },
+  container: { flex: 1 },
   tabContainer: { 
     flexDirection: 'row', 
-    backgroundColor: '#fff', 
     paddingHorizontal: 16, 
     paddingTop: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border
   },
   tabBtn: { 
     flex: 1, 
@@ -67,7 +73,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent'
   },
-  tabBtnActive: { borderBottomColor: Colors.primary },
-  tabText: { fontSize: 16, color: Colors.textMuted, fontWeight: '500' },
-  tabTextActive: { color: Colors.primary, fontWeight: 'bold' },
+  tabText: { fontSize: 16, fontWeight: '500' },
 });
