@@ -9,6 +9,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius } from '@constants/Colors';
 import NotificationApi from '@api/notification';
 import { useNotificationStore } from '@store/notificationStore';
+import { saveNotificationsToLocal, getLocalNotifications } from '../src/offline';
 import Avatar from '@components/Avatar';
 import { notificationTarget } from '@utils/notificationNav';
 
@@ -98,11 +99,20 @@ export default function NotificationsScreen() {
       const res = await NotificationApi.getAll();
       const data: NotifItem[] = res.data?.data ?? [];
       setItems(data);
+      if (data.length > 0) {
+        saveNotificationsToLocal(data).catch(() => {});
+      }
       // Cập nhật store
       const unread = data.filter(n => !n.isRead).length;
       setUnreadCount(unread);
     } catch (e) {
-      console.error('Lỗi tải thông báo:', e);
+      console.warn('[Notifications] Lỗi tải thông báo từ mạng, nạp từ SQLite cục bộ:', e);
+      const cached = await getLocalNotifications();
+      if (cached.length > 0) {
+        setItems(cached);
+        const unread = cached.filter(n => !n.isRead).length;
+        setUnreadCount(unread);
+      }
     } finally {
       setLoading(false);
     }

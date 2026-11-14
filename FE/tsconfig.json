@@ -43,6 +43,12 @@
       ],
       "@theme": [
         "src/theme/index"
+      ],
+      "@offline/*": [
+        "src/offline/*"
+      ],
+      "@offline": [
+        "src/offline/index"
       ]
     }
   },
