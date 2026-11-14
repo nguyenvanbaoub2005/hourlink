@@ -22,6 +22,9 @@ on:
         default: true
         type: boolean
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -54,17 +57,15 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
-      - name: 📱 Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 💎 Setup Ruby & Bundler for Fastlane
+      - name: 💎 Setup Ruby for Fastlane
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
-          bundler-cache: true
           working-directory: FE
+
+      - name: 📦 Install Fastlane & Bundler dependencies
+        run: bundle install
 
       - name: 📦 Install Node dependencies
         run: npm ci
@@ -143,4 +144,3 @@ jobs:
           draft: false
           prerelease: false
           name: "HourLink Mobile Release ${{ github.ref_name }}"
-
