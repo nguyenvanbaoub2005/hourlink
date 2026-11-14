@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Buffer } from 'buffer';
 import * as SecureStore from 'expo-secure-store';
 import { TOKEN_KEY, REFRESH_KEY } from '@api/axiosInstance';
 import AuthApi from '@api/auth';
