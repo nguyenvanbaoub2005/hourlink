@@ -102,6 +102,8 @@ jobs:
           ls -la dist/ 2>/dev/null || true
           echo "=== GRADLE LOGS ==="
           find android -name "*.log" -exec cat {} + 2>/dev/null || true
+          echo "=== APP BUILD.GRADLE ==="
+          cat android/app/build.gradle 2>/dev/null || true
 
       - name: 📊 Display Build Artifacts Summary
         run: |
