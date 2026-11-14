@@ -8,6 +8,7 @@ import NotificationToast from '@components/NotificationToast';
 import { AppThemeProvider, useTheme } from '@theme';
 import { NetworkProvider } from '../src/offline/NetworkContext';
 import { OfflineBanner } from '../src/components/OfflineBanner';
+import { AppAlertModal } from '../src/components/AppAlertModal';
 import { setUnauthorizedHandler } from '@api/axiosInstance';
 
 const queryClient = new QueryClient({
@@ -36,6 +37,8 @@ function RootNavigationContent() {
       </Stack>
       {/* Toast thông báo nổi — hoạt động trên tất cả màn hình */}
       <NotificationToast />
+      {/* Modal thông báo tùy chỉnh hiện đại toàn app */}
+      <AppAlertModal />
     </View>
   );
 }

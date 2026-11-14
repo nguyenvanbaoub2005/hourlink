@@ -13,6 +13,7 @@ import Avatar from '@components/Avatar';
 import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import { useAuthStore } from '@store/authStore';
 import { saveAppointmentsToLocal, getLocalAppointments } from '../../src/offline';
+import { showAppAlert } from '../../src/components/AppAlertModal';
 import type { AppointmentItem } from '@types';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -124,13 +125,21 @@ export default function AppointmentsScreen() {
       }
       await countsPromise;
     } catch {
-      // Ngoại tuyến: nạp từ SQLite cục bộ và lọc đúng theo tab đang chọn (không hiện Alert popup gây phiền)
+      // Ngoại tuyến: nạp từ SQLite cục bộ và lọc đúng theo tab đang chọn
       try {
         const cached = await getLocalAppointments();
         const filtered = filterAppointmentsByTab(cached, activeTab);
         setAppointments(filtered);
       } catch {
         setAppointments([]);
+      }
+      if (isRefresh) {
+        showAppAlert({
+          type: 'offline',
+          title: 'Đang ngoại tuyến',
+          message: 'Không thể kết nối máy chủ. Ứng dụng đang hiển thị các lịch hẹn lưu trong máy của bạn.',
+          confirmText: 'Đã hiểu',
+        });
       }
     } finally {
       setLoading(false);
@@ -149,28 +158,35 @@ export default function AppointmentsScreen() {
       setCancelTarget({ id, title });
       return;
     }
-    Alert.alert(
-      'Xác nhận lịch hẹn',
-      `Bạn có chắc chắn muốn xác nhận buổi hẹn "${title}" không?`,
-      [
-        { text: 'Bỏ qua', style: 'cancel' },
-        {
-          text: 'Đồng ý',
-          onPress: async () => {
-            try {
-              setActionLoading(id);
-              await AppointmentApi.respond(id, { action });
-              Alert.alert('Thành công', 'Đã xác nhận lịch hẹn.');
-              fetchAppointments();
-            } catch (err: any) {
-              Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể xác nhận lịch hẹn.');
-            } finally {
-              setActionLoading(null);
-            }
-          },
-        },
-      ]
-    );
+    showAppAlert({
+      type: 'info',
+      title: 'Xác nhận lịch hẹn',
+      message: `Bạn có chắc chắn muốn xác nhận buổi hẹn "${title}" không?`,
+      confirmText: 'Đồng ý',
+      cancelText: 'Bỏ qua',
+      onConfirm: async () => {
+        try {
+          setActionLoading(id);
+          await AppointmentApi.respond(id, { action });
+          showAppAlert({
+            type: 'success',
+            title: 'Thành công',
+            message: 'Đã xác nhận lịch hẹn.',
+            confirmText: 'Đã hiểu',
+          });
+          fetchAppointments();
+        } catch (err: any) {
+          showAppAlert({
+            type: 'error',
+            title: 'Lỗi',
+            message: err?.response?.data?.message || 'Không thể xác nhận lịch hẹn.',
+            confirmText: 'Đóng',
+          });
+        } finally {
+          setActionLoading(null);
+        }
+      },
+    });
   };
 
   const submitCancellation = async (reason: string) => {
@@ -179,10 +195,20 @@ export default function AppointmentsScreen() {
       setActionLoading(cancelTarget.id);
       await AppointmentApi.respond(cancelTarget.id, { action: 'CANCEL', reason });
       setCancelTarget(null);
-      Alert.alert('Đã hủy lịch hẹn', 'Lý do hủy đã được gửi cho người còn lại.');
+      showAppAlert({
+        type: 'success',
+        title: 'Đã hủy lịch hẹn',
+        message: 'Lý do hủy đã được gửi cho người còn lại.',
+        confirmText: 'Đã hiểu',
+      });
       await fetchAppointments();
     } catch (err: any) {
-      Alert.alert('Lỗi', err?.response?.data?.message || 'Không thể hủy lịch hẹn.');
+      showAppAlert({
+        type: 'error',
+        title: 'Lỗi',
+        message: err?.response?.data?.message || 'Không thể hủy lịch hẹn.',
+        confirmText: 'Đóng',
+      });
     } finally {
       setActionLoading(null);
     }
