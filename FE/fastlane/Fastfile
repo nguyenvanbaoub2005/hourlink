@@ -65,27 +65,35 @@ platform :android do
     # 4. Patch build.gradle để đảm bảo release buildType trỏ tới release signing
     build_gradle_path = File.join(keystore_dir, "build.gradle")
     if File.exist?(build_gradle_path)
-      gradle_content = File.read(build_gradle_path)
+      gradle_content = File.read(build_gradle_path).gsub(/\r\n/, "\n")
       unless gradle_content.include?("signingConfigs.release")
-        signing_block = <<~GRADLE
-          signingConfigs {
-              debug {
-                  storeFile file('debug.keystore')
-                  storePassword 'android'
-                  keyAlias 'androiddebugkey'
-                  keyPassword 'android'
-              }
+        release_signing_block = <<~GRADLE
               release {
                   storeFile file('release.keystore')
                   storePassword '#{keystore_password}'
                   keyAlias '#{key_alias}'
                   keyPassword '#{key_password}'
               }
-          }
         GRADLE
 
-        gradle_content = gradle_content.sub(/signingConfigs\s*\{[\s\S]*?\n\s*\}/, signing_block.strip)
-        gradle_content = gradle_content.gsub(/signingConfig\s+signingConfigs\.debug/, "signingConfig signingConfigs.release")
+        # Chèn block release { ... } ngay sau "signingConfigs {"
+        if gradle_content.include?("signingConfigs {")
+          gradle_content = gradle_content.sub("signingConfigs {", "signingConfigs {\n#{release_signing_block.rstrip}")
+        end
+
+        # Chuyển release buildType từ signingConfigs.debug sang signingConfigs.release
+        # Khối release có comment: "// Caution! In production, you need to generate your own keystore file."
+        debug_sign_target = "// Caution! In production, you need to generate your own keystore file.\n            // see https://reactnative.dev/docs/signed-apk-android.\n            signingConfig signingConfigs.debug"
+        if gradle_content.include?(debug_sign_target)
+          gradle_content = gradle_content.sub(debug_sign_target, "signingConfig signingConfigs.release")
+        else
+          # Fallback: thay thế signingConfig debug thứ hai (của block release)
+          parts = gradle_content.split("signingConfig signingConfigs.debug", 3)
+          if parts.length >= 3
+            gradle_content = "#{parts[0]}signingConfig signingConfigs.debug#{parts[1]}signingConfig signingConfigs.release#{parts[2]}"
+          end
+        end
+
         File.write(build_gradle_path, gradle_content)
         UI.success("Đã cấu hình signingConfig release thành công trong build.gradle!")
       end
