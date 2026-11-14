@@ -64,54 +64,32 @@ jobs:
           ruby-version: '3.2'
           working-directory: FE
 
-      - name: 📦 Install Fastlane & Bundler dependencies
+      - name: 📦 Install Fastlane via Bundler
         run: bundle install
 
       - name: 📦 Install Node dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 🔍 TypeScript Static Type Check
         run: npm run typecheck
 
-      - name: 🔐 Configure Android Release Signing Keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          mkdir -p fastlane
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Giải mã Keystore từ GitHub Secrets..."
-            echo "$KEYSTORE_BASE64" | base64 --decode > fastlane/release.keystore
-          else
-            echo "⚠️ Chưa cấu hình ANDROID_KEYSTORE_BASE64 trong Secrets. Tạo Keystore tự động cho CI..."
-            keytool -genkey -v \
-              -keystore fastlane/release.keystore \
-              -alias "${{ secrets.ANDROID_KEY_ALIAS || 'hourlink' }}" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'hourlink123' }}" \
-              -keypass "${{ secrets.ANDROID_KEY_PASSWORD || 'hourlink123' }}" \
-              -dname "CN=HourLink, OU=Mobile, O=HourLink Team, L=Hanoi, ST=Hanoi, C=VN" \
-              -noprompt
-          fi
-          echo "✅ Keystore đã sẵn sàng tại FE/fastlane/release.keystore"
-
-      - name: 🚀 Build & Sign Release APK via Fastlane
+      - name: 🚀 Run Fastlane Build & Sign Release APK
         if: ${{ github.event.inputs.build_type == 'apk' || github.event.inputs.build_type == 'both' || github.event_name == 'push' }}
         env:
-          ANDROID_KEYSTORE_PATH: "release.keystore"
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'hourlink123' }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'hourlink' }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'hourlink123' }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: bundle exec fastlane android build_apk
 
-      - name: 🚀 Build & Sign Release AAB via Fastlane
+      - name: 🚀 Run Fastlane Build & Sign Release AAB
         if: ${{ github.event.inputs.build_type == 'aab' || github.event.inputs.build_type == 'both' }}
         env:
-          ANDROID_KEYSTORE_PATH: "release.keystore"
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'hourlink123' }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'hourlink' }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'hourlink123' }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || 'hourlink123' }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: bundle exec fastlane android build_aab
 
       - name: 📊 Display Build Artifacts Summary
