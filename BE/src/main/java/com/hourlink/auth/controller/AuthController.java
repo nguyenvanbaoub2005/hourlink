@@ -6,6 +6,7 @@ import com.hourlink.auth.dto.request.LoginRequest;
 import com.hourlink.auth.dto.request.LogoutRequest;
 import com.hourlink.auth.dto.request.RefreshRequest;
 import com.hourlink.auth.dto.request.RegisterRequest;
+import com.hourlink.auth.dto.request.SocialLoginRequest;
 import com.hourlink.auth.dto.response.AuthResponse;
 import com.hourlink.auth.dto.response.IntrospectResponse;
 import com.hourlink.auth.service.AuthService;
@@ -35,6 +36,12 @@ public class AuthController {
     @PostMapping("/register")
     public ApiResponse<AuthResponse> register(@RequestBody @Valid RegisterRequest request) {
         var result = authService.register(request);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/social-login")
+    public ApiResponse<AuthResponse> socialLogin(@RequestBody @Valid SocialLoginRequest request) {
+        var result = authService.socialLogin(request);
         return ApiResponse.success(result);
     }
 
