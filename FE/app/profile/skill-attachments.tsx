@@ -11,6 +11,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Colors } from '@constants/Colors';
 import SkillApi from '@api/skill';
+import {
+  analyzeEvidenceImageOnDevice,
+  type OnDeviceEvidenceAnalysis,
+} from '../../src/ai/onDeviceAi';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type Attachment = {
@@ -53,6 +57,7 @@ export default function SkillAttachmentsScreen() {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [fileToRename, setFileToRename] = useState<{uri: string, name: string, type: string} | null>(null);
   const [newFileName, setNewFileName] = useState('');
+  const [onDeviceAnalysis, setOnDeviceAnalysis] = useState<OnDeviceEvidenceAnalysis | null>(null);
 
   const fetchAttachments = useCallback(async () => {
     if (!skillId) return;
@@ -108,8 +113,20 @@ export default function SkillAttachmentsScreen() {
       const asset = result.assets[0];
       const name = asset.fileName ?? `image_${Date.now()}.jpg`;
       const type = asset.mimeType ?? 'image/jpeg';
+      const analysis = await analyzeEvidenceImageOnDevice(
+        {
+          uri: asset.uri,
+          width: asset.width,
+          height: asset.height,
+          fileSize: asset.fileSize,
+          fileName: asset.fileName,
+          mimeType: asset.mimeType,
+        },
+        skillName || 'Kỹ năng',
+      );
+      setOnDeviceAnalysis(analysis);
       setFileToRename({ uri: asset.uri, name, type });
-      setNewFileName(name);
+      setNewFileName(analysis.suggestedTitle);
       setRenameModalVisible(true);
     }
   };
@@ -303,6 +320,28 @@ export default function SkillAttachmentsScreen() {
           <View style={styles.renameBox}>
             <Text style={styles.renameTitle}>Đổi tên file</Text>
             <Text style={styles.renameSub}>Nhập tên hiển thị cho file này trước khi tải lên</Text>
+            {onDeviceAnalysis && (
+              <View
+                style={{
+                  backgroundColor: '#F0FDF4',
+                  borderColor: '#86EFAC',
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 10,
+                  marginBottom: 12,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#15803D' }}>
+                  🤖 On-Device AI ({onDeviceAnalysis.engine} · {onDeviceAnalysis.inferenceTimeMs}ms)
+                </Text>
+                <Text style={{ fontSize: 13, color: '#166534', marginTop: 3 }}>
+                  Nhãn: {onDeviceAnalysis.labelVi} ({Math.round(onDeviceAnalysis.confidence * 100)}%)
+                </Text>
+                <Text style={{ fontSize: 12, color: '#15803D', marginTop: 2 }}>
+                  Chất lượng ảnh: {onDeviceAnalysis.qualityScore}/100
+                </Text>
+              </View>
+            )}
             <TextInput
               style={styles.renameInput}
               value={newFileName}
