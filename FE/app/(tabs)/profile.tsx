@@ -75,6 +75,10 @@ export default function ProfileScreen() {
       router.push({ pathname: '/profile/reputation', params: { tab: 'BADGES' } } as any);
       return;
     }
+    if (label === 'Chứng nhận kỹ năng') {
+      router.push('/profile/certificates' as any);
+      return;
+    }
     if (label === 'Báo cáo của tôi') {
       router.push('/report/my-reports' as any);
       return;
@@ -365,6 +369,7 @@ export default function ProfileScreen() {
             { icon: 'book-outline', color: '#0284C7', bg: '#E0F2FE', label: 'Yêu cầu của tôi' },
             { icon: 'star-outline', color: '#D97706', bg: '#FFEDD5', label: 'Đánh giá & Uy tín' },
             { icon: 'ribbon-outline', color: '#7C3AED', bg: '#EDE9FE', label: 'Huy hiệu của tôi' },
+            { icon: 'school-outline', color: '#0D9488', bg: '#CCFBF1', label: 'Chứng nhận kỹ năng' },
             { icon: 'people-outline', color: '#9333EA', bg: '#F3E8FF', label: 'Lời mời' },
           ].map(item => (
             <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: isDark ? colors.surfaceVariant : '#F8FAFC', borderColor: colors.outline }]} onPress={() => handleMenuPress(item.label)}>

@@ -13,6 +13,7 @@ import RatingApi from '@api/rating';
 import Avatar from '@components/Avatar';
 import CancelAppointmentModal from '@components/CancelAppointmentModal';
 import DateTimePickerModal from '@components/DateTimePickerModal';
+import SoftSkillPracticeCard from '@components/appointment/SoftSkillPracticeCard';
 import { useAuthStore } from '@store/authStore';
 import type { AppointmentItem, RatingResponse } from '@types';
 
@@ -421,6 +422,17 @@ export default function AppointmentDetailScreen() {
             </View>
           </View>
         </View>
+
+        {/* Bài thực hành Kỹ năng mềm, Chấm điểm 3 tiêu chí & Chứng nhận kỹ năng số */}
+        {['CONFIRMED', 'UPCOMING', 'IN_PROGRESS', 'COMPLETED'].includes(statusStr) && (
+          <SoftSkillPracticeCard
+            appointmentId={appointment.id}
+            skillTitle={titleStr}
+            isMentor={currentUser?.id === (appointment.providerId || (appointment as any).provider?.id)}
+            mentorName={appointment.providerName || (appointment as any).provider?.fullName || 'Người hướng dẫn'}
+            learnerName={appointment.receiverName || (appointment as any).receiver?.fullName || 'Người học'}
+          />
+        )}
 
         {/* Additional details */}
         {(!!appointment.cancelReason || !!appointment.rescheduleProposedTime) && (
