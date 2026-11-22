@@ -19,6 +19,10 @@ import CommunityApi from '@api/community';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import type { ActivityResponse, ParticipantResponse } from '@types';
 import { openCommunityChat } from '@utils/chatNav';
+import {
+  analyzeEvidenceImageOnDevice,
+  type OnDeviceEvidenceAnalysis,
+} from '../../../src/ai/onDeviceAi';
 
 const MAX_IMAGES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -33,6 +37,7 @@ export default function ActivityEvidenceScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>();
+  const [aiAnalysis, setAiAnalysis] = useState<OnDeviceEvidenceAnalysis | null>(null);
 
   const hasEnded = Boolean(
     participant && new Date(participant.activityEndTime) <= new Date()
@@ -109,7 +114,25 @@ export default function ActivityEvidenceScreen() {
       Alert.alert('Ảnh quá lớn', 'Mỗi ảnh minh chứng không được vượt quá 5 MB.');
       return;
     }
-    setSelected(result.assets.slice(0, MAX_IMAGES));
+    const picked = result.assets.slice(0, MAX_IMAGES);
+    setSelected(picked);
+    if (picked[0]) {
+      const analysis = await analyzeEvidenceImageOnDevice(
+        {
+          uri: picked[0].uri,
+          width: picked[0].width,
+          height: picked[0].height,
+          fileSize: picked[0].fileSize,
+          fileName: picked[0].fileName,
+          mimeType: picked[0].mimeType,
+        },
+        participant?.activityTitle || 'Hoạt động cộng đồng',
+      );
+      setAiAnalysis(analysis);
+      if (!note.trim()) {
+        setNote(analysis.suggestedNote);
+      }
+    }
   };
 
   const submit = async () => {
@@ -240,6 +263,28 @@ export default function ActivityEvidenceScreen() {
         )}
 
         <Text style={styles.sectionTitle}>Ghi chú</Text>
+        {aiAnalysis && (
+          <View
+            style={{
+              backgroundColor: '#EFF6FF',
+              borderColor: '#BFDBFE',
+              borderWidth: 1,
+              borderRadius: Radius.md,
+              padding: 12,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1D4ED8' }}>
+              🤖 Phân tích ảnh trên thiết bị ({aiAnalysis.engine} · {aiAnalysis.inferenceTimeMs}ms)
+            </Text>
+            <Text style={{ fontSize: 13, color: '#1E3A8A', marginTop: 4 }}>
+              • Phân loại: {aiAnalysis.labelVi} (Độ tin cậy {Math.round(aiAnalysis.confidence * 100)}%)
+            </Text>
+            <Text style={{ fontSize: 13, color: '#1E3A8A', marginTop: 2 }}>
+              • Điểm chất lượng ảnh: {aiAnalysis.qualityScore}/100
+            </Text>
+          </View>
+        )}
         <TextInput
           style={[styles.noteInput, !canSubmit && styles.disabled]}
           value={note}

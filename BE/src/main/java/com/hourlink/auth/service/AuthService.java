@@ -15,12 +15,14 @@ import com.hourlink.auth.dto.request.LoginRequest;
 import com.hourlink.auth.dto.request.LogoutRequest;
 import com.hourlink.auth.dto.request.RefreshRequest;
 import com.hourlink.auth.dto.request.RegisterRequest;
+import com.hourlink.auth.dto.request.SocialLoginRequest;
 import com.hourlink.auth.dto.response.AuthResponse;
 import com.hourlink.auth.dto.response.IntrospectResponse;
 import com.hourlink.auth.entity.InvalidatedToken;
 import com.hourlink.auth.repository.InvalidatedTokenRepository;
 import com.hourlink.common.exception.AppException;
 import com.hourlink.common.exception.ErrorCode;
+import com.hourlink.common.service.FirebaseService;
 import com.hourlink.user.entity.User;
 import com.hourlink.user.entity.UserRole;
 import com.hourlink.user.repository.RoleRepository;
@@ -54,6 +56,10 @@ public class AuthService {
     RoleRepository roleRepository;
     UserRoleRepository userRoleRepository;
     WalletService walletService;
+
+    @NonFinal
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    FirebaseService firebaseService;
 
     @NonFinal
     @Value("${jwt.signerKey}")
@@ -115,6 +121,69 @@ public class AuthService {
 
         // Khởi tạo ví Time Credit với balance = 5.0 (credit khởi đầu)
         walletService.initWallet(user);
+
+        return AuthResponse.builder()
+                .token(generateToken(user, "access", VALID_DURATION))
+                .refreshToken(generateToken(user, "refresh", REFRESHABLE_DURATION))
+                .authenticated(true)
+                .build();
+    }
+
+    /**
+     * Đăng nhập / tự động khởi tạo tài khoản qua Firebase Auth BaaS (Google / Apple).
+     */
+    public AuthResponse socialLogin(SocialLoginRequest request) {
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+        String fullName = request.getFullName() != null ? request.getFullName().trim() : null;
+        String avatarUrl = request.getAvatarUrl();
+
+        if (firebaseService != null && request.getIdToken() != null && !request.getIdToken().isBlank()) {
+            var verified = firebaseService.verifyIdToken(request.getIdToken());
+            if (verified != null) {
+                if (verified.email() != null && !verified.email().isBlank()) {
+                    email = verified.email().trim().toLowerCase();
+                }
+                if (verified.name() != null && !verified.name().isBlank()) {
+                    fullName = verified.name().trim();
+                }
+                if (verified.picture() != null && !verified.picture().isBlank()) {
+                    avatarUrl = verified.picture();
+                }
+            }
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+
+        final String resolvedEmail = email;
+        final String resolvedName = (fullName != null && !fullName.isBlank())
+                ? fullName
+                : resolvedEmail.split("@")[0];
+        final String resolvedAvatar = avatarUrl;
+
+        User user = userRepository.findByEmail(resolvedEmail).orElseGet(() -> {
+            User newUser = User.builder()
+                    .email(resolvedEmail)
+                    .fullName(resolvedName)
+                    .avatarUrl(resolvedAvatar)
+                    .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .build();
+            newUser = userRepository.save(newUser);
+
+            var defaultRole = roleRepository.findByRoleCode("ROLE_USER")
+                    .orElseThrow(() -> new AppException(ErrorCode.UNCATEGORIZED_EXCEPTION));
+            var userRole = UserRole.builder()
+                    .user(newUser)
+                    .role(defaultRole)
+                    .build();
+            userRoleRepository.save(userRole);
+            newUser.setUserRoles(java.util.List.of(userRole));
+            walletService.initWallet(newUser);
+            return newUser;
+        });
+
+        ensureAccountActive(user);
 
         return AuthResponse.builder()
                 .token(generateToken(user, "access", VALID_DURATION))

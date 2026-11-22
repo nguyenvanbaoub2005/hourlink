@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 writeSecurityError(res, HttpServletResponse.SC_FORBIDDEN, "Không có quyền truy cập"))
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll() // SSE: request gốc đã được xác thực
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_URLS).permitAll()
                         .requestMatchers("/admin/**").hasAuthority("ROLE_ADMIN")

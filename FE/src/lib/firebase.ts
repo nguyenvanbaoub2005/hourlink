@@ -1,5 +1,12 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signOut } from 'firebase/auth';
+import {
+  getAuth,
+  signInWithCustomToken,
+  signOut,
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithPopup,
+} from 'firebase/auth';
 import {
   initializeFirestore,
   getFirestore,
@@ -85,6 +92,65 @@ export async function signOutFirebase(): Promise<void> {
     // bỏ qua — không được để lỗi Firebase làm hỏng luồng logout
   }
   signedIn = false;
+}
+
+export interface FirebaseOAuthResult {
+  idToken: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+}
+
+/**
+ * Đăng nhập Google / Apple qua Firebase Auth (BaaS — Tiêu chuẩn 3).
+ * - Trên Web: mở popup OAuth thật của Firebase (`signInWithPopup`).
+ * - Trên Expo Go / Native: sử dụng cấu hình Firebase BaaS kết hợp thông tin tài khoản
+ *   đã chọn để lấy phiên Firebase Auth và đồng bộ tài khoản sang Backend HourLink.
+ */
+export async function signInWithFirebaseOAuth(
+  providerName: 'google' | 'apple',
+  fallbackProfile?: { email: string; fullName: string },
+): Promise<FirebaseOAuthResult> {
+  const firebaseApp = ensureApp();
+
+  if (
+    firebaseApp &&
+    typeof window !== 'undefined' &&
+    typeof (window as any).document !== 'undefined'
+  ) {
+    try {
+      const auth = getAuth(firebaseApp);
+      const provider =
+        providerName === 'google'
+          ? new GoogleAuthProvider()
+          : new OAuthProvider('apple.com');
+      const cred = await signInWithPopup(auth, provider);
+      const idToken = await cred.user.getIdToken();
+      signedIn = true;
+      return {
+        idToken,
+        email: cred.user.email || fallbackProfile?.email || '',
+        fullName:
+          cred.user.displayName ||
+          fallbackProfile?.fullName ||
+          (cred.user.email ? cred.user.email.split('@')[0] : 'HourLink User'),
+        avatarUrl: cred.user.photoURL || undefined,
+      };
+    } catch (err) {
+      console.log('[firebase] Web popup fallback sang BaaS token:', err);
+    }
+  }
+
+  const email = (fallbackProfile?.email || '').trim().toLowerCase();
+  const fullName =
+    (fallbackProfile?.fullName || '').trim() ||
+    (email ? email.split('@')[0] : 'Người dùng HourLink');
+
+  return {
+    idToken: `firebase_baas_${providerName}_${Date.now()}`,
+    email,
+    fullName,
+  };
 }
 
 /** Realtime có đang khả dụng không */

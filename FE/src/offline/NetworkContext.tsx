@@ -37,7 +37,16 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // 1. Khởi tạo Database SQLite Offline
     initOfflineDatabase()
       .then(() => getPendingOfflineActions())
-      .then((pending) => setPendingSyncCount(pending.length))
+      .then(async (pending) => {
+        setPendingSyncCount(pending.length);
+        // Mở lại app (hoặc app bị tắt khi đang offline) mà còn thao tác chờ → gửi ngay nếu có mạng
+        if (pending.length > 0) {
+          const net = await NetInfo.fetch();
+          if (net.isConnected && net.isInternetReachable !== false) {
+            syncManager.syncPendingActions();
+          }
+        }
+      })
       .catch((err) => console.warn('[NetworkProvider] Khởi tạo DB thất bại:', err));
 
     // 2. Lắng nghe trạng thái hàng đợi Sync

@@ -3,6 +3,7 @@ package com.hourlink.common.service;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.SetOptions;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseToken;
 import com.google.firebase.cloud.FirestoreClient;
 import com.hourlink.config.FirebaseConfig;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,31 @@ public class FirebaseService {
     /** Firebase đã sẵn sàng chưa */
     public boolean isEnabled() {
         return firebaseConfig.isEnabled();
+    }
+
+    /** Thông tin người dùng đã xác thực từ Firebase ID Token (BaaS Auth). */
+    public record VerifiedFirebaseUser(String uid, String email, String name, String picture) {}
+
+    /**
+     * Xác thực Firebase ID Token do client gửi lên sau khi đăng nhập Google/Apple qua Firebase Auth.
+     * Trả về null nếu Firebase Admin chưa bật hoặc token không phải JWT của Firebase Admin.
+     */
+    public VerifiedFirebaseUser verifyIdToken(String idToken) {
+        if (!isEnabled() || idToken == null || idToken.isBlank()) {
+            return null;
+        }
+        try {
+            FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(idToken);
+            return new VerifiedFirebaseUser(
+                    decoded.getUid(),
+                    decoded.getEmail(),
+                    decoded.getName(),
+                    decoded.getPicture()
+            );
+        } catch (Exception e) {
+            log.warn("Không verify được Firebase ID Token qua Admin SDK: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

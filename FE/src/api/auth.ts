@@ -1,6 +1,14 @@
 import api from './axiosInstance';
 import type { ApiResponse, AuthResponse, LoginRequest, RegisterRequest } from '@types';
 
+export interface SocialLoginRequest {
+  provider: 'google' | 'apple' | 'firebase';
+  idToken?: string;
+  email: string;
+  fullName?: string;
+  avatarUrl?: string;
+}
+
 /**
  * AuthApi — API calls cho module auth.
  * Base URL: /auth
@@ -8,6 +16,7 @@ import type { ApiResponse, AuthResponse, LoginRequest, RegisterRequest } from '@
 const AuthApi = {
   login: (data: LoginRequest) => api.post<ApiResponse<AuthResponse>>('/auth/login', data),
   register: (data: RegisterRequest) => api.post<ApiResponse<AuthResponse>>('/auth/register', data),
+  socialLogin: (data: SocialLoginRequest) => api.post<ApiResponse<AuthResponse>>('/auth/social-login', data),
   sendOtp: (data: any) => api.post('/auth/send-otp', data),
   verifyOtp: (data: any) => api.post('/auth/verify-otp', data),
   refresh: (data: { token: string }) => api.post('/auth/refresh', data),

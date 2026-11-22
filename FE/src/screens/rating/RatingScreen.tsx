@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Spacing } from '@constants/Colors';
 import RatingApi from '@api/rating';
 import Avatar from '@components/Avatar';
+import { executeOfflineMutation, useNetwork } from '@offline';
 
 // ─── Các tiêu chí đánh giá ────────────────────────────────────
 const CRITERIA = [
@@ -76,6 +77,8 @@ const starStyles = StyleSheet.create({
  */
 export default function RatingScreen() {
   const router = useRouter();
+  const { isOffline } = useNetwork();
+  const [queuedOffline, setQueuedOffline] = useState(false);
   const {
     appointmentId,
     revieweeId,
@@ -148,7 +151,15 @@ export default function RatingScreen() {
         if (criteriaScores[key] > 0) payload[key] = criteriaScores[key];
       });
 
-      await RatingApi.submitRating(payload);
+      const result = await executeOfflineMutation({
+        actionType: 'SUBMIT_RATING',
+        endpoint:   '/ratings',
+        method:     'POST',
+        payload,
+        isOffline,
+        onlineAction: () => RatingApi.submitRating(payload),
+      });
+      setQueuedOffline(result.isQueuedOffline);
       setSubmitted(true);
     } catch (err: any) {
       const msg =
@@ -167,14 +178,22 @@ export default function RatingScreen() {
           <View style={styles.successIcon}>
             <Ionicons name="checkmark-circle" size={80} color={Colors.success} />
           </View>
-          <Text style={styles.successTitle}>Đánh giá thành công!</Text>
+          <Text style={styles.successTitle}>
+            {queuedOffline ? 'Đã lưu đánh giá ngoại tuyến' : 'Đánh giá thành công!'}
+          </Text>
           <Text style={styles.successSubtitle}>
-            Cảm ơn bạn đã đánh giá buổi hỗ trợ.{'\n'}
-            Điểm uy tín của{' '}
-            <Text style={{ color: Colors.primary, fontWeight: '700' }}>
-              {revieweeName}
-            </Text>{' '}
-            đã được cập nhật.
+            {queuedOffline ? (
+              'Đánh giá sẽ tự động được gửi khi thiết bị có kết nối mạng.'
+            ) : (
+              <>
+                Cảm ơn bạn đã đánh giá buổi hỗ trợ.{'\n'}
+                Điểm uy tín của{' '}
+                <Text style={{ color: Colors.primary, fontWeight: '700' }}>
+                  {revieweeName}
+                </Text>{' '}
+                đã được cập nhật.
+              </>
+            )}
           </Text>
           <TouchableOpacity
             style={styles.doneBtn}

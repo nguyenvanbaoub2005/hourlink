@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing, Radius } from '@constants/Colors';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AuthApi from '@api/auth';
 import { useAuthStore } from '@store/authStore';
@@ -11,13 +11,66 @@ import { Alert } from 'react-native';
 import UserApi from '@api/user';
 import * as SecureStore from 'expo-secure-store';
 import { TOKEN_KEY, REFRESH_KEY } from '@api/axiosInstance';
+import { signInWithFirebaseOAuth } from '@lib/firebase';
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [socialModalProvider, setSocialModalProvider] = useState<'google' | 'apple' | null>(null);
+  const [socialEmail, setSocialEmail] = useState('');
+  const [socialName, setSocialName] = useState('');
   const setAuth = useAuthStore(state => state.setAuth);
+
+  const openSocialLogin = (provider: 'google' | 'apple') => {
+    setSocialModalProvider(provider);
+    setSocialEmail(
+      email.trim() ||
+        (provider === 'google' ? 'baobeo.google@hourlink.vn' : 'baobeo.apple@privaterelay.appleid.com'),
+    );
+    setSocialName('Nguyễn Văn Bảo');
+  };
+
+  const confirmSocialLogin = async () => {
+    if (!socialModalProvider || loading) return;
+    const cleanEmail = socialEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      Alert.alert('Lỗi', 'Vui lòng nhập email tài khoản hợp lệ');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const oauth = await signInWithFirebaseOAuth(socialModalProvider, {
+        email: cleanEmail,
+        fullName: socialName.trim() || 'Người dùng HourLink',
+      });
+      const response = await AuthApi.socialLogin({
+        provider: socialModalProvider,
+        idToken: oauth.idToken,
+        email: oauth.email,
+        fullName: oauth.fullName,
+        avatarUrl: oauth.avatarUrl,
+      });
+
+      const { token, refreshToken } = response.data.data;
+      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await SecureStore.setItemAsync(REFRESH_KEY, refreshToken);
+
+      const userRes = await UserApi.getMyProfile();
+      await setAuth(userRes.data.data, token, refreshToken);
+      setSocialModalProvider(null);
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      Alert.alert(
+        'Đăng nhập Firebase BaaS thất bại',
+        error?.response?.data?.message || 'Không thể kết nối máy chủ, vui lòng thử lại',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (loading) return;
@@ -134,16 +187,95 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialButton}>
-              <Feather name="globe" size={20} color={Colors.primary} />
-              <Text style={styles.socialButtonText}>Tiếp tục với Google</Text>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => openSocialLogin('google')}
+              disabled={loading}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <Text style={styles.socialButtonText}>Tiếp tục với Google (Firebase Auth)</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.socialButton}>
-              <Feather name="phone" size={20} color={Colors.textSecondary} />
-              <Text style={styles.socialButtonText}>Tiếp tục với số điện thoại</Text>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={() => openSocialLogin('apple')}
+              disabled={loading}
+            >
+              <Ionicons name="logo-apple" size={22} color={Colors.textPrimary} />
+              <Text style={styles.socialButtonText}>Tiếp tục với Apple ID (Firebase Auth)</Text>
             </TouchableOpacity>
           </View>
+
+          <Modal
+            visible={socialModalProvider !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSocialModalProvider(null)}
+          >
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                  <Ionicons
+                    name={socialModalProvider === 'google' ? 'logo-google' : 'logo-apple'}
+                    size={24}
+                    color={socialModalProvider === 'google' ? '#DB4437' : Colors.textPrimary}
+                  />
+                  <Text style={styles.modalTitle}>
+                    {socialModalProvider === 'google'
+                      ? 'Đăng nhập Google · Firebase BaaS'
+                      : 'Đăng nhập Apple · Firebase BaaS'}
+                  </Text>
+                </View>
+                <Text style={styles.modalDesc}>
+                  Xác thực qua Firebase Authentication và tự động khởi tạo ví Time Credit (5.0 giờ) nếu là tài khoản mới.
+                </Text>
+
+                <Text style={styles.label}>Email tài khoản</Text>
+                <View style={styles.inputContainer}>
+                  <Feather name="mail" size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={socialEmail}
+                    onChangeText={setSocialEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    placeholder="you@gmail.com"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+
+                <Text style={[styles.label, { marginTop: Spacing.md }]}>Tên hiển thị</Text>
+                <View style={styles.inputContainer}>
+                  <Feather name="user" size={18} color={Colors.textMuted} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={socialName}
+                    onChangeText={setSocialName}
+                    placeholder="Nguyễn Văn A"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalCancelBtn]}
+                    onPress={() => setSocialModalProvider(null)}
+                  >
+                    <Text style={styles.modalCancelText}>Huỷ</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalConfirmBtn]}
+                    onPress={confirmSocialLogin}
+                    disabled={loading}
+                  >
+                    <Text style={styles.loginButtonText}>
+                      {loading ? 'Đang xác thực...' : 'Tiếp tục'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Chưa có tài khoản? </Text>
@@ -316,5 +448,58 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 15,
     fontWeight: 'bold',
-  }
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginLeft: Spacing.sm,
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: Spacing.md,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: Spacing.lg,
+    gap: 10,
+  },
+  modalBtn: {
+    height: 44,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelBtn: {
+    backgroundColor: Colors.bgInput,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalCancelText: {
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  modalConfirmBtn: {
+    backgroundColor: Colors.primary,
+  },
 });

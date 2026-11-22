@@ -9,6 +9,7 @@ import {
   enqueueOfflineAction,
 } from './database';
 import { useNetwork } from './NetworkContext';
+import { isNetworkError } from './queuePolicy';
 
 /**
  * Hook nạp danh sách Yêu cầu trợ giúp với cơ chế Offline-First:
@@ -118,6 +119,14 @@ export function useOfflineAppointments(fetcher: () => Promise<any[]>) {
  * Helper thực hiện mutation có hỗ trợ hàng đợi ngoại tuyến:
  * Nếu mất mạng, tự động đẩy vào SQLite queue để gửi sau
  */
+export interface OfflineMutationResult {
+  success: boolean;
+  isQueuedOffline: boolean;
+  queueId?: string;
+  message?: string;
+  data?: any;
+}
+
 export async function executeOfflineMutation({
   actionType,
   endpoint,
@@ -132,8 +141,8 @@ export async function executeOfflineMutation({
   payload: any;
   isOffline: boolean;
   onlineAction: () => Promise<any>;
-}) {
-  if (isOffline) {
+}): Promise<OfflineMutationResult> {
+  const queue = async (): Promise<OfflineMutationResult> => {
     const queueId = await enqueueOfflineAction(actionType, endpoint, method, payload);
     return {
       success: true,
@@ -141,12 +150,17 @@ export async function executeOfflineMutation({
       queueId,
       message: 'Đã lưu thao tác ngoại tuyến. Thao tác sẽ được tự động đồng bộ khi có kết nối mạng!',
     };
-  }
-
-  const result = await onlineAction();
-  return {
-    success: true,
-    isQueuedOffline: false,
-    data: result,
   };
+
+  if (isOffline) return queue();
+
+  try {
+    const result = await onlineAction();
+    return { success: true, isQueuedOffline: false, data: result };
+  } catch (error) {
+    // NetInfo báo "có mạng" nhưng request vẫn không tới được server (Wi-Fi yếu, server tắt...)
+    // → vẫn lưu hàng đợi thay vì mất dữ liệu người dùng vừa nhập. Lỗi 4xx/5xx thì ném lại như cũ.
+    if (isNetworkError(error)) return queue();
+    throw error;
+  }
 }
