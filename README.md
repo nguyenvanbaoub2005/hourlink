@@ -114,6 +114,14 @@
 - Dashboard riêng cho tổ chức (trường học, trung tâm...)
 - Quản lý thành viên, theo dõi hoạt động
 
+### 🎓 Thực hành Kỹ năng Mềm & Chứng nhận Số
+- **Giao bài thực hành** kỹ năng mềm (Giao tiếp, Thuyết trình, Giải quyết xung đột...) sau mỗi buổi hỗ trợ
+- **Gợi ý đề bài AI** tự động dựa trên kỹ năng và lịch hẹn
+- **Người dạy chấm điểm** theo 3 tiêu chí: Giao tiếp, Vận dụng tình huống, Tư duy phản biện (thang 1–10)
+- **Chứng nhận số tự động** (`HL-CERT-YYYY-XXXXXX`) khi điểm trung bình ≥ 5.0, với 3 mức: ĐẠT / GIỎI / XUẤT SẮC
+- **Xác minh chứng chỉ** công khai bằng mã code, không cần đăng nhập
+- Màn hình "Chứng nhận của tôi" trong hồ sơ cá nhân
+
 ---
 
 ## 🛠️ Công nghệ sử dụng
