@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  fe-typecheck:
-    name: Frontend TypeScript Check
+  fe-typecheck-and-test:
+    name: Frontend TypeScript & Jest Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,3 +34,27 @@ jobs:
 
       - name: 🔍 TypeScript Compile Check
         run: npm run typecheck
+
+      - name: 🧪 Run Jest Unit Tests
+        run: npm test -- --ci
+
+  be-test:
+    name: Backend JUnit & Integration Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: BE
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: 🧪 Run Backend Unit Tests
+        run: chmod +x ./mvnw && ./mvnw test
