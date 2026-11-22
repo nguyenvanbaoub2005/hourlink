@@ -74,6 +74,17 @@ export default function HelpScreen() {
         })}
       </View>
 
+      <SettingsGroup title="Hỏi đáp thông minh">
+        <SettingsRow
+          icon="sparkles-outline"
+          iconColor="#7C3AED"
+          iconBackground="#F5F3FF"
+          title="Trợ lý AI HourLink"
+          subtitle="Chatbot Gemini trả lời theo thời gian thực"
+          onPress={() => router.push('/profile/ai-assistant' as any)}
+        />
+      </SettingsGroup>
+
       <SettingsGroup title="Liên kết hữu ích">
         <SettingsRow
           icon="alert-circle-outline"

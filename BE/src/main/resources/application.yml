@@ -77,3 +77,8 @@ logging:
     com.hourlink: DEBUG
     org.springframework.security: INFO
     org.hibernate.SQL: DEBUG
+
+# Gemini — Trợ lý AI streaming (/ai-chat/stream). Để trống key: dùng bộ FAQ nội bộ.
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.0-flash}
