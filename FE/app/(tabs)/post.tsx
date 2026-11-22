@@ -12,6 +12,7 @@ import SkillApi from '@api/skill';
 import HelpRequestApi from '@api/helprequest';
 import AiMatchingApi from '@api/aimatching';
 import RegionPickerModal from '@components/RegionPickerModal';
+import { executeOfflineMutation, useNetwork } from '@offline';
 
 // ─── Types ─────────────────────────────────────────────────
 type Category = { id: string; name: string };
@@ -41,6 +42,7 @@ const FORMAT_MAP = {
 export default function PostScreen() {
   const { colors, isDark } = useTheme();
   const router = useRouter();
+  const { isOffline } = useNetwork();
   const params = useLocalSearchParams<{ editId?: string; editType?: 'needHelp' | 'shareSkill'; initialData?: string }>();
   const { editId, editType, initialData } = params;
 
@@ -230,7 +232,7 @@ export default function PostScreen() {
         });
         Alert.alert('Thành công', 'Kỹ năng của bạn đã được đăng!');
       } else {
-        await HelpRequestApi.createRequest({
+        const payload = {
           title,
           description,
           currentLevel,
@@ -239,8 +241,21 @@ export default function PostScreen() {
           duration:    selectedDur.minutes,
           region,
           categoryId:  category.id,
+        };
+        // Offline-first: mất mạng thì lưu SQLite, tự gửi khi có mạng lại
+        const result = await executeOfflineMutation({
+          actionType: 'CREATE_HELP_REQUEST',
+          endpoint:   '/help-request',
+          method:     'POST',
+          payload,
+          isOffline,
+          onlineAction: () => HelpRequestApi.createRequest(payload),
         });
-        Alert.alert('Thành công', 'Yêu cầu của bạn đã được đăng. AI sẽ tìm người phù hợp!');
+        if (result.isQueuedOffline) {
+          Alert.alert('Đã lưu ngoại tuyến', result.message);
+        } else {
+          Alert.alert('Thành công', 'Yêu cầu của bạn đã được đăng. AI sẽ tìm người phù hợp!');
+        }
       }
 
       // Reset

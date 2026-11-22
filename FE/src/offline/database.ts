@@ -261,6 +261,15 @@ export async function updateOfflineActionStatus(
   );
 }
 
+/**
+ * Thao tác kẹt ở trạng thái SYNCING (app bị tắt giữa lúc đồng bộ) sẽ không bao giờ được gửi lại
+ * nếu không đưa về PENDING. Chỉ gọi khi KHÔNG có vòng đồng bộ nào đang chạy.
+ */
+export async function resetStaleSyncingActions(): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync("UPDATE offline_sync_queue SET status = 'PENDING' WHERE status = 'SYNCING'");
+}
+
 export async function clearAllLocalCache(): Promise<void> {
   const db = getDatabase();
   await db.execAsync(`

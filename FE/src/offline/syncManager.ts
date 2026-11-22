@@ -2,9 +2,11 @@ import api from '@api/axiosInstance';
 import {
   getPendingOfflineActions,
   removeOfflineAction,
+  resetStaleSyncingActions,
   updateOfflineActionStatus,
   type OfflineAction,
 } from './database';
+import { resolveSyncOutcome } from './queuePolicy';
 
 type SyncListener = (isSyncing: boolean, pendingCount: number) => void;
 
@@ -32,6 +34,7 @@ class SyncManager {
     let failed = 0;
 
     try {
+      await resetStaleSyncingActions();
       const pending = await getPendingOfflineActions();
       this.notify(pending.length);
 
@@ -59,10 +62,14 @@ class SyncManager {
           successful++;
         } catch (error: any) {
           failed++;
-          const nextRetry = (action.retryCount || 0) + 1;
-          const nextStatus = nextRetry >= 5 ? 'FAILED' : 'PENDING';
-          await updateOfflineActionStatus(action.id, nextStatus, nextRetry);
-          console.warn(`[SyncManager] Thao tác offline ${action.id} thất bại (lần ${nextRetry}):`, error?.message);
+          const outcome = resolveSyncOutcome(action.retryCount || 0, error);
+          await updateOfflineActionStatus(action.id, outcome.status, outcome.retryCount);
+          console.warn(
+            `[SyncManager] Thao tác offline ${action.id} → ${outcome.status} (lần ${outcome.retryCount}):`,
+            error?.message,
+          );
+          // Đang mất mạng thật: dừng, giữ nguyên thứ tự các thao tác còn lại cho lần sau
+          if (outcome.stopSync) break;
         }
       }
     } finally {
